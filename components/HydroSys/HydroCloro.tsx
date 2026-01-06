@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, HydroCloroEntry } from '../../types';
 import { hydroService } from '../../services/hydroService';
@@ -41,10 +41,13 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleSave = () => {
-    if (selectedDateStr && user.sedeId) {
+    // Changed to handle sedeIds array, defaulting to the first one for saving
+    const primarySedeId = (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : null;
+
+    if (selectedDateStr && primarySedeId) {
         hydroService.saveCloro({
             id: Date.now().toString(),
-            sedeId: user.sedeId,
+            sedeId: primarySedeId,
             date: selectedDateStr,
             cl: Number(form.cl),
             ph: Number(form.ph),
@@ -259,11 +262,25 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                     </div>
 
                     <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Responsável Técnico</label>
+                        <div className="relative">
+                            <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                            <input 
+                                type="text"
+                                className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-slate-300 outline-none text-sm transition-colors font-medium text-slate-700 dark:text-slate-200"
+                                value={form.responsavel}
+                                onChange={e => setForm({...form, responsavel: e.target.value})}
+                                placeholder="Nome do Responsável"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
                         <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Medida Corretiva (Opcional)</label>
                         <textarea 
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-300 outline-none text-sm transition-colors"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-slate-300 outline-none text-sm transition-colors"
                             placeholder="Descreva se aplicou produto..."
-                            rows={3}
+                            rows={2}
                             value={form.medidaCorretiva}
                             onChange={e => setForm({...form, medidaCorretiva: e.target.value})}
                         />

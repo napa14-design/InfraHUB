@@ -82,7 +82,7 @@ export const authService = {
       avatarUrl: '', // Default no avatar
       organizationId: userData.organizationId,
       regionId: userData.regionId,
-      sedeId: userData.sedeId,
+      sedeIds: userData.sedeIds || [],
     };
 
     users.push(newUser);

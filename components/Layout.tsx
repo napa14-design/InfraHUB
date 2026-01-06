@@ -47,7 +47,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const userSede = user.sedeId ? orgService.getSedeById(user.sedeId) : null;
+  const userSedeCount = user.sedeIds ? user.sedeIds.length : 0;
+  const primarySede = userSedeCount > 0 ? orgService.getSedeById(user.sedeIds[0]) : null;
   const userRegion = user.regionId ? orgService.getRegionById(user.regionId) : null;
 
   // Check if we are inside HydroSys module
@@ -246,11 +247,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 <p className="text-xs text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider">{user.role}</p>
               </div>
             </div>
-            {(userSede || userRegion) && (
+            {(userRegion || primarySede) && (
               <div className="flex items-start text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700/50">
                 <MapPin size={12} className="mr-1 mt-0.5 flex-shrink-0" />
                 <span className="leading-tight">
-                  {userSede?.name} <br/>
+                  {userSedeCount > 1 ? `${userSedeCount} Sedes Vinculadas` : primarySede?.name} <br/>
                   <span className="opacity-70">{userRegion?.name}</span>
                 </span>
               </div>

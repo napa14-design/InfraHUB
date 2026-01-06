@@ -1,50 +1,75 @@
 import { UserRole, AppModule, ModuleStatus, User, ModuleType, Organization, Region, Sede, Local } from './types';
 
-// --- ESTRUTURA ORGANIZACIONAL MOCKADA ---
+// --- ESTRUTURA ORGANIZACIONAL ---
 
-// Nível 1: Instituição (Organization)
+// Nível 1: Instituição
 export const MOCK_ORGS: Organization[] = [
-  { id: 'org-col', name: 'Colégio Farias Brito', logoUrl: '' },
-  { id: 'org-uni', name: 'Centro Universitário FB', logoUrl: '' }
+  { id: 'org-colegio', name: 'Colégio', logoUrl: '' },
+  { id: 'org-uni', name: 'Universidade', logoUrl: '' }
 ];
 
-// Nível 2: Região
+// Nível 2: Regiões
 export const MOCK_REGIONS: Region[] = [
-  // Colégio
-  { id: 'reg-dt', organizationId: 'org-col', name: 'Dionísio Torres' },
-  { id: 'reg-ald', organizationId: 'org-col', name: 'Aldeota' },
-  { id: 'reg-pql', organizationId: 'org-col', name: 'Parquelândia' },
-  { id: 'reg-sul', organizationId: 'org-col', name: 'Sul' },
-  { id: 'reg-ben', organizationId: 'org-col', name: 'Benfica' },
-  // Universidade
-  { id: 'reg-uni-all', organizationId: 'org-uni', name: 'Campus Geral' } 
+  // --- COLÉGIO ---
+  { id: 'reg-dt', organizationId: 'org-colegio', name: 'Região Dionísio Torres' },
+  { id: 'reg-ald-col', organizationId: 'org-colegio', name: 'Região Aldeota' }, // BS, SP, PNV
+  { id: 'reg-pql-col', organizationId: 'org-colegio', name: 'Região Parquelândia' },
+  { id: 'reg-sul', organizationId: 'org-colegio', name: 'Região Sul' },
+  { id: 'reg-benfica', organizationId: 'org-colegio', name: 'Região Benfica' },
+  
+  // --- UNIVERSIDADE ---
+  { id: 'reg-campus', organizationId: 'org-uni', name: 'Campus Universitários' }
 ];
 
-// Nível 3: Sede
+// Nível 3: Sedes
 export const MOCK_SEDES: Sede[] = [
-  // Colégio - Dionísio Torres
-  { id: 'sede-dt1', regionId: 'reg-dt', name: 'DT1 (Central)', address: 'Rua Principal' },
-  { id: 'sede-dt2', regionId: 'reg-dt', name: 'DT2', address: '' },
-  { id: 'sede-pdt', regionId: 'reg-dt', name: 'PDT (Pre-Vest)', address: '' },
-  { id: 'sede-idi', regionId: 'reg-dt', name: 'Idiomas', address: '' },
-  // Colégio - Aldeota
-  { id: 'sede-bs', regionId: 'reg-ald', name: 'BS', address: '' },
-  { id: 'sede-sp', regionId: 'reg-ald', name: 'SP', address: '' },
-  { id: 'sede-pnv', regionId: 'reg-ald', name: 'PNV', address: '' },
-  // Colégio - Sul
-  { id: 'sede-sul1', regionId: 'reg-sul', name: 'SUL 1', address: '' },
-  { id: 'sede-sul2', regionId: 'reg-sul', name: 'SUL 2', address: '' },
-  // Universidade
-  { id: 'sede-dl', regionId: 'reg-uni-all', name: 'Dom Luís (DL)', address: '' },
-  { id: 'sede-pe', regionId: 'reg-uni-all', name: 'Parque Ecológico (PE)', address: '' },
-  { id: 'sede-eus', regionId: 'reg-uni-all', name: 'Eusébio (EUS)', address: '' }
+  // ================= COLÉGIO =================
+
+  // Região Dionísio Torres
+  { id: 'DT', regionId: 'reg-dt', name: 'DT (Sede Principal)' },
+  { id: 'DT1', regionId: 'reg-dt', name: 'DT 1' },
+  { id: 'DT2', regionId: 'reg-dt', name: 'DT 2' },
+  { id: 'PDT', regionId: 'reg-dt', name: 'PDT' },
+  { id: 'IDIOMAS', regionId: 'reg-dt', name: 'IDIOMAS' },
+
+  // Região Aldeota (Apenas os listados para Colégio)
+  { id: 'BS', regionId: 'reg-ald-col', name: 'BS' },
+  { id: 'SP', regionId: 'reg-ald-col', name: 'SP' },
+  { id: 'PNV', regionId: 'reg-ald-col', name: 'PNV' },
+
+  // Região Parquelândia (Colégio)
+  { id: 'PQL1', regionId: 'reg-pql-col', name: 'PQL 1' },
+  { id: 'PQL2', regionId: 'reg-pql-col', name: 'PQL 2' },
+  { id: 'PJF', regionId: 'reg-pql-col', name: 'PJF' },
+
+  // Região Sul
+  { id: 'SUL1', regionId: 'reg-sul', name: 'SUL 1' },
+  { id: 'SUL2', regionId: 'reg-sul', name: 'SUL 2' },
+  { id: 'SUL3', regionId: 'reg-sul', name: 'SUL 3' },
+  { id: 'PSUL', regionId: 'reg-sul', name: 'PSUL' },
+
+  // Região Benfica (Colégio)
+  { id: 'BN', regionId: 'reg-benfica', name: 'BN (Colégio)' },
+
+  // ================= UNIVERSIDADE =================
+  
+  // Campus ALD (Unificado)
+  { id: 'ALD', regionId: 'reg-campus', name: 'ALD (Campus Aldeota)' }, 
+
+  // Campus PQL (Unificado)
+  { id: 'PQL3', regionId: 'reg-campus', name: 'PQL 3 (Campus Parquelândia)' },
+
+  // Outros Campus
+  { id: 'BN-UNI', regionId: 'reg-campus', name: 'BN (Universidade)' },
+  { id: 'DL', regionId: 'reg-campus', name: 'DL (Dom Luís)' },
+  { id: 'EUS', regionId: 'reg-campus', name: 'EUS (Eusébio)' },
+  { id: 'PE', regionId: 'reg-campus', name: 'PE (Parque Ecológico)' },
 ];
 
-// Nível 4: Local (Exemplos)
+// Nível 4: Local (Exemplos Genéricos)
 export const MOCK_LOCAIS: Local[] = [
-  { id: 'loc-1', sedeId: 'sede-dt1', name: 'Bebedouro Hall Entrada', tipo: 'BEBEDOURO' },
-  { id: 'loc-2', sedeId: 'sede-dt1', name: 'Piscina Olímpica', tipo: 'PISCINA' },
-  { id: 'loc-3', sedeId: 'sede-sul1', name: 'Cozinha Industrial', tipo: 'TORNEIRA' }
+  { id: 'loc-1', sedeId: 'DT', name: 'Bebedouro Hall', tipo: 'BEBEDOURO' },
+  { id: 'loc-2', sedeId: 'PQL3', name: 'Piscina Hidro', tipo: 'PISCINA' },
 ];
 
 // Mock Users
@@ -54,36 +79,48 @@ export const MOCK_USERS: User[] = [
     name: 'Roberto Admin',
     email: 'admin@nexus.com',
     role: UserRole.ADMIN,
-    organizationId: 'org-col',
+    organizationId: 'org-colegio',
     regionId: 'reg-dt',
-    sedeId: 'sede-dt1',
+    sedeIds: ['DT'],
     status: 'ACTIVE',
     password: '123',
     isFirstLogin: false
   },
   {
     id: '2',
-    name: 'Glória Gestora',
-    email: 'gestor@nexus.com',
+    name: 'Glória Gestora (Colégio)',
+    email: 'gestor@colegio.com',
     role: UserRole.GESTOR,
-    organizationId: 'org-col',
-    regionId: 'reg-dt',
-    sedeId: 'sede-dt1',
+    organizationId: 'org-colegio',
+    regionId: 'reg-ald-col',
+    sedeIds: ['BS', 'SP', 'PNV'], // Gestor com múltiplas sedes
     status: 'ACTIVE',
     password: '123',
     isFirstLogin: false
   },
   {
     id: '3',
-    name: 'João Operacional',
-    email: 'operacional@nexus.com',
+    name: 'João Operacional (PQL3 Uni)',
+    email: 'op@uni.com',
     role: UserRole.OPERATIONAL,
-    organizationId: 'org-col',
-    regionId: 'reg-dt',
-    sedeId: 'sede-dt1',
+    organizationId: 'org-uni',
+    regionId: 'reg-campus',
+    sedeIds: ['PQL3'], 
     status: 'ACTIVE',
     password: '123',
-    isFirstLogin: true // Force password change
+    isFirstLogin: false 
+  },
+  {
+    id: '4',
+    name: 'Carlos Gestor (ALD Uni)',
+    email: 'ald@uni.com', 
+    role: UserRole.GESTOR,
+    organizationId: 'org-uni',
+    regionId: 'reg-campus',
+    sedeIds: ['ALD'], // Vê tudo que é mapeado para ALD
+    status: 'ACTIVE',
+    password: '123',
+    isFirstLogin: false 
   }
 ];
 

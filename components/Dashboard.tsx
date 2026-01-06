@@ -46,7 +46,9 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const navigate = useNavigate();
   const [modules, setModules] = useState<AppModule[]>([]);
-  const userSede = user.sedeId ? orgService.getSedeById(user.sedeId) : null;
+  
+  const userSedeCount = user.sedeIds ? user.sedeIds.length : 0;
+  const primarySede = userSedeCount > 0 ? orgService.getSedeById(user.sedeIds[0]) : null;
 
   useEffect(() => {
     setModules(moduleService.getAll());
@@ -96,11 +98,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <p className="text-xs text-slate-500 dark:text-slate-300 uppercase tracking-wider font-bold mb-1">Sua Unidade</p>
             <div className="flex items-center gap-2">
               <Building2 size={18} className="text-brand-600 dark:text-brand-300" />
-              <span className="font-semibold text-lg">{userSede ? userSede.name : 'Matriz Global'}</span>
+              <span className="font-semibold text-lg">
+                  {userSedeCount > 1 ? `${userSedeCount} Unidades Ativas` : (primarySede?.name || 'Matriz Global')}
+              </span>
             </div>
             <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <Map size={12} />
-              {userSede?.address || 'Localização não definida'}
+              {userSedeCount > 1 ? 'Múltiplos Endereços' : (primarySede?.address || 'Localização não definida')}
             </div>
           </div>
         </div>

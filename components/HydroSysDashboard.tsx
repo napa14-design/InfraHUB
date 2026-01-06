@@ -26,7 +26,8 @@ const RouteMap: Record<string, string> = {
 
 export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
-  const userSede = user.sedeId ? orgService.getSedeById(user.sedeId) : null;
+  // Changed logic to handle sedeIds array instead of single sedeId property
+  const userSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
 
   // Filter modules based on user role
   const allowedSubModules = HYDROSYS_SUBMODULES.filter(mod => {

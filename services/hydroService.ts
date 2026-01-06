@@ -10,38 +10,152 @@ const KEYS = {
   CAIXA: 'hs_caixas'
 };
 
-// --- MOCK DATA GENERATORS ---
+// --- HELPER: CSV DATE PARSER ---
+// Converts DD/MM/YYYY to YYYY-MM-DD
+const parseDate = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('/');
+    if (parts.length !== 3) return '';
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+};
+
+// --- REAL CERTIFICADOS DATA (FROM CSV) ---
 const mockCertificados: HydroCertificado[] = [
+  // 1. ALD - VL (MAPPED TO ALD)
   {
-    id: '1', sedeId: 'sede-dt1', parceiro: 'Lab Waters', status: 'VIGENTE', semestre: '1º/2024',
-    validadeSemestre: '2024-06-30', dataAnalise: '2024-01-15', validade: '2024-07-15',
-    linkMicro: 'https://example.com/micro1.pdf', linkFisico: 'https://example.com/fisico1.pdf', empresa: 'Nexus SP', agendamento: 'Mensal', observacao: 'Tudo ok'
+    id: 'cert-ald-vl', sedeId: 'ALD', parceiro: 'ALD - VL', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('22/08/2025'), validade: parseDate('18/02/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
   },
+  // 2. ALD - TP (MAPPED TO ALD)
   {
-    id: '2', sedeId: 'sede-dt1', parceiro: 'Bio Analise', status: 'VENCIDO', semestre: '2º/2023',
-    validadeSemestre: '2023-12-31', dataAnalise: '2023-07-01', validade: '2024-01-01',
-    linkMicro: 'https://example.com/micro2.pdf', linkFisico: '', empresa: 'Nexus RJ', agendamento: 'Bimestral', observacao: 'Renovar urgente'
+    id: 'cert-ald-tp', sedeId: 'ALD', parceiro: 'ALD - TP', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('17/09/2025'), validade: parseDate('16/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
   },
+  // 3. ALD - VM (MAPPED TO ALD)
   {
-    id: '3', sedeId: 'sede-sul1', parceiro: 'Lab Waters', status: 'VIGENTE', semestre: '1º/2024',
-    validadeSemestre: '2024-06-30', dataAnalise: '2024-02-10', validade: '2024-08-10',
-    linkMicro: '', linkFisico: 'https://example.com/fisico3.pdf', empresa: 'Nexus SP', agendamento: 'Mensal', observacao: 'Pendente Micro'
-  }
+    id: 'cert-ald-vm', sedeId: 'ALD', parceiro: 'ALD - VM', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('17/09/2025'), validade: parseDate('16/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 4. BN
+  {
+    id: 'cert-bn', sedeId: 'BN', parceiro: 'BN', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('17/09/2025'), validade: parseDate('16/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 5. BS
+  {
+    id: 'cert-bs', sedeId: 'BS', parceiro: 'BS', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('05/09/2025'), validade: parseDate('04/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 6. DL
+  {
+    id: 'cert-dl', sedeId: 'DL', parceiro: 'DL', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('26/09/2025'), validade: parseDate('25/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 7. DT
+  {
+    id: 'cert-dt', sedeId: 'DT', parceiro: 'DT', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('05/09/2025'), validade: parseDate('04/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 8. EUS
+  {
+    id: 'cert-eus', sedeId: 'EUS', parceiro: 'EUS', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('29/08/2025'), validade: parseDate('25/02/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 9. PE
+  {
+    id: 'cert-pe', sedeId: 'PE', parceiro: 'PE', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('26/09/2025'), validade: parseDate('25/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 10. PJF (Não Certificado)
+  {
+    id: 'cert-pjf', sedeId: 'PJF', parceiro: 'PJF', status: 'VENCIDO', semestre: '2º/2025',
+    validadeSemestre: parseDate('19/11/2025'), dataAnalise: '', validade: '', 
+    linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: 'AGENDAR', observacao: 'Não Certificado'
+  },
+  // 11. PNV
+  {
+    id: 'cert-pnv', sedeId: 'PNV', parceiro: 'PNV', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('05/09/2025'), validade: parseDate('04/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 12. PQL1
+  {
+    id: 'cert-pql1', sedeId: 'PQL1', parceiro: 'PQL1', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('10/09/2025'), validade: parseDate('09/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 13. PQL2
+  {
+    id: 'cert-pql2', sedeId: 'PQL2', parceiro: 'PQL2', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('10/09/2025'), validade: parseDate('09/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 14. PQL3
+  {
+    id: 'cert-pql3', sedeId: 'PQL3', parceiro: 'PQL3', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('10/09/2025'), validade: parseDate('09/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 15. FISIOTERAPIA - PQL3 (MAPPED TO PQL3)
+  {
+    id: 'cert-fisio-pql3', sedeId: 'PQL3', parceiro: 'FISIOTERAPIA - PQL3', status: 'VENCIDO', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: '', validade: '', 
+    linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: 'REAGENDAR', observacao: 'Não Certificado'
+  },
+  // 16. PSUL
+  {
+    id: 'cert-psul', sedeId: 'PSUL', parceiro: 'PSUL', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('29/09/2025'), validade: parseDate('28/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 17. SP
+  {
+    id: 'cert-sp', sedeId: 'SP', parceiro: 'SP', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('05/09/2025'), validade: parseDate('04/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 18. SUL1
+  {
+    id: 'cert-sul1', sedeId: 'SUL1', parceiro: 'SUL1', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('10/09/2025'), validade: parseDate('09/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 19. SUL2
+  {
+    id: 'cert-sul2', sedeId: 'SUL2', parceiro: 'SUL2', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('30/09/2025'), validade: parseDate('29/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
+  // 20. SUL3
+  {
+    id: 'cert-sul3', sedeId: 'SUL3', parceiro: 'SUL3', status: 'VIGENTE', semestre: '2º/2025',
+    validadeSemestre: '', dataAnalise: parseDate('29/09/2025'), validade: parseDate('28/03/2026'),
+    linkMicro: '#', linkFisico: '#', empresa: 'Nexus Group', agendamento: '', observacao: ''
+  },
 ];
 
 const mockCloro: HydroCloroEntry[] = [
-  { id: '1', sedeId: 'sede-1', date: new Date().toISOString().split('T')[0], cl: 1.5, ph: 7.2, responsavel: 'João Op.', medidaCorretiva: 'Nenhuma' },
-  { id: '2', sedeId: 'sede-1', date: '2023-10-25', cl: 0.5, ph: 6.8, responsavel: 'João Op.', medidaCorretiva: 'Adicionado Cloro' }
+  { id: '1', sedeId: 'DT', date: new Date().toISOString().split('T')[0], cl: 1.5, ph: 7.2, responsavel: 'João Op.', medidaCorretiva: 'Nenhuma' },
+  { id: '2', sedeId: 'ALD', date: '2023-10-25', cl: 0.5, ph: 6.8, responsavel: 'Maria Op.', medidaCorretiva: 'Adicionado Cloro' }
 ];
 
 const mockFiltros: HydroFiltro[] = [
-  { id: '1', sedeId: 'sede-1', patrimonio: 'BEB-001', bebedouro: 'IBBL Industrial', local: 'Refeitório', dataTroca: '2023-12-01', proximaTroca: '2024-06-01' },
-  { id: '2', sedeId: 'sede-2', patrimonio: 'BEB-009', bebedouro: 'Esmaltec', local: 'Recepção', dataTroca: '2024-01-15', proximaTroca: '2024-07-15' }
+  { id: '1', sedeId: 'DT', patrimonio: 'BEB-001', bebedouro: 'IBBL Industrial', local: 'Refeitório', dataTroca: '2023-12-01', proximaTroca: '2024-06-01' },
+  { id: '2', sedeId: 'PQL3', patrimonio: 'BEB-009', bebedouro: 'Esmaltec', local: 'Recepção Fisio', dataTroca: '2024-01-15', proximaTroca: '2024-07-15' }
 ];
 
 const mockPocos: HydroPoco[] = [
   { 
-    id: '1', sedeId: 'sede-1', bairro: 'Centro', responsavel: 'Eng. Carlos', local: 'Subsolo', 
+    id: '1', sedeId: 'SUL1', bairro: 'Sul', responsavel: 'Eng. Carlos', local: 'Subsolo', 
     dataUltimaLimpeza: '2023-11-20', referenciaBomba: 'Bomba A', dataLimpeza: '2023-11-20', situacaoLimpeza: 'OK',
     fichaOperacional: 'FO-10', previsaoLimpeza1_2026: '2026-05-20', ultimaTrocaFiltro: '2023-11-20',
     situacaoFiltro: 'OK', proximaTrocaFiltro: '2024-05-20', refil: 'Carvão Ativado'
@@ -50,23 +164,42 @@ const mockPocos: HydroPoco[] = [
 
 const mockCisternas: HydroCisterna[] = [
   {
-    id: '1', sedeId: 'sede-1', responsavel: 'Carlos', local: 'Térreo', numCelulas: 2, capacidade: '10.000L',
+    id: '1', sedeId: 'BN', responsavel: 'Carlos', local: 'Térreo', numCelulas: 2, capacidade: '10.000L',
     previsaoLimpeza1_2025: '2025-02-10', dataLimpeza1: '', previsaoLimpeza2_2025: '2025-08-10', dataLimpeza2: '', situacao: 'Regular'
   }
 ];
 
 const mockCaixas: HydroCaixa[] = [
     {
-    id: '1', sedeId: 'sede-1', responsavel: 'Carlos', local: 'Telhado', numCelulas: 4, capacidade: '5.000L',
+    id: '1', sedeId: 'SP', responsavel: 'Carlos', local: 'Telhado', numCelulas: 4, capacidade: '5.000L',
     previsaoLimpeza1_2025: '2025-03-15', dataLimpeza1: '', previsaoLimpeza2_2025: '2025-09-15', dataLimpeza2: '', situacao: 'Regular'
   }
 ];
 
 
-// --- HELPER ---
+// --- HELPER: SMART FILTERING ---
 const filterByScope = <T extends { sedeId: string }>(data: T[], user: User): T[] => {
   if (user.role === UserRole.ADMIN) return data;
-  return data.filter(item => item.sedeId === user.sedeId);
+  
+  // Logic: 
+  // Check if item's sede is in user's assigned sedes list
+  const userSedes = user.sedeIds || [];
+
+  return data.filter(item => {
+      const itemSede = item.sedeId ? item.sedeId.toUpperCase() : '';
+      if (!itemSede) return false;
+
+      // 1. Direct Match in Array
+      if (userSedes.includes(itemSede)) return true;
+
+      // 2. Sub-string match (e.g. User has 'ALD', item is 'ALD-VL' -> Not needed anymore due to normalization, 
+      // but kept if legacy data exists).
+      // We check if ANY of the user's sedes is a substring of the item sede
+      // or if the item sede is a substring of the user's sede (less likely)
+      const isSubMatch = userSedes.some(us => itemSede.includes(us));
+      
+      return isSubMatch;
+  });
 };
 
 export const hydroService = {

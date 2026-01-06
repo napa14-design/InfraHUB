@@ -75,7 +75,8 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const initialForm: HydroCertificado = {
     id: '',
-    sedeId: user.sedeId || '',
+    // Changed to handle sedeIds array, default to first one
+    sedeId: (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : '',
     parceiro: '',
     status: 'VIGENTE',
     semestre: '1º SEM - 2025',
@@ -84,7 +85,8 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     validade: '',
     linkMicro: '',
     linkFisico: '',
-    empresa: user.sedeId ? 'Minha Unidade' : '',
+    // Changed to handle sedeIds array
+    empresa: (user.sedeIds && user.sedeIds.length > 0) ? 'Minha Unidade' : '',
     agendamento: '',
     observacao: ''
   };

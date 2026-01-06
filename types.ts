@@ -1,3 +1,4 @@
+
 export enum UserRole {
   ADMIN = 'ADMIN',
   GESTOR = 'GESTOR',
@@ -47,7 +48,7 @@ export interface User {
   // Link user to hierarchy
   organizationId?: string;
   regionId?: string;
-  sedeId?: string;
+  sedeIds: string[]; // Changed from sedeId string to string array
 }
 
 export enum ModuleStatus {
