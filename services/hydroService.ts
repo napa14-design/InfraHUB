@@ -1,4 +1,4 @@
-import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPoco, HydroCisterna, HydroCaixa } from '../types';
+import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPoco, HydroCisterna, HydroCaixa, HydroSettings } from '../types';
 
 // Mock Data Storage Keys
 const KEYS = {
@@ -7,7 +7,8 @@ const KEYS = {
   FILTRO: 'hs_filtros',
   POCO: 'hs_pocos',
   CISTERNA: 'hs_cisternas',
-  CAIXA: 'hs_caixas'
+  CAIXA: 'hs_caixas',
+  SETTINGS: 'hs_settings'
 };
 
 // --- HELPER: CSV DATE PARSER ---
@@ -36,7 +37,7 @@ const parseMonthYear = (dateStr?: string) => {
     return `${year}-${month}-01`;
 };
 
-// --- REAL CERTIFICADOS DATA (Sample maintained as provided manually, user didn't provide full CSV for this) ---
+// --- REAL CERTIFICADOS DATA ---
 const mockCertificados: HydroCertificado[] = [
   {
     id: 'cert-ald-vl', sedeId: 'ALD', parceiro: 'ALD - VL', status: 'VIGENTE', semestre: '2º/2025',
@@ -283,4 +284,25 @@ export const hydroService = {
     else data.push(item);
     localStorage.setItem(KEYS.CAIXA, JSON.stringify(data));
   },
+
+  // --- SETTINGS ---
+  getSettings: (): HydroSettings => {
+    const stored = localStorage.getItem(KEYS.SETTINGS);
+    if (stored) return JSON.parse(stored);
+    
+    // Default Settings
+    return {
+      validadeCertificadoMeses: 6,
+      validadeFiltroMeses: 6,
+      validadeLimpezaMeses: 6,
+      cloroMin: 1.0,
+      cloroMax: 3.0,
+      phMin: 7.4,
+      phMax: 7.6
+    };
+  },
+
+  saveSettings: (settings: HydroSettings) => {
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
+  }
 };

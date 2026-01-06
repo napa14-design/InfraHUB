@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCloroEntry } from '../../types';
+import { User, HydroCloroEntry, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 
 export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
@@ -11,12 +11,16 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDateStr, setSelectedDateStr] = useState('');
   
+  // Settings State
+  const [settings, setSettings] = useState<HydroSettings>(hydroService.getSettings());
+
   const [form, setForm] = useState<Partial<HydroCloroEntry>>({
     cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name
   });
 
   useEffect(() => {
     setEntries(hydroService.getCloro(user));
+    setSettings(hydroService.getSettings());
   }, [user]);
 
   const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -26,6 +30,9 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
   const getEntry = (date: string) => entries.find(e => e.date === date);
+
+  // Helper to check safety range based on settings
+  const isSafe = (val: number, min: number, max: number) => val >= min && val <= max;
 
   const handleDayClick = (day: number) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -41,7 +48,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleSave = () => {
-    // Changed to handle sedeIds array, defaulting to the first one for saving
     const primarySedeId = (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : null;
 
     if (selectedDateStr && primarySedeId) {
@@ -105,18 +111,27 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                   const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   const entry = getEntry(dateStr);
                   
-                  // Styles mimicking the reference image
-                  let cardStyle = "bg-yellow-50/50 dark:bg-yellow-900/5 border border-dashed border-yellow-200 text-yellow-600/60"; // Future
+                  let cardStyle = "bg-yellow-50/50 dark:bg-yellow-900/5 border border-dashed border-yellow-200 text-yellow-600/60";
                   let statusLabel = "FUTURO";
                   let Icon = Clock;
                   let iconColor = "text-yellow-400";
 
                   if (dateStr < todayStr) {
                       if (entry) {
-                          cardStyle = "bg-white dark:bg-slate-800 border-2 border-emerald-100 dark:border-emerald-900/30 shadow-sm";
-                          statusLabel = "REGISTRADO";
-                          Icon = CheckCircle2;
-                          iconColor = "text-emerald-500";
+                          const clSafe = isSafe(entry.cl, settings.cloroMin, settings.cloroMax);
+                          const phSafe = isSafe(entry.ph, settings.phMin, settings.phMax);
+                          
+                          if (clSafe && phSafe) {
+                              cardStyle = "bg-white dark:bg-slate-800 border-2 border-emerald-100 dark:border-emerald-900/30 shadow-sm";
+                              statusLabel = "REGISTRADO";
+                              Icon = CheckCircle2;
+                              iconColor = "text-emerald-500";
+                          } else {
+                              cardStyle = "bg-red-50 dark:bg-red-900/20 border-2 border-red-200";
+                              statusLabel = "FORA DO PADRÃO";
+                              Icon = AlertTriangle;
+                              iconColor = "text-red-500";
+                          }
                       } else {
                           cardStyle = "bg-red-50 dark:bg-red-900/10 border-2 border-red-100 text-red-400";
                           statusLabel = "PENDENTE";
@@ -154,10 +169,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                           <div className="w-full">
                               {entry ? (
                                   <div className="flex flex-col gap-1">
-                                      <div className="flex justify-between items-center text-xs bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-lg font-bold text-slate-600 dark:text-slate-300">
+                                      <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.cl, settings.cloroMin, settings.cloroMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
                                           <span>CL</span> <span>{entry.cl}</span>
                                       </div>
-                                      <div className="flex justify-between items-center text-xs bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-lg font-bold text-slate-600 dark:text-slate-300">
+                                      <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.ph, settings.phMin, settings.phMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
                                           <span>pH</span> <span>{entry.ph}</span>
                                       </div>
                                   </div>
@@ -169,12 +184,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                   );
               })}
           </div>
-          
-          {/* Background decorative blob */}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-cyan-500/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
       </div>
 
-      {/* --- INFO FOOTER (REFERENCE IMAGE STYLE) --- */}
+      {/* --- INFO FOOTER (DYNAMIC) --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
            {/* Padrão Cloro */}
            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
@@ -183,7 +196,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                </div>
                <div>
                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Padrão Cloro</p>
-                   <p className="text-2xl font-black text-slate-800">1.0 - 3.0</p>
+                   <p className="text-2xl font-black text-slate-800">{settings.cloroMin} - {settings.cloroMax}</p>
                    <span className="text-xs font-bold text-emerald-600">ppm ideal</span>
                </div>
            </div>
@@ -195,7 +208,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                </div>
                <div>
                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Padrão pH</p>
-                   <p className="text-2xl font-black text-slate-800">7.4 - 7.6</p>
+                   <p className="text-2xl font-black text-slate-800">{settings.phMin} - {settings.phMax}</p>
                    <span className="text-xs font-bold text-cyan-600">neutro/básico</span>
                </div>
            </div>
@@ -207,7 +220,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                </div>
                <div>
                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Alerta Cloro</p>
-                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; 1.0 <span className="text-slate-300">|</span> &gt; 3.0</p>
+                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; {settings.cloroMin} <span className="text-slate-300">|</span> &gt; {settings.cloroMax}</p>
                    <span className="text-xs font-bold text-amber-600">Ação corretiva</span>
                </div>
            </div>
@@ -219,7 +232,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                </div>
                <div>
                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Alerta pH</p>
-                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; 7.4 <span className="text-slate-300">|</span> &gt; 7.6</p>
+                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; {settings.phMin} <span className="text-slate-300">|</span> &gt; {settings.phMax}</p>
                    <span className="text-xs font-bold text-red-600">Crítico</span>
                </div>
            </div>
@@ -241,8 +254,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
                 <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
-                            <label className="block text-xs font-bold text-cyan-600 uppercase mb-2">Cloro (ppm)</label>
+                        <div className={`p-4 rounded-2xl border ${isSafe(Number(form.cl), settings.cloroMin, settings.cloroMax) ? 'bg-cyan-50 border-cyan-100' : 'bg-red-50 border-red-100'}`}>
+                            <label className={`block text-xs font-bold uppercase mb-2 ${isSafe(Number(form.cl), settings.cloroMin, settings.cloroMax) ? 'text-cyan-600' : 'text-red-600'}`}>Cloro (ppm)</label>
                             <input 
                                 type="number" step="0.1"
                                 className="w-full bg-white px-2 py-2 rounded-xl border border-cyan-200 focus:ring-2 focus:ring-cyan-500 outline-none text-3xl font-black text-center text-slate-800"
@@ -250,8 +263,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                 onChange={e => setForm({...form, cl: Number(e.target.value)})}
                             />
                         </div>
-                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
-                            <label className="block text-xs font-bold text-blue-600 uppercase mb-2">pH</label>
+                        <div className={`p-4 rounded-2xl border ${isSafe(Number(form.ph), settings.phMin, settings.phMax) ? 'bg-blue-50 border-blue-100' : 'bg-red-50 border-red-100'}`}>
+                            <label className={`block text-xs font-bold uppercase mb-2 ${isSafe(Number(form.ph), settings.phMin, settings.phMax) ? 'text-blue-600' : 'text-red-600'}`}>pH</label>
                             <input 
                                 type="number" step="0.1"
                                 className="w-full bg-white px-2 py-2 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 outline-none text-3xl font-black text-center text-slate-800"

@@ -105,6 +105,16 @@ export interface NotificationRule {
 
 // --- HYDROSYS TYPES ---
 
+export interface HydroSettings {
+  validadeCertificadoMeses: number;
+  validadeFiltroMeses: number;
+  validadeLimpezaMeses: number;
+  cloroMin: number;
+  cloroMax: number;
+  phMin: number;
+  phMax: number;
+}
+
 export interface HydroCertificado {
   id: string;
   sedeId: string; // Para controle de acesso

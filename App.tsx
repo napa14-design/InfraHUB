@@ -15,6 +15,7 @@ import { HydroCertificados } from './components/HydroSys/HydroCertificados';
 import { HydroCloro } from './components/HydroSys/HydroCloro';
 import { HydroFiltros } from './components/HydroSys/HydroFiltros';
 import { HydroReservatorios } from './components/HydroSys/HydroReservatorios';
+import { HydroConfig } from './components/HydroSys/HydroConfig';
 import { HydroSysAnalytics } from './components/HydroSys/HydroAnalytics';
 import { ThemeProvider } from './components/ThemeContext';
 
@@ -124,6 +125,16 @@ const App: React.FC = () => {
                     <Route path="/module/hydrosys/cloro" element={<HydroCloro user={user} />} />
                     <Route path="/module/hydrosys/filtros" element={<HydroFiltros user={user} />} />
                     <Route path="/module/hydrosys/reservatorios" element={<HydroReservatorios user={user} />} />
+                    
+                    <Route 
+                      path="/module/hydrosys/config" 
+                      element={
+                        user.role === UserRole.ADMIN 
+                          ? <HydroConfig user={user} />
+                          : <Navigate to="/module/hydrosys" replace />
+                      } 
+                    />
+
                     <Route 
                       path="/module/hydrosys/analytics" 
                       element={

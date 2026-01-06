@@ -25,7 +25,10 @@ import {
   Filter,
   Droplet,
   PieChart,
-  ArrowLeft
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  MoreVertical
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -35,7 +38,9 @@ interface LayoutProps {
 }
 
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  // Sidebar States
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Mobile
+  const [isCollapsed, setIsCollapsed] = useState(false); // Desktop
   
   // Notification States
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -55,15 +60,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isHydroSys = location.pathname.includes('/module/hydrosys');
 
   useEffect(() => {
-    // 1. Run Check Logic for Warnings/Criticals based on Rules
     notificationService.checkSystemStatus(user);
-    
-    // 2. Load Notifications
     setNotifications(notificationService.getAll());
-
-    // 3. Interval for polling (Simulated)
     const interval = setInterval(() => {
-      // Re-check system status every minute in case something expired while open
       notificationService.checkSystemStatus(user);
       setNotifications(notificationService.getAll());
     }, 60000);
@@ -81,57 +80,96 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       setIsNotifOpen(true);
   };
 
-  const navItemClass = (path: string) => `
-    flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200
-    ${location.pathname === path 
-      ? 'bg-brand-500/10 text-brand-600 dark:text-brand-400 font-bold shadow-sm' 
-      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
-  `;
-
   const unreadCount = notifications.filter(n => !n.read).length;
-  // Check if there are any CRITICAL unread notifications to animate the bell
   const hasCritical = notifications.some(n => !n.read && n.type === 'ERROR');
+
+  // --- COMPONENT: NAV ITEM ---
+  const NavItem = ({ to, icon: Icon, label, onClick }: { to: string, icon: any, label: string, onClick?: () => void }) => {
+    const isActive = location.pathname === to;
+    
+    return (
+      <Link 
+        to={to} 
+        onClick={() => {
+            if(onClick) onClick();
+            setIsSidebarOpen(false);
+        }}
+        className={`
+          group relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 mb-1
+          ${isActive 
+            ? 'bg-gradient-to-r from-brand-50 to-white dark:from-brand-900/20 dark:to-transparent text-brand-600 dark:text-brand-400 font-bold' 
+            : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
+          ${isCollapsed ? 'justify-center' : ''}
+        `}
+      >
+        {/* Active Indicator Strip */}
+        {isActive && !isCollapsed && (
+            <div className="absolute left-0 top-2 bottom-2 w-1 bg-brand-500 rounded-r-full" />
+        )}
+
+        {/* Icon - Remove margin animation when collapsed to keep centering perfect */}
+        <div className={`flex-shrink-0 transition-all duration-200 ${isActive && !isCollapsed ? 'ml-2' : ''}`}>
+            <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+        </div>
+
+        {/* Label (Hidden if Collapsed) */}
+        {!isCollapsed && (
+            <span className="ml-3 truncate transition-opacity duration-300 opacity-100">
+                {label}
+            </span>
+        )}
+
+        {/* Tooltip for Collapsed Mode */}
+        {isCollapsed && (
+            <div className="absolute left-14 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl transition-opacity translate-x-2 group-hover:translate-x-0">
+                {label}
+            </div>
+        )}
+      </Link>
+    );
+  };
+
+  // --- COMPONENT: SECTION LABEL ---
+  const SectionLabel = ({ label }: { label: string }) => {
+      if (isCollapsed) return <div className="h-px bg-slate-100 dark:bg-slate-800 mx-4 my-4"></div>; // Divider when collapsed
+      return (
+        <p className="px-4 mt-6 mb-2 text-[10px] font-extrabold text-slate-400 dark:text-slate-500 uppercase tracking-widest animate-in fade-in duration-300">
+            {label}
+        </p>
+      );
+  };
 
   const renderHydroSysSidebar = () => (
     <>
-      <div className="pt-2 pb-2">
-        <p className="px-4 text-xs font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider mb-2">
-          Menu HydroSys
-        </p>
-        
-        <Link to="/module/hydrosys" className={navItemClass('/module/hydrosys')} onClick={() => setIsSidebarOpen(false)}>
-          <LayoutGrid size={20} />
-          <span>Dashboard Hydro</span>
-        </Link>
-        <Link to="/module/hydrosys/cloro" className={navItemClass('/module/hydrosys/cloro')} onClick={() => setIsSidebarOpen(false)}>
-          <TestTube size={20} />
-          <span>Controle de Cloro</span>
-        </Link>
-        <Link to="/module/hydrosys/certificados" className={navItemClass('/module/hydrosys/certificados')} onClick={() => setIsSidebarOpen(false)}>
-          <Award size={20} />
-          <span>Certificados</span>
-        </Link>
-        <Link to="/module/hydrosys/filtros" className={navItemClass('/module/hydrosys/filtros')} onClick={() => setIsSidebarOpen(false)}>
-          <Filter size={20} />
-          <span>Filtros</span>
-        </Link>
-        <Link to="/module/hydrosys/reservatorios" className={navItemClass('/module/hydrosys/reservatorios')} onClick={() => setIsSidebarOpen(false)}>
-          <Droplet size={20} />
-          <span>Reservatórios</span>
-        </Link>
-        {user.role === UserRole.ADMIN && (
-           <Link to="/module/hydrosys/analytics" className={navItemClass('/module/hydrosys/analytics')} onClick={() => setIsSidebarOpen(false)}>
-            <PieChart size={20} />
-            <span>Analytics</span>
-          </Link>
-        )}
-      </div>
+      <SectionLabel label="Módulos HydroSys" />
+      
+      <NavItem to="/module/hydrosys" icon={LayoutGrid} label="Dashboard" />
+      <NavItem to="/module/hydrosys/cloro" icon={TestTube} label="Controle de Cloro" />
+      <NavItem to="/module/hydrosys/certificados" icon={Award} label="Certificados" />
+      <NavItem to="/module/hydrosys/filtros" icon={Filter} label="Filtros" />
+      <NavItem to="/module/hydrosys/reservatorios" icon={Droplet} label="Reservatórios" />
+      
+      {user.role === UserRole.ADMIN && (
+         <NavItem to="/module/hydrosys/analytics" icon={PieChart} label="Analytics" />
+      )}
 
-      <div className="mt-4 border-t border-slate-100 dark:border-slate-800 pt-4">
-          <Link to="/" className="flex items-center space-x-3 px-4 py-3 rounded-xl text-slate-500 hover:text-brand-600 transition-colors">
-            <ArrowLeft size={20} />
-            <span>Voltar ao Hub</span>
-          </Link>
+      <div className={`mt-4 border-t border-slate-100 dark:border-slate-800 pt-4`}>
+          {isCollapsed ? (
+              <div className="flex justify-center group relative">
+                  <Link to="/" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:text-brand-600 transition-colors" title="Voltar ao Hub">
+                      <ArrowLeft size={20} />
+                  </Link>
+                  {/* Tooltip for Back Button */}
+                  <div className="absolute left-14 top-1/2 -translate-y-1/2 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+                      Voltar ao Hub
+                  </div>
+              </div>
+          ) : (
+              <Link to="/" className="flex items-center space-x-3 px-3 py-3 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <ArrowLeft size={20} />
+                <span className="font-medium">Voltar ao Hub</span>
+              </Link>
+          )}
       </div>
     </>
   );
@@ -143,46 +181,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
     return (
       <>
-        <Link to="/" className={navItemClass('/')} onClick={() => setIsSidebarOpen(false)}>
-          <LayoutGrid size={20} />
-          <span>Dashboard</span>
-        </Link>
+        <NavItem to="/" icon={LayoutGrid} label="Dashboard" />
 
         {(isAdmin || canManageUsers) && (
-          <div className="pt-4 pb-2">
-            <p className="px-4 text-xs font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
-              Administração
-            </p>
-          </div>
+          <SectionLabel label="Administração" />
         )}
 
-        {isAdmin && (
-          <Link to="/admin/org" className={navItemClass('/admin/org')} onClick={() => setIsSidebarOpen(false)}>
-            <Building2 size={20} />
-            <span>Estrutura Org.</span>
-          </Link>
-        )}
-        
-        {canManageUsers && (
-          <Link to="/admin/users" className={navItemClass('/admin/users')} onClick={() => setIsSidebarOpen(false)}>
-            <ShieldCheck size={20} />
-            <span>Gestão Usuários</span>
-          </Link>
-        )}
-
-        {isAdmin && (
-          <Link to="/admin/modules" className={navItemClass('/admin/modules')} onClick={() => setIsSidebarOpen(false)}>
-            <Layers size={20} />
-            <span>Catálogo de Apps</span>
-          </Link>
-        )}
-
-        {isAdmin && (
-           <Link to="/admin/notifications" className={navItemClass('/admin/notifications')} onClick={() => setIsSidebarOpen(false)}>
-            <Bell size={20} />
-            <span>Config. Notificações</span>
-          </Link>
-        )}
+        {isAdmin && <NavItem to="/admin/org" icon={Building2} label="Estrutura Org." />}
+        {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão Usuários" />}
+        {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo Apps" />}
+        {isAdmin && <NavItem to="/admin/notifications" icon={Bell} label="Notificações" />}
       </>
     );
   };
@@ -207,102 +215,123 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         />
       )}
 
-      {/* Sidebar - Glassmorphism */}
+      {/* Sidebar - Desktop Collapsible & Mobile Drawer */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-r border-slate-200 dark:border-slate-800 shadow-xl transform transition-transform duration-300 ease-in-out
-        lg:relative lg:translate-x-0
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        fixed inset-y-0 left-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 shadow-xl 
+        transform transition-all duration-300 ease-in-out
+        lg:relative 
+        ${isSidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full lg:translate-x-0'}
+        ${isCollapsed ? 'lg:w-[88px]' : 'lg:w-72'}
       `}>
-        <div className="h-full flex flex-col p-4">
-          {/* Logo Area */}
-          <div className="h-20 flex items-center px-4 mb-2">
-            <div className="flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg 
-                ${isHydroSys ? 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' : 'bg-gradient-to-br from-brand-500 to-indigo-600 shadow-brand-500/30'}`}>
-                {isHydroSys ? <Droplets size={22} /> : <LayoutGrid size={22} />}
-              </div>
-              <div>
-                <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white">Nexus</span>
-                <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest">
-                  {isHydroSys ? 'HydroSys' : 'Corporativo'}
-                </span>
+        <div className="h-full flex flex-col">
+          
+          {/* 1. Header (Logo) */}
+          <div className="h-20 flex items-center px-4 mb-2 flex-shrink-0 transition-all">
+            <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'justify-between w-full space-x-3'}`}>
+              <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transition-all duration-300 flex-shrink-0
+                    ${isHydroSys ? 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' : 'bg-gradient-to-br from-brand-500 to-indigo-600 shadow-brand-500/30'}
+                  `}>
+                    {isHydroSys ? <Droplets size={22} /> : <LayoutGrid size={22} />}
+                  </div>
+                  
+                  {!isCollapsed && (
+                      <div className="animate-in fade-in duration-300 whitespace-nowrap overflow-hidden">
+                        <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Nexus</span>
+                        <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
+                          {isHydroSys ? 'HydroSys' : 'Corporativo'}
+                        </span>
+                      </div>
+                  )}
               </div>
             </div>
+            
+            {/* Mobile Close Button */}
             <button 
-              className="ml-auto lg:hidden text-slate-500 hover:text-brand-500"
+              className="lg:hidden text-slate-500 hover:text-brand-500 ml-auto"
               onClick={() => setIsSidebarOpen(false)}
             >
               <X size={24} />
             </button>
           </div>
 
-          {/* User Info Card */}
-          <div className="p-4 mb-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-600 shadow-sm bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">
-                  {user.name.charAt(0)}
-              </div>
-              <div className="overflow-hidden">
-                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
-                <p className="text-xs text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider">{user.role}</p>
-              </div>
-            </div>
-            {(userRegion || primarySede) && (
-              <div className="flex items-start text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-200 dark:border-slate-700/50">
-                <MapPin size={12} className="mr-1 mt-0.5 flex-shrink-0" />
-                <span className="leading-tight">
-                  {userSedeCount > 1 ? `${userSedeCount} Sedes Vinculadas` : primarySede?.name} <br/>
-                  <span className="opacity-70">{userRegion?.name}</span>
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <nav className="flex-1 space-y-1 overflow-y-auto px-2">
+          {/* 2. Navigation (Scrollable) */}
+          <nav className="flex-1 overflow-y-auto px-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 overflow-x-hidden">
             {isHydroSys ? renderHydroSysSidebar() : renderMainSidebar()}
           </nav>
 
-          {/* Bottom Actions */}
-          <div className="pt-4 mt-auto border-t border-slate-100 dark:border-slate-800 space-y-2">
-             <button 
-                onClick={toggleTheme}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-                  <span>{theme === 'light' ? 'Modo Escuro' : 'Modo Claro'}</span>
-                </div>
-              </button>
-             <button 
-                onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }}
-                className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <div className="flex items-center space-x-3">
-                  <Bell size={20} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
-                  <span>Notificações</span>
-                </div>
-                {unreadCount > 0 && (
-                  <span className={`text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${hasCritical ? 'bg-red-500 shadow-red-500/50 animate-pulse' : 'bg-brand-500 shadow-brand-500/50'}`}>
-                    {unreadCount}
-                  </span>
-                )}
-              </button>
+          {/* 3. Footer (User Profile & Collapse) */}
+          <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-2">
+             
+             {/* Collapse Button (Desktop Only) */}
+             <div className={`hidden lg:flex ${isCollapsed ? 'justify-center' : 'justify-end'} mb-2`}>
+                 <button 
+                    onClick={() => setIsCollapsed(!isCollapsed)}
+                    className="p-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-brand-600 hover:border-brand-300 transition-all shadow-sm"
+                 >
+                     {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                 </button>
+             </div>
 
-            <button 
-              onClick={handleLogout}
-              className="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-            >
-              <LogOut size={20} />
-              <span>Sair do Sistema</span>
-            </button>
+             {/* User Profile Card */}
+             <div className={`
+                relative rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm transition-all duration-300 group
+                ${isCollapsed ? 'p-2 flex flex-col items-center' : 'p-3'}
+             `}>
+                <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'justify-between w-full'}`}>
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex-shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold border-2 border-white dark:border-slate-900">
+                                {user.name.charAt(0)}
+                            </div>
+                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
+                        </div>
+                        
+                        {!isCollapsed && (
+                            <div className="overflow-hidden">
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">{user.name.split(' ')[0]}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{user.role}</p>
+                            </div>
+                        )}
+                    </div>
+
+                    {!isCollapsed && (
+                        <button onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Sair">
+                            <LogOut size={16} />
+                        </button>
+                    )}
+                </div>
+
+                {/* Theme Toggle Mini (Inside Profile Card for Collapsed or Below for Expanded) */}
+                <button 
+                    onClick={toggleTheme}
+                    className={`
+                        flex items-center justify-center rounded-lg text-slate-400 hover:text-brand-500 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors
+                        ${isCollapsed ? 'mt-2 w-9 h-9 border border-slate-100 dark:border-slate-700' : 'mt-3 w-full py-1.5 border-t border-slate-100 dark:border-slate-700 pt-3'}
+                    `}
+                    title="Alternar Tema"
+                >
+                    {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+                </button>
+                
+                {/* Logout Button when collapsed (Extra small icon below theme) */}
+                {isCollapsed && (
+                    <button 
+                        onClick={handleLogout} 
+                        className="mt-2 w-9 h-9 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" 
+                        title="Sair"
+                    >
+                        <LogOut size={16} />
+                    </button>
+                )}
+             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative">
-        {/* Mobile Header */}
+      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative bg-slate-50 dark:bg-slate-950">
+        {/* Mobile Header (Only visible on small screens) */}
         <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between lg:hidden flex-shrink-0 z-30">
           <div className="flex items-center space-x-3">
              <button onClick={() => setIsSidebarOpen(true)} className="text-slate-500 dark:text-slate-400">
