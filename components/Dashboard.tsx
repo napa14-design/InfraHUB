@@ -65,7 +65,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
+      
       {/* Hero Section - Adapted for Light/Dark Mode */}
       <div className="relative rounded-3xl overflow-hidden p-8 md:p-12 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition-colors">
         {/* Background Mesh Gradient - Only visible in Dark Mode for effect, or subtle in light */}
@@ -106,7 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       </div>
 
       {/* Modules Grid */}
-      <div>
+      <div className="pt-4">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
             <LayoutGrid className="text-brand-500" size={24} />

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, AppNotification } from '../types';
+import { User, UserRole, AppNotification, NotificationType } from '../types';
 import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { orgService } from '../services/orgService';
 import { NotificationCenter } from './NotificationCenter';
+import { CriticalAlertBanner } from './CriticalAlertBanner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
 import { 
@@ -11,7 +12,6 @@ import {
   Menu, 
   X, 
   LayoutGrid, 
-  Settings, 
   Bell, 
   ShieldCheck,
   Layers,
@@ -36,8 +36,12 @@ interface LayoutProps {
 
 export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // Notification States
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifFilter, setNotifFilter] = useState<NotificationType | 'ALL'>('ALL');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  
   const { theme, toggleTheme } = useTheme();
   
   const navigate = useNavigate();
@@ -69,6 +73,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     authService.logout();
     onLogout();
     navigate('/login');
+  };
+
+  const handleOpenCriticalNotifications = () => {
+      setNotifFilter('ERROR');
+      setIsNotifOpen(true);
   };
 
   const navItemClass = (path: string) => `
@@ -185,6 +194,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         notifications={notifications}
         onMarkRead={(id) => setNotifications(notificationService.markAsRead(id))}
         onMarkAllRead={() => setNotifications(notificationService.markAllRead())}
+        activeFilter={notifFilter}
+        onFilterChange={setNotifFilter}
       />
 
       {/* Mobile Sidebar Overlay */}
@@ -263,7 +274,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 </div>
               </button>
              <button 
-                onClick={() => setIsNotifOpen(true)}
+                onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }}
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <div className="flex items-center space-x-3">
@@ -301,7 +312,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setIsNotifOpen(true)} className="relative text-slate-500 dark:text-slate-400">
+            <button onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} className="relative text-slate-500 dark:text-slate-400">
               <Bell size={24} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
               {unreadCount > 0 && (
                 <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${hasCritical ? 'bg-red-600' : 'bg-brand-500'}`}></span>
@@ -316,6 +327,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
           <div className="max-w-7xl mx-auto">
+             {/* CRITICAL ALERT BANNER - ONLY ON DASHBOARD */}
+             {location.pathname === '/' && (
+                 <CriticalAlertBanner onViewCritical={handleOpenCriticalNotifications} />
+             )}
+            
             {children}
           </div>
         </div>
