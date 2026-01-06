@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { User, HydroCertificado, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { EmptyState } from '../Shared/EmptyState';
 
 // --- HELPERS ---
 const getDaysRemaining = (validade: string) => {
@@ -75,7 +76,6 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const initialForm: HydroCertificado = {
     id: '',
-    // Changed to handle sedeIds array, default to first one
     sedeId: (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : '',
     parceiro: '',
     status: 'VIGENTE',
@@ -85,7 +85,6 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     validade: '',
     linkMicro: '',
     linkFisico: '',
-    // Changed to handle sedeIds array
     empresa: (user.sedeIds && user.sedeIds.length > 0) ? 'Minha Unidade' : '',
     agendamento: '',
     observacao: ''
@@ -222,196 +221,209 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
         />
       </div>
 
-      {/* LIST HEADER */}
-      <div className="flex items-center justify-between">
-         <div className="flex items-center gap-2">
-            <Filter className="text-cyan-600" size={20} />
-            <h2 className="font-bold text-slate-800 dark:text-white">
-                {filterStatus ? `Filtrando: ${getStatusConfig(filterStatus).label}` : 'Todos os Registros'}
-            </h2>
-            <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
-                {filteredData.length}
-            </span>
-         </div>
-         {filterStatus && (
-             <button onClick={() => setFilterStatus(null)} className="text-sm text-cyan-600 hover:underline">
-                 Limpar Filtro
-             </button>
-         )}
-      </div>
-
-      {/* --- MOBILE: RICH CARDS --- */}
-      <div className="md:hidden space-y-4">
-        {filteredData.map(item => {
-            const statusCfg = getStatusConfig(item.status);
-            const daysLeft = getDaysRemaining(item.validade);
-            const daysCfg = getDaysConfig(daysLeft);
-
-            return (
-                <div key={item.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    {/* Card Header */}
-                    <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
-                        <div className="flex gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-slate-500 font-bold text-sm shadow-inner">
-                                {item.parceiro.substring(0, 2).toUpperCase()}
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white text-sm">{item.parceiro}</h3>
-                                <p className="text-xs text-slate-500">{item.semestre}</p>
-                            </div>
-                        </div>
-                        <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${statusCfg.bg} ${statusCfg.text}`}>
-                            {statusCfg.label}
-                        </div>
-                    </div>
-
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
-                         <div className="p-3 text-center">
-                             <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Dias</p>
-                             <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${daysCfg.bg} ${daysCfg.text}`}>
-                                 {daysCfg.label}
-                             </span>
-                         </div>
-                         <div className="p-3 text-center">
-                             <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Análise</p>
-                             <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                {new Date(item.dataAnalise).toLocaleDateString()}
-                             </p>
-                         </div>
-                         <div className="p-3 text-center">
-                             <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Validade</p>
-                             <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                                {new Date(item.validade).toLocaleDateString()}
-                             </p>
-                         </div>
-                    </div>
-
-                    {/* Docs Links */}
-                    <div className="p-3 flex gap-2 justify-center bg-slate-50/30 dark:bg-slate-900/30 border-b border-slate-100 dark:border-slate-800">
-                         {item.linkMicro ? (
-                             <a href={item.linkMicro} target="_blank" className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded hover:bg-purple-100 transition-colors">
-                                 <Microscope size={12} /> Micro
-                             </a>
-                         ) : <span className="text-xs text-slate-400 italic">Sem Micro</span>}
-                         
-                         {item.linkFisico ? (
-                             <a href={item.linkFisico} target="_blank" className="flex items-center gap-1 text-xs font-bold text-cyan-600 bg-cyan-50 px-2 py-1 rounded hover:bg-cyan-100 transition-colors">
-                                 <FlaskConical size={12} /> Físico
-                             </a>
-                         ) : <span className="text-xs text-slate-400 italic">Sem Físico</span>}
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className="p-2 flex items-center justify-between bg-white dark:bg-slate-900">
-                        <div className="flex gap-1">
-                            {/* Renovar */}
-                            <button 
-                                onClick={() => handleRenovar(item)}
-                                className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform"
-                                title="Renovar"
-                            >
-                                <FlaskConical size={16} />
-                            </button>
-                            {/* Editar */}
-                            <button 
-                                onClick={() => handleEdit(item)}
-                                className="h-9 w-9 rounded-xl border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 flex items-center justify-center transition-colors"
-                                title="Editar"
-                            >
-                                <Edit size={16} />
-                            </button>
-                             {/* Histórico */}
-                             <button 
-                                onClick={() => { setHistoryTargetId(item.sedeId); setIsHistoryOpen(true); }}
-                                className="h-9 w-9 rounded-xl border border-slate-200 text-slate-400 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 flex items-center justify-center transition-colors"
-                                title="Histórico"
-                            >
-                                <History size={16} />
-                            </button>
-                        </div>
-                        {/* Delete */}
-                        <button 
-                            onClick={() => handleDelete(item.id)}
-                            className="h-9 w-9 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
-                        >
-                            <Trash2 size={16} />
-                        </button>
-                    </div>
+      {/* LIST CONTENT OR EMPTY STATE */}
+      {filteredData.length === 0 ? (
+          <EmptyState 
+            icon={FileText}
+            title="Nenhum Certificado"
+            description={filterStatus ? `Não há certificados com status "${filterStatus}".` : "Nenhum certificado registrado nesta unidade ainda."}
+            actionLabel={!filterStatus ? "Adicionar Primeiro" : undefined}
+            onAction={!filterStatus ? handleNew : undefined}
+          />
+      ) : (
+        <>
+            {/* LIST HEADER */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Filter className="text-cyan-600" size={20} />
+                    <h2 className="font-bold text-slate-800 dark:text-white">
+                        {filterStatus ? `Filtrando: ${getStatusConfig(filterStatus).label}` : 'Todos os Registros'}
+                    </h2>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {filteredData.length}
+                    </span>
                 </div>
-            );
-        })}
-      </div>
+                {filterStatus && (
+                    <button onClick={() => setFilterStatus(null)} className="text-sm text-cyan-600 hover:underline">
+                        Limpar Filtro
+                    </button>
+                )}
+            </div>
 
-      {/* --- DESKTOP: TABLE --- */}
-      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
-        <table className="w-full text-left text-sm">
-             <thead className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
-                 <tr>
-                     <th className="py-4 px-6 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Parceiro</th>
-                     <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Status</th>
-                     <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Dias</th>
-                     <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Análise</th>
-                     <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Validade</th>
-                     <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Docs</th>
-                     <th className="py-4 px-6 text-right font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Ações</th>
-                 </tr>
-             </thead>
-             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                 {filteredData.map(item => {
-                     const statusCfg = getStatusConfig(item.status);
-                     const daysLeft = getDaysRemaining(item.validade);
-                     const daysCfg = getDaysConfig(daysLeft);
+            {/* --- MOBILE: RICH CARDS --- */}
+            <div className="md:hidden space-y-4">
+                {filteredData.map(item => {
+                    const statusCfg = getStatusConfig(item.status);
+                    const daysLeft = getDaysRemaining(item.validade);
+                    const daysCfg = getDaysConfig(daysLeft);
 
-                     return (
-                         <tr key={item.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                             <td className="py-4 px-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">
+                    return (
+                        <div key={item.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                            {/* Card Header */}
+                            <div className="p-4 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
+                                <div className="flex gap-3">
+                                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center text-slate-500 font-bold text-sm shadow-inner">
                                         {item.parceiro.substring(0, 2).toUpperCase()}
                                     </div>
                                     <div>
-                                        <div className="font-bold text-slate-900 dark:text-white">{item.parceiro}</div>
-                                        <div className="text-xs text-slate-500">{item.semestre}</div>
+                                        <h3 className="font-bold text-slate-900 dark:text-white text-sm">{item.parceiro}</h3>
+                                        <p className="text-xs text-slate-500">{item.semestre}</p>
                                     </div>
                                 </div>
-                             </td>
-                             <td className="py-4 px-6 text-center">
-                                 <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusCfg.bg} ${statusCfg.text}`}>
-                                     {statusCfg.label}
-                                 </span>
-                             </td>
-                             <td className="py-4 px-6 text-center">
-                                 <span className={`inline-flex px-2 py-1 rounded-md text-xs font-bold ${daysCfg.bg} ${daysCfg.text}`}>
-                                     {daysCfg.label}
-                                 </span>
-                             </td>
-                             <td className="py-4 px-6 text-center text-slate-600 dark:text-slate-400">
-                                 {new Date(item.dataAnalise).toLocaleDateString()}
-                             </td>
-                             <td className="py-4 px-6 text-center font-medium text-slate-900 dark:text-white">
-                                 {new Date(item.validade).toLocaleDateString()}
-                             </td>
-                             <td className="py-4 px-6 text-center">
-                                 <div className="flex justify-center gap-2">
-                                     {item.linkMicro && <a href={item.linkMicro} className="text-purple-600 hover:scale-110 transition-transform"><Microscope size={16}/></a>}
-                                     {item.linkFisico && <a href={item.linkFisico} className="text-cyan-600 hover:scale-110 transition-transform"><FlaskConical size={16}/></a>}
-                                 </div>
-                             </td>
-                             <td className="py-4 px-6 text-right">
-                                 <div className="flex justify-end items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                     <button onClick={() => handleRenovar(item)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Renovar"><FlaskConical size={16}/></button>
-                                     <button onClick={() => handleEdit(item)} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Editar"><Edit size={16}/></button>
-                                     <button onClick={() => { setHistoryTargetId(item.sedeId); setIsHistoryOpen(true); }} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Histórico"><History size={16}/></button>
-                                     <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" title="Excluir"><Trash2 size={16}/></button>
-                                 </div>
-                             </td>
-                         </tr>
-                     );
-                 })}
-             </tbody>
-        </table>
-      </div>
+                                <div className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${statusCfg.bg} ${statusCfg.text}`}>
+                                    {statusCfg.label}
+                                </div>
+                            </div>
+
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-3 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+                                <div className="p-3 text-center">
+                                    <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Dias</p>
+                                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${daysCfg.bg} ${daysCfg.text}`}>
+                                        {daysCfg.label}
+                                    </span>
+                                </div>
+                                <div className="p-3 text-center">
+                                    <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Análise</p>
+                                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        {new Date(item.dataAnalise).toLocaleDateString()}
+                                    </p>
+                                </div>
+                                <div className="p-3 text-center">
+                                    <p className="text-[10px] uppercase text-slate-400 font-bold mb-1">Validade</p>
+                                    <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                        {new Date(item.validade).toLocaleDateString()}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Docs Links */}
+                            <div className="p-3 flex gap-2 justify-center bg-slate-50/30 dark:bg-slate-900/30 border-b border-slate-100 dark:border-slate-800">
+                                {item.linkMicro ? (
+                                    <a href={item.linkMicro} target="_blank" className="flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded hover:bg-purple-100 transition-colors">
+                                        <Microscope size={12} /> Micro
+                                    </a>
+                                ) : <span className="text-xs text-slate-400 italic">Sem Micro</span>}
+                                
+                                {item.linkFisico ? (
+                                    <a href={item.linkFisico} target="_blank" className="flex items-center gap-1 text-xs font-bold text-cyan-600 bg-cyan-50 px-2 py-1 rounded hover:bg-cyan-100 transition-colors">
+                                        <FlaskConical size={12} /> Físico
+                                    </a>
+                                ) : <span className="text-xs text-slate-400 italic">Sem Físico</span>}
+                            </div>
+
+                            {/* Action Footer */}
+                            <div className="p-2 flex items-center justify-between bg-white dark:bg-slate-900">
+                                <div className="flex gap-1">
+                                    {/* Renovar */}
+                                    <button 
+                                        onClick={() => handleRenovar(item)}
+                                        className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform"
+                                        title="Renovar"
+                                    >
+                                        <FlaskConical size={16} />
+                                    </button>
+                                    {/* Editar */}
+                                    <button 
+                                        onClick={() => handleEdit(item)}
+                                        className="h-9 w-9 rounded-xl border border-slate-200 text-slate-400 hover:text-cyan-600 hover:border-cyan-200 hover:bg-cyan-50 flex items-center justify-center transition-colors"
+                                        title="Editar"
+                                    >
+                                        <Edit size={16} />
+                                    </button>
+                                    {/* Histórico */}
+                                    <button 
+                                        onClick={() => { setHistoryTargetId(item.sedeId); setIsHistoryOpen(true); }}
+                                        className="h-9 w-9 rounded-xl border border-slate-200 text-slate-400 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50 flex items-center justify-center transition-colors"
+                                        title="Histórico"
+                                    >
+                                        <History size={16} />
+                                    </button>
+                                </div>
+                                {/* Delete */}
+                                <button 
+                                    onClick={() => handleDelete(item.id)}
+                                    className="h-9 w-9 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* --- DESKTOP: TABLE --- */}
+            <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-100 dark:border-slate-800">
+                        <tr>
+                            <th className="py-4 px-6 font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Parceiro</th>
+                            <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Status</th>
+                            <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Dias</th>
+                            <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Análise</th>
+                            <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Validade</th>
+                            <th className="py-4 px-6 text-center font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Docs</th>
+                            <th className="py-4 px-6 text-right font-semibold text-slate-600 dark:text-slate-400 text-xs uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {filteredData.map(item => {
+                            const statusCfg = getStatusConfig(item.status);
+                            const daysLeft = getDaysRemaining(item.validade);
+                            const daysCfg = getDaysConfig(daysLeft);
+
+                            return (
+                                <tr key={item.id} className="group hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <td className="py-4 px-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">
+                                                {item.parceiro.substring(0, 2).toUpperCase()}
+                                            </div>
+                                            <div>
+                                                <div className="font-bold text-slate-900 dark:text-white">{item.parceiro}</div>
+                                                <div className="text-xs text-slate-500">{item.semestre}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="py-4 px-6 text-center">
+                                        <span className={`inline-flex px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusCfg.bg} ${statusCfg.text}`}>
+                                            {statusCfg.label}
+                                        </span>
+                                    </td>
+                                    <td className="py-4 px-6 text-center">
+                                        <span className={`inline-flex px-2 py-1 rounded-md text-xs font-bold ${daysCfg.bg} ${daysCfg.text}`}>
+                                            {daysCfg.label}
+                                        </span>
+                                    </td>
+                                    <td className="py-4 px-6 text-center text-slate-600 dark:text-slate-400">
+                                        {new Date(item.dataAnalise).toLocaleDateString()}
+                                    </td>
+                                    <td className="py-4 px-6 text-center font-medium text-slate-900 dark:text-white">
+                                        {new Date(item.validade).toLocaleDateString()}
+                                    </td>
+                                    <td className="py-4 px-6 text-center">
+                                        <div className="flex justify-center gap-2">
+                                            {item.linkMicro && <a href={item.linkMicro} className="text-purple-600 hover:scale-110 transition-transform"><Microscope size={16}/></a>}
+                                            {item.linkFisico && <a href={item.linkFisico} className="text-cyan-600 hover:scale-110 transition-transform"><FlaskConical size={16}/></a>}
+                                        </div>
+                                    </td>
+                                    <td className="py-4 px-6 text-right">
+                                        <div className="flex justify-end items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleRenovar(item)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Renovar"><FlaskConical size={16}/></button>
+                                            <button onClick={() => handleEdit(item)} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Editar"><Edit size={16}/></button>
+                                            <button onClick={() => { setHistoryTargetId(item.sedeId); setIsHistoryOpen(true); }} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Histórico"><History size={16}/></button>
+                                            <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" title="Excluir"><Trash2 size={16}/></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                </table>
+            </div>
+        </>
+      )}
 
       {/* --- SLIDE OVER (SHEET) FOR FORM --- */}
       {isSheetOpen && (
