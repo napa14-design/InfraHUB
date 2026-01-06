@@ -9,6 +9,7 @@ import { ModuleView } from './components/ModuleView';
 import { AdminUserManagement } from './components/AdminUserManagement';
 import { AdminModuleManagement } from './components/AdminModuleManagement';
 import { AdminOrgManagement } from './components/AdminOrgManagement';
+import { AdminNotificationConfig } from './components/AdminNotificationConfig';
 import { HydroSysDashboard } from './components/HydroSysDashboard';
 import { HydroCertificados } from './components/HydroSys/HydroCertificados';
 import { HydroCloro } from './components/HydroSys/HydroCloro';
@@ -30,9 +31,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = async (email: string) => {
-    const loggedUser = await authService.login(email);
-    if (loggedUser) {
-      setUser(loggedUser);
+    // In this mock implementation, we retrieve the user by email since authentication 
+    // was already handled by the Login component.
+    const users = authService.getAllUsers();
+    const foundUser = users.find(u => u.email === email);
+    
+    if (foundUser) {
+      setUser(foundUser);
       return true;
     }
     return false;
@@ -74,7 +79,7 @@ const App: React.FC = () => {
                     <Route 
                       path="/admin/users" 
                       element={
-                        user.role === UserRole.ADMIN 
+                        (user.role === UserRole.ADMIN || user.role === UserRole.GESTOR)
                           ? <AdminUserManagement /> 
                           : <Navigate to="/" replace />
                       } 
@@ -94,6 +99,15 @@ const App: React.FC = () => {
                       element={
                         user.role === UserRole.ADMIN 
                           ? <AdminOrgManagement /> 
+                          : <Navigate to="/" replace />
+                      } 
+                    />
+
+                    <Route 
+                      path="/admin/notifications" 
+                      element={
+                        user.role === UserRole.ADMIN 
+                          ? <AdminNotificationConfig /> 
                           : <Navigate to="/" replace />
                       } 
                     />

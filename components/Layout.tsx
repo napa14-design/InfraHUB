@@ -50,14 +50,20 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const isHydroSys = location.pathname.includes('/module/hydrosys');
 
   useEffect(() => {
+    // 1. Run Check Logic for Warnings/Criticals based on Rules
+    notificationService.checkSystemStatus(user);
+    
+    // 2. Load Notifications
     setNotifications(notificationService.getAll());
+
+    // 3. Interval for polling (Simulated)
     const interval = setInterval(() => {
-      const newNotif = notificationService.simulateIncoming();
-      const updated = notificationService.add(newNotif);
-      setNotifications(updated);
-    }, 45000);
+      // Re-check system status every minute in case something expired while open
+      notificationService.checkSystemStatus(user);
+      setNotifications(notificationService.getAll());
+    }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
 
   const handleLogout = () => {
     authService.logout();
@@ -73,6 +79,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   `;
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  // Check if there are any CRITICAL unread notifications to animate the bell
+  const hasCritical = notifications.some(n => !n.read && n.type === 'ERROR');
 
   const renderHydroSysSidebar = () => (
     <>
@@ -118,36 +126,56 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     </>
   );
 
-  const renderMainSidebar = () => (
-    <>
-      <Link to="/" className={navItemClass('/')} onClick={() => setIsSidebarOpen(false)}>
-        <LayoutGrid size={20} />
-        <span>Dashboard</span>
-      </Link>
+  const renderMainSidebar = () => {
+    const isAdmin = user.role === UserRole.ADMIN;
+    const isGestor = user.role === UserRole.GESTOR;
+    const canManageUsers = isAdmin || isGestor;
 
-      {user.role === UserRole.ADMIN && (
-        <>
+    return (
+      <>
+        <Link to="/" className={navItemClass('/')} onClick={() => setIsSidebarOpen(false)}>
+          <LayoutGrid size={20} />
+          <span>Dashboard</span>
+        </Link>
+
+        {(isAdmin || canManageUsers) && (
           <div className="pt-4 pb-2">
             <p className="px-4 text-xs font-bold text-slate-400 dark:text-slate-600 uppercase tracking-wider">
               Administração
             </p>
           </div>
+        )}
+
+        {isAdmin && (
           <Link to="/admin/org" className={navItemClass('/admin/org')} onClick={() => setIsSidebarOpen(false)}>
             <Building2 size={20} />
             <span>Estrutura Org.</span>
           </Link>
+        )}
+        
+        {canManageUsers && (
           <Link to="/admin/users" className={navItemClass('/admin/users')} onClick={() => setIsSidebarOpen(false)}>
             <ShieldCheck size={20} />
             <span>Gestão Usuários</span>
           </Link>
+        )}
+
+        {isAdmin && (
           <Link to="/admin/modules" className={navItemClass('/admin/modules')} onClick={() => setIsSidebarOpen(false)}>
             <Layers size={20} />
             <span>Catálogo de Apps</span>
           </Link>
-        </>
-      )}
-    </>
-  );
+        )}
+
+        {isAdmin && (
+           <Link to="/admin/notifications" className={navItemClass('/admin/notifications')} onClick={() => setIsSidebarOpen(false)}>
+            <Bell size={20} />
+            <span>Config. Notificações</span>
+          </Link>
+        )}
+      </>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 flex">
@@ -199,11 +227,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           {/* User Info Card */}
           <div className="p-4 mb-6 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700/50">
             <div className="flex items-center space-x-3 mb-3">
-              <img 
-                src={user.avatarUrl} 
-                alt={user.name} 
-                className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-600 shadow-sm"
-              />
+              <div className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-600 shadow-sm bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-300 font-bold">
+                  {user.name.charAt(0)}
+              </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{user.name}</p>
                 <p className="text-xs text-brand-600 dark:text-brand-400 font-bold uppercase tracking-wider">{user.role}</p>
@@ -241,11 +267,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
               >
                 <div className="flex items-center space-x-3">
-                  <Bell size={20} />
+                  <Bell size={20} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
                   <span>Notificações</span>
                 </div>
                 {unreadCount > 0 && (
-                  <span className="bg-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm shadow-brand-500/50">
+                  <span className={`text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm ${hasCritical ? 'bg-red-500 shadow-red-500/50 animate-pulse' : 'bg-brand-500 shadow-brand-500/50'}`}>
                     {unreadCount}
                   </span>
                 )}
@@ -276,12 +302,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </div>
           <div className="flex items-center gap-3">
             <button onClick={() => setIsNotifOpen(true)} className="relative text-slate-500 dark:text-slate-400">
-              <Bell size={24} />
+              <Bell size={24} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+                <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${hasCritical ? 'bg-red-600' : 'bg-brand-500'}`}></span>
               )}
             </button>
-            <img src={user.avatarUrl} className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700" alt="User" />
+            <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">
+                {user.name.charAt(0)}
+            </div>
           </div>
         </header>
 

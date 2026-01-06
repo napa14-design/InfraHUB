@@ -30,12 +30,20 @@ export interface Local {
   tipo?: string; // Ex: Bebedouro, Piscina, Cozinha
 }
 
+export type UserStatus = 'ACTIVE' | 'INACTIVE';
+
 export interface User {
   id: string;
   name: string;
   email: string;
   role: UserRole;
   avatarUrl?: string;
+  status: UserStatus;
+  
+  // Auth fields (Mock only - in real app password is never exposed like this)
+  password?: string; 
+  isFirstLogin: boolean;
+
   // Link user to hierarchy
   organizationId?: string;
   regionId?: string;
@@ -80,6 +88,18 @@ export interface AppNotification {
   type: NotificationType;
   read: boolean;
   timestamp: Date;
+  link?: string; // Optional link to navigate to the issue
+  moduleSource?: string;
+}
+
+export interface NotificationRule {
+  id: string;
+  moduleId: string;
+  name: string; // Ex: "Validade de Certificados"
+  description: string;
+  warningDays: number; // Ex: 30 dias antes
+  criticalDays: number; // Ex: 0 dias (Vencido) ou 7 dias antes
+  enabled: boolean;
 }
 
 // --- HYDROSYS TYPES ---

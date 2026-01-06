@@ -66,35 +66,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
   return (
     <div className="space-y-10">
-      {/* Hero Section */}
-      <div className="relative rounded-3xl overflow-hidden p-8 md:p-12">
-        {/* Background Mesh Gradient */}
-        <div className="absolute inset-0 bg-slate-900">
-           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-500/30 rounded-full blur-[100px] mix-blend-screen opacity-50 animate-pulse"></div>
-           <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-500/30 rounded-full blur-[80px] mix-blend-screen opacity-50"></div>
+      {/* Hero Section - Adapted for Light/Dark Mode */}
+      <div className="relative rounded-3xl overflow-hidden p-8 md:p-12 border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition-colors">
+        {/* Background Mesh Gradient - Only visible in Dark Mode for effect, or subtle in light */}
+        <div className="absolute inset-0 bg-white dark:bg-slate-900 transition-colors">
+           <div className="hidden dark:block absolute top-0 right-0 w-[500px] h-[500px] bg-brand-500/30 rounded-full blur-[100px] mix-blend-screen opacity-50 animate-pulse"></div>
+           <div className="hidden dark:block absolute bottom-0 left-0 w-[400px] h-[400px] bg-purple-500/30 rounded-full blur-[80px] mix-blend-screen opacity-50"></div>
+           
+           {/* Light Mode subtle gradient */}
+           <div className="dark:hidden absolute top-0 right-0 w-full h-full bg-gradient-to-br from-slate-50 to-white"></div>
         </div>
 
         <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <div className="flex items-center space-x-2 text-brand-300 mb-2 font-medium">
+            <div className="flex items-center space-x-2 text-brand-600 dark:text-brand-300 mb-2 font-medium">
               <Sun size={18} />
               <span>Bom dia,</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tight mb-4">
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight mb-4">
               {user.name.split(' ')[0]}
             </h1>
-            <p className="text-slate-300 text-lg max-w-xl leading-relaxed">
-              Bem-vindo ao Nexus Hub. Você tem acesso a <span className="text-white font-bold">{accessibleModules.length} aplicações</span> hoje.
+            <p className="text-slate-600 dark:text-slate-300 text-lg max-w-xl leading-relaxed">
+              Bem-vindo ao Nexus Hub. Você tem acesso a <span className="font-bold text-slate-900 dark:text-white">{accessibleModules.length} aplicações</span> hoje.
             </p>
           </div>
 
-          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-4 min-w-[200px] text-white">
-            <p className="text-xs text-slate-300 uppercase tracking-wider font-bold mb-1">Sua Unidade</p>
+          <div className="bg-slate-50 dark:bg-white/10 backdrop-blur-md border border-slate-200 dark:border-white/20 rounded-2xl p-4 min-w-[200px] text-slate-900 dark:text-white">
+            <p className="text-xs text-slate-500 dark:text-slate-300 uppercase tracking-wider font-bold mb-1">Sua Unidade</p>
             <div className="flex items-center gap-2">
-              <Building2 size={18} className="text-brand-300" />
+              <Building2 size={18} className="text-brand-600 dark:text-brand-300" />
               <span className="font-semibold text-lg">{userSede ? userSede.name : 'Matriz Global'}</span>
             </div>
-            <div className="mt-2 text-xs text-slate-400 flex items-center gap-1">
+            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
               <Map size={12} />
               {userSede?.address || 'Localização não definida'}
             </div>
@@ -109,7 +112,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <LayoutGrid className="text-brand-500" size={24} />
             Ferramentas Operacionais
           </h2>
-          <span className="text-sm text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
+          <span className="text-sm text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-3 py-1 rounded-full shadow-sm">
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
           </span>
         </div>

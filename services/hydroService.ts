@@ -13,14 +13,19 @@ const KEYS = {
 // --- MOCK DATA GENERATORS ---
 const mockCertificados: HydroCertificado[] = [
   {
-    id: '1', sedeId: 'sede-1', parceiro: 'Lab Waters', status: 'VIGENTE', semestre: '1º/2024',
+    id: '1', sedeId: 'sede-dt1', parceiro: 'Lab Waters', status: 'VIGENTE', semestre: '1º/2024',
     validadeSemestre: '2024-06-30', dataAnalise: '2024-01-15', validade: '2024-07-15',
-    linkMicro: '#', linkFisico: '#', empresa: 'Nexus SP', agendamento: 'Mensal', observacao: 'Tudo ok'
+    linkMicro: 'https://example.com/micro1.pdf', linkFisico: 'https://example.com/fisico1.pdf', empresa: 'Nexus SP', agendamento: 'Mensal', observacao: 'Tudo ok'
   },
   {
-    id: '2', sedeId: 'sede-2', parceiro: 'Bio Analise', status: 'VENCIDO', semestre: '2º/2023',
+    id: '2', sedeId: 'sede-dt1', parceiro: 'Bio Analise', status: 'VENCIDO', semestre: '2º/2023',
     validadeSemestre: '2023-12-31', dataAnalise: '2023-07-01', validade: '2024-01-01',
-    linkMicro: '#', linkFisico: '#', empresa: 'Nexus RJ', agendamento: 'Bimestral', observacao: 'Renovar urgente'
+    linkMicro: 'https://example.com/micro2.pdf', linkFisico: '', empresa: 'Nexus RJ', agendamento: 'Bimestral', observacao: 'Renovar urgente'
+  },
+  {
+    id: '3', sedeId: 'sede-sul1', parceiro: 'Lab Waters', status: 'VIGENTE', semestre: '1º/2024',
+    validadeSemestre: '2024-06-30', dataAnalise: '2024-02-10', validade: '2024-08-10',
+    linkMicro: '', linkFisico: 'https://example.com/fisico3.pdf', empresa: 'Nexus SP', agendamento: 'Mensal', observacao: 'Pendente Micro'
   }
 ];
 

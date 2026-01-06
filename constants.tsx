@@ -54,30 +54,36 @@ export const MOCK_USERS: User[] = [
     name: 'Roberto Admin',
     email: 'admin@nexus.com',
     role: UserRole.ADMIN,
-    avatarUrl: 'https://i.pravatar.cc/150?u=1',
     organizationId: 'org-col',
     regionId: 'reg-dt',
-    sedeId: 'sede-dt1'
+    sedeId: 'sede-dt1',
+    status: 'ACTIVE',
+    password: '123',
+    isFirstLogin: false
   },
   {
     id: '2',
     name: 'Glória Gestora',
     email: 'gestor@nexus.com',
     role: UserRole.GESTOR,
-    avatarUrl: 'https://i.pravatar.cc/150?u=2',
     organizationId: 'org-col',
     regionId: 'reg-dt',
-    sedeId: 'sede-dt1'
+    sedeId: 'sede-dt1',
+    status: 'ACTIVE',
+    password: '123',
+    isFirstLogin: false
   },
   {
     id: '3',
     name: 'João Operacional',
     email: 'operacional@nexus.com',
     role: UserRole.OPERATIONAL,
-    avatarUrl: 'https://i.pravatar.cc/150?u=3',
     organizationId: 'org-col',
     regionId: 'reg-dt',
-    sedeId: 'sede-dt1'
+    sedeId: 'sede-dt1',
+    status: 'ACTIVE',
+    password: '123',
+    isFirstLogin: true // Force password change
   }
 ];
 

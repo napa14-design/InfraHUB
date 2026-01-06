@@ -1,5 +1,6 @@
 import React from 'react';
-import { X, Check, Info, AlertTriangle, CheckCircle, AlertCircle, Bell } from 'lucide-react';
+import { X, Check, Info, AlertTriangle, CheckCircle, AlertCircle, Bell, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { AppNotification } from '../types';
 
 interface NotificationCenterProps {
@@ -17,13 +18,6 @@ const IconMap = {
   ERROR: AlertCircle
 };
 
-const ColorMap = {
-  INFO: 'text-blue-500 bg-blue-50',
-  WARNING: 'text-amber-500 bg-amber-50',
-  SUCCESS: 'text-emerald-500 bg-emerald-50',
-  ERROR: 'text-red-500 bg-red-50'
-};
-
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   isOpen,
   onClose,
@@ -31,6 +25,14 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onMarkRead,
   onMarkAllRead
 }) => {
+  const navigate = useNavigate();
+
+  const handleLinkClick = (link: string, id: string) => {
+      onMarkRead(id);
+      onClose();
+      navigate(link);
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -43,34 +45,34 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
 
       {/* Panel */}
       <div className={`
-        fixed inset-y-0 right-0 z-50 w-full md:w-96 bg-white shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col
+        fixed inset-y-0 right-0 z-50 w-full md:w-96 bg-white dark:bg-slate-900 shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col border-l border-slate-200 dark:border-slate-800
         ${isOpen ? 'translate-x-0' : 'translate-x-full'}
       `}>
-        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900">
           <div className="flex items-center gap-2">
-            <Bell size={20} className="text-slate-600" />
-            <h2 className="font-bold text-slate-800">Notificações</h2>
-            <span className="bg-brand-100 text-brand-700 text-xs px-2 py-0.5 rounded-full font-medium">
+            <Bell size={20} className="text-slate-600 dark:text-slate-400" />
+            <h2 className="font-bold text-slate-800 dark:text-white">Notificações</h2>
+            <span className="bg-brand-100 dark:bg-brand-900/30 text-brand-700 dark:text-brand-400 text-xs px-2 py-0.5 rounded-full font-medium">
               {notifications.filter(n => !n.read).length} novas
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={onMarkAllRead}
-              className="text-xs font-medium text-brand-600 hover:text-brand-800 px-2 py-1 hover:bg-brand-50 rounded transition-colors"
+              className="text-xs font-medium text-brand-600 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300 px-2 py-1 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded transition-colors"
             >
               Marcar lidas
             </button>
             <button 
               onClick={onClose}
-              className="p-1 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+              className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 transition-colors"
             >
               <X size={20} />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 dark:bg-slate-950/50">
           {notifications.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400">
               <Bell size={48} className="mb-3 opacity-20" />
@@ -79,39 +81,64 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
           ) : (
             notifications.map((notification) => {
               const Icon = IconMap[notification.type];
-              const colors = ColorMap[notification.type];
               
+              // Custom Styles based on type
+              let containerClass = "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700";
+              let iconClass = "text-slate-500 bg-slate-100 dark:bg-slate-700";
+              
+              if (notification.type === 'ERROR') {
+                  containerClass = "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30 ring-1 ring-red-300 dark:ring-red-900/50";
+                  iconClass = "text-red-600 bg-red-100 dark:bg-red-900/30 animate-pulse";
+              } else if (notification.type === 'WARNING') {
+                  containerClass = "bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30";
+                  iconClass = "text-amber-600 bg-amber-100 dark:bg-amber-900/30";
+              } else if (notification.type === 'SUCCESS') {
+                   containerClass = "bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-900/30";
+                   iconClass = "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30";
+              }
+              
+              if (notification.read) {
+                  containerClass = "bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-800 opacity-60";
+                  iconClass = "text-slate-400 bg-slate-100 dark:bg-slate-700";
+              }
+
               return (
                 <div 
                   key={notification.id}
-                  className={`
-                    relative p-4 rounded-xl border transition-all duration-200 group
-                    ${notification.read ? 'bg-white border-slate-100 opacity-75' : 'bg-white border-slate-200 shadow-sm border-l-4 border-l-brand-500'}
-                  `}
+                  className={`relative p-4 rounded-xl border transition-all duration-200 group ${containerClass}`}
                 >
                   <div className="flex items-start gap-3">
-                    <div className={`p-2 rounded-full ${colors} flex-shrink-0`}>
+                    <div className={`p-2 rounded-full flex-shrink-0 ${iconClass}`}>
                       <Icon size={16} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
-                        <h3 className={`text-sm font-semibold mb-1 ${notification.read ? 'text-slate-600' : 'text-slate-900'}`}>
+                        <h3 className={`text-sm font-bold mb-1 ${notification.read ? 'text-slate-500' : 'text-slate-900 dark:text-white'}`}>
                           {notification.title}
                         </h3>
                         <span className="text-[10px] text-slate-400 whitespace-nowrap ml-2">
                           {new Date(notification.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500 leading-snug">
+                      <p className={`text-sm leading-snug ${notification.read ? 'text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
                         {notification.message}
                       </p>
+                      
+                      {notification.link && (
+                          <button 
+                            onClick={() => handleLinkClick(notification.link!, notification.id)}
+                            className="mt-2 text-xs font-bold flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline"
+                          >
+                              Ver Detalhes <ArrowRight size={12} />
+                          </button>
+                      )}
                     </div>
                   </div>
                   
                   {!notification.read && (
                     <button 
                       onClick={(e) => { e.stopPropagation(); onMarkRead(notification.id); }}
-                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-slate-100 rounded-full text-brand-600 transition-all"
+                      className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-black/5 rounded-full text-slate-500 transition-all"
                       title="Marcar como lida"
                     >
                       <Check size={14} />

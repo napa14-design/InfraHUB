@@ -585,11 +585,30 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                            <div className="flex items-center gap-2"><Calendar size={12}/> Análise: {new Date(hist.dataAnalise).toLocaleDateString()}</div>
                                            <div className="flex items-center gap-2"><Clock size={12}/> Vencimento: {new Date(hist.validade).toLocaleDateString()}</div>
                                        </div>
-                                       {hist.linkMicro && (
-                                           <a href={hist.linkMicro} target="_blank" className="mt-3 flex items-center justify-center gap-2 w-full py-2 bg-slate-50 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition-colors">
-                                               <FileText size={12}/> Ver Laudo PDF
-                                           </a>
-                                       )}
+                                       
+                                       {/* NEW LINKS SECTION FOR HISTORY */}
+                                       <div className="mt-3 grid grid-cols-2 gap-2">
+                                           {hist.linkMicro ? (
+                                                <a href={hist.linkMicro} target="_blank" className="flex items-center justify-center gap-2 py-2 bg-purple-50 text-purple-700 rounded-lg text-xs font-bold hover:bg-purple-100 transition-colors border border-purple-100">
+                                                    <Microscope size={14}/> Micro
+                                                </a>
+                                           ) : (
+                                                <span className="flex items-center justify-center gap-2 py-2 bg-slate-50 text-slate-400 rounded-lg text-xs border border-slate-100 cursor-not-allowed">
+                                                    <Microscope size={14}/> N/A
+                                                </span>
+                                           )}
+
+                                           {hist.linkFisico ? (
+                                                <a href={hist.linkFisico} target="_blank" className="flex items-center justify-center gap-2 py-2 bg-cyan-50 text-cyan-700 rounded-lg text-xs font-bold hover:bg-cyan-100 transition-colors border border-cyan-100">
+                                                    <FlaskConical size={14}/> Físico
+                                                </a>
+                                           ) : (
+                                                <span className="flex items-center justify-center gap-2 py-2 bg-slate-50 text-slate-400 rounded-lg text-xs border border-slate-100 cursor-not-allowed">
+                                                    <FlaskConical size={14}/> N/A
+                                                </span>
+                                           )}
+                                       </div>
+
                                    </div>
                                </div>
                            ))}
