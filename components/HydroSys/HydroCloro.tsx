@@ -1,0 +1,284 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, HydroCloroEntry } from '../../types';
+import { hydroService } from '../../services/hydroService';
+
+export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
+  const navigate = useNavigate();
+  const [entries, setEntries] = useState<HydroCloroEntry[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedDateStr, setSelectedDateStr] = useState('');
+  
+  const [form, setForm] = useState<Partial<HydroCloroEntry>>({
+    cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name
+  });
+
+  useEffect(() => {
+    setEntries(hydroService.getCloro(user));
+  }, [user]);
+
+  const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+  const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+  const getEntry = (date: string) => entries.find(e => e.date === date);
+
+  const handleDayClick = (day: number) => {
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setSelectedDateStr(dateStr);
+    
+    const entry = getEntry(dateStr);
+    if (entry) {
+        setForm(entry);
+    } else {
+        setForm({ cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSave = () => {
+    if (selectedDateStr && user.sedeId) {
+        hydroService.saveCloro({
+            id: Date.now().toString(),
+            sedeId: user.sedeId,
+            date: selectedDateStr,
+            cl: Number(form.cl),
+            ph: Number(form.ph),
+            medidaCorretiva: form.medidaCorretiva,
+            responsavel: form.responsavel || user.name
+        });
+        setEntries(hydroService.getCloro(user));
+        setIsModalOpen(false);
+    }
+  };
+
+  // Rendering Calendar
+  const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+  const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+
+  return (
+    <div className="space-y-8 animate-in fade-in pb-20 md:pb-0">
+      
+      {/* HEADER */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25 text-white">
+            <TestTube size={28} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Controle de Cloro e pH
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400">
+              Monitoramento diário da qualidade da água.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* --- CALENDAR --- */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-6 md:p-8 relative overflow-hidden">
+          {/* Calendar Header */}
+          <div className="flex items-center justify-between mb-8 relative z-10">
+              <button onClick={handlePrevMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"><ChevronLeft size={20} /></button>
+              <h2 className="text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight">{monthName}</h2>
+              <button onClick={handleNextMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"><ChevronRight size={20} /></button>
+          </div>
+
+          {/* Days Grid */}
+          <div className="grid grid-cols-7 gap-3 mb-4 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+              <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+          </div>
+
+          <div className="grid grid-cols-7 gap-3 lg:gap-4 relative z-10">
+              {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
+              
+              {Array.from({ length: daysInMonth }).map((_, i) => {
+                  const day = i + 1;
+                  const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const entry = getEntry(dateStr);
+                  
+                  // Styles mimicking the reference image
+                  let cardStyle = "bg-yellow-50/50 dark:bg-yellow-900/5 border border-dashed border-yellow-200 text-yellow-600/60"; // Future
+                  let statusLabel = "FUTURO";
+                  let Icon = Clock;
+                  let iconColor = "text-yellow-400";
+
+                  if (dateStr < todayStr) {
+                      if (entry) {
+                          cardStyle = "bg-white dark:bg-slate-800 border-2 border-emerald-100 dark:border-emerald-900/30 shadow-sm";
+                          statusLabel = "REGISTRADO";
+                          Icon = CheckCircle2;
+                          iconColor = "text-emerald-500";
+                      } else {
+                          cardStyle = "bg-red-50 dark:bg-red-900/10 border-2 border-red-100 text-red-400";
+                          statusLabel = "PENDENTE";
+                          Icon = AlertTriangle;
+                          iconColor = "text-red-400";
+                      }
+                  } else if (dateStr === todayStr) {
+                      if (entry) {
+                           cardStyle = "bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 shadow-md shadow-emerald-500/10";
+                           statusLabel = "HOJE (OK)";
+                           Icon = CheckCircle2;
+                           iconColor = "text-emerald-600";
+                      } else {
+                           cardStyle = "bg-white dark:bg-slate-800 border-2 border-red-400 ring-4 ring-red-50 dark:ring-red-900/20";
+                           statusLabel = "HOJE";
+                           Icon = AlertTriangle;
+                           iconColor = "text-red-500 animate-pulse";
+                      }
+                  }
+
+                  return (
+                      <button 
+                        key={day}
+                        onClick={() => handleDayClick(day)}
+                        className={`
+                            group h-24 md:h-32 rounded-2xl flex flex-col justify-between p-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
+                            ${cardStyle}
+                        `}
+                      >
+                          <div className="flex justify-between items-start w-full">
+                              <span className={`text-lg font-bold ${dateStr === todayStr ? 'text-slate-900' : 'opacity-70'}`}>{day}</span>
+                              <Icon size={16} className={iconColor} />
+                          </div>
+
+                          <div className="w-full">
+                              {entry ? (
+                                  <div className="flex flex-col gap-1">
+                                      <div className="flex justify-between items-center text-xs bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-lg font-bold text-slate-600 dark:text-slate-300">
+                                          <span>CL</span> <span>{entry.cl}</span>
+                                      </div>
+                                      <div className="flex justify-between items-center text-xs bg-slate-100 dark:bg-slate-700/50 px-2 py-1 rounded-lg font-bold text-slate-600 dark:text-slate-300">
+                                          <span>pH</span> <span>{entry.ph}</span>
+                                      </div>
+                                  </div>
+                              ) : (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 flex justify-center">{statusLabel}</span>
+                              )}
+                          </div>
+                      </button>
+                  );
+              })}
+          </div>
+          
+          {/* Background decorative blob */}
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-cyan-500/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+      </div>
+
+      {/* --- INFO FOOTER (REFERENCE IMAGE STYLE) --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+           {/* Padrão Cloro */}
+           <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
+               <div className="w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center text-emerald-600">
+                   <Droplets size={24} />
+               </div>
+               <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Padrão Cloro</p>
+                   <p className="text-2xl font-black text-slate-800">1.0 - 3.0</p>
+                   <span className="text-xs font-bold text-emerald-600">ppm ideal</span>
+               </div>
+           </div>
+
+           {/* Padrão pH */}
+           <div className="bg-gradient-to-br from-cyan-50 to-blue-50 border border-cyan-100 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
+               <div className="w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center text-cyan-600">
+                   <TestTube size={24} />
+               </div>
+               <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Padrão pH</p>
+                   <p className="text-2xl font-black text-slate-800">7.4 - 7.6</p>
+                   <span className="text-xs font-bold text-cyan-600">neutro/básico</span>
+               </div>
+           </div>
+
+           {/* Alerta Cloro */}
+           <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
+               <div className="w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center text-amber-600">
+                   <AlertTriangle size={24} />
+               </div>
+               <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Alerta Cloro</p>
+                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; 1.0 <span className="text-slate-300">|</span> &gt; 3.0</p>
+                   <span className="text-xs font-bold text-amber-600">Ação corretiva</span>
+               </div>
+           </div>
+
+            {/* Alerta pH */}
+           <div className="bg-gradient-to-br from-red-50 to-rose-50 border border-red-100 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
+               <div className="w-12 h-12 rounded-full bg-white shadow-md flex items-center justify-center text-red-600">
+                   <AlertTriangle size={24} />
+               </div>
+               <div>
+                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Alerta pH</p>
+                   <p className="text-lg font-black text-slate-800 leading-tight">&lt; 7.4 <span className="text-slate-300">|</span> &gt; 7.6</p>
+                   <span className="text-xs font-bold text-red-600">Crítico</span>
+               </div>
+           </div>
+      </div>
+
+      {/* --- MODAL (SIMPLIFIED FOR USER) --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200 border-t-8 border-cyan-500">
+                <div className="flex justify-between items-center mb-6">
+                    <div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lançamento Diário</p>
+                        <h3 className="text-2xl font-black text-slate-900 dark:text-white">
+                            {selectedDateStr.split('-').reverse().slice(0, 2).join('/')}
+                        </h3>
+                    </div>
+                    <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 p-2 rounded-full hover:bg-slate-200"><X className="text-slate-500" size={20} /></button>
+                </div>
+
+                <div className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-cyan-50 p-4 rounded-2xl border border-cyan-100">
+                            <label className="block text-xs font-bold text-cyan-600 uppercase mb-2">Cloro (ppm)</label>
+                            <input 
+                                type="number" step="0.1"
+                                className="w-full bg-white px-2 py-2 rounded-xl border border-cyan-200 focus:ring-2 focus:ring-cyan-500 outline-none text-3xl font-black text-center text-slate-800"
+                                value={form.cl}
+                                onChange={e => setForm({...form, cl: Number(e.target.value)})}
+                            />
+                        </div>
+                        <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <label className="block text-xs font-bold text-blue-600 uppercase mb-2">pH</label>
+                            <input 
+                                type="number" step="0.1"
+                                className="w-full bg-white px-2 py-2 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 outline-none text-3xl font-black text-center text-slate-800"
+                                value={form.ph}
+                                onChange={e => setForm({...form, ph: Number(e.target.value)})}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Medida Corretiva (Opcional)</label>
+                        <textarea 
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-slate-300 outline-none text-sm transition-colors"
+                            placeholder="Descreva se aplicou produto..."
+                            rows={3}
+                            value={form.medidaCorretiva}
+                            onChange={e => setForm({...form, medidaCorretiva: e.target.value})}
+                        />
+                    </div>
+
+                    <button 
+                        onClick={handleSave}
+                        className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-xl shadow-cyan-500/30 transition-all hover:scale-[1.02]"
+                    >
+                        <Save size={20} /> Salvar Registro
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+    </div>
+  );
+};
