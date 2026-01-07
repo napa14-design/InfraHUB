@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bell, Save, AlertTriangle, AlertCircle, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Bell, Save, AlertTriangle, AlertCircle, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { NotificationRule } from '../types';
 import { configService } from '../services/configService';
@@ -8,6 +9,9 @@ export const AdminNotificationConfig: React.FC = () => {
   const navigate = useNavigate();
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
+  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -19,14 +23,35 @@ export const AdminNotificationConfig: React.FC = () => {
   const handleUpdate = (id: string, field: keyof NotificationRule, value: any) => {
     setRules(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
     setHasChanges(true);
+    setSaveStatus('IDLE');
+    setErrorMessage('');
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
+    setSaveStatus('IDLE');
+    setErrorMessage('');
+    let errorFound = null;
+
     for (const r of rules) {
-        await configService.saveRule(r);
+        const { error } = await configService.saveRule(r);
+        if (error) {
+            errorFound = error;
+            break; // Stop on first error
+        }
     }
-    setHasChanges(false);
-    alert('Regras de notificação atualizadas com sucesso!');
+
+    setIsSaving(false);
+    if (errorFound) {
+        setSaveStatus('ERROR');
+        // Handle if error is object or string
+        const msg = typeof errorFound === 'string' ? errorFound : JSON.stringify(errorFound);
+        setErrorMessage(msg);
+    } else {
+        setSaveStatus('SUCCESS');
+        setHasChanges(false);
+        setTimeout(() => setSaveStatus('IDLE'), 3000);
+    }
   };
 
   const handleReset = async () => {
@@ -66,14 +91,34 @@ export const AdminNotificationConfig: React.FC = () => {
             </button>
             <button 
                 onClick={handleSave}
-                disabled={!hasChanges}
-                className="flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!hasChanges || isSaving}
+                className={`flex items-center justify-center px-4 py-2 rounded-lg font-bold text-white transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed
+                    ${saveStatus === 'SUCCESS' ? 'bg-emerald-500 hover:bg-emerald-600' : 
+                      saveStatus === 'ERROR' ? 'bg-red-500 hover:bg-red-600' :
+                      'bg-brand-600 hover:bg-brand-700'}
+                `}
             >
-                <Save size={18} className="mr-2" />
-                Salvar Alterações
+                {isSaving ? (
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></span>
+                ) : saveStatus === 'SUCCESS' ? (
+                    <CheckCircle2 size={18} className="mr-2" />
+                ) : (
+                    <Save size={18} className="mr-2" />
+                )}
+                {saveStatus === 'SUCCESS' ? 'Salvo!' : saveStatus === 'ERROR' ? 'Erro' : 'Salvar Alterações'}
             </button>
         </div>
       </div>
+
+      {saveStatus === 'ERROR' && (
+          <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 flex items-center gap-3">
+              <XCircle size={20} />
+              <div>
+                  <p className="font-bold">Erro ao salvar configurações</p>
+                  <p className="text-sm">{errorMessage || 'Verifique a conexão ou permissões da tabela notification_rules.'}</p>
+              </div>
+          </div>
+      )}
 
       <div className="grid grid-cols-1 gap-6">
           {rules.map(rule => (

@@ -14,25 +14,28 @@ const getEnv = (key: string) => {
     return '';
 };
 
-const supabaseUrl = getEnv('VITE_SUPABASE_URL');
-const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
+// Usa variáveis de ambiente OU as chaves fornecidas como fallback
+const supabaseUrl = getEnv('VITE_SUPABASE_URL') || 'https://fkgjksidezjaqupkdyev.supabase.co';
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZrZ2prc2lkZXpqYXF1cGtkeWV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3MzA0NTgsImV4cCI6MjA4MzMwNjQ1OH0.iqQNLpObWcMrkNnqcaTePNSdQFj7fd66Dxw8dlvpOXc';
+
+// Debug Logs
+console.log(`[Supabase Init] URL: ${supabaseUrl}`);
+console.log(`[Supabase Init] Key Length: ${supabaseAnonKey?.length || 0}`);
 
 // Verifica se o Supabase foi configurado com chaves reais
-// Se a URL estiver vazia ou for a URL de placeholder, consideramos como NÃO configurado.
 export const isSupabaseConfigured = () => {
-    return (
+    const isConfigured = (
         supabaseUrl && 
         supabaseUrl !== '' && 
         supabaseAnonKey && 
         supabaseAnonKey !== '' &&
         !supabaseUrl.includes('placeholder.supabase.co')
     );
+    return isConfigured;
 };
 
 // Inicializa o cliente Supabase.
-// Se não estiver configurado, usa placeholders para evitar crash na inicialização do módulo,
-// mas os serviços devem verificar `isSupabaseConfigured()` antes de fazer chamadas de rede.
 export const supabase = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co', 
-    supabaseAnonKey || 'placeholder-key'
+    supabaseUrl, 
+    supabaseAnonKey
 );

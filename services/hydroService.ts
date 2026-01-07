@@ -3,6 +3,153 @@ import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPo
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS } from '../constants';
 
+// --- MAPPERS (DB snake_case <-> App camelCase) ---
+
+const mapCertificadoFromDB = (db: any): HydroCertificado => ({
+    id: db.id,
+    sedeId: db.sede_id,
+    parceiro: db.parceiro,
+    status: db.status,
+    semestre: db.semestre,
+    validadeSemestre: db.validade_semestre,
+    dataAnalise: db.data_analise,
+    validade: db.validade,
+    linkMicro: db.link_micro,
+    linkFisico: db.link_fisico,
+    empresa: db.empresa,
+    agendamento: db.agendamento,
+    observacao: db.observacao
+});
+
+const mapCertificadoToDB = (app: HydroCertificado) => ({
+    id: app.id,
+    sede_id: app.sedeId,
+    parceiro: app.parceiro,
+    status: app.status,
+    semestre: app.semestre,
+    validade_semestre: app.validadeSemestre,
+    data_analise: app.dataAnalise,
+    validade: app.validade,
+    link_micro: app.linkMicro,
+    link_fisico: app.linkFisico,
+    empresa: app.empresa,
+    agendamento: app.agendamento,
+    observacao: app.observacao
+});
+
+const mapCloroFromDB = (db: any): HydroCloroEntry => ({
+    id: db.id,
+    sedeId: db.sede_id,
+    date: db.date,
+    cl: db.cl,
+    ph: db.ph,
+    medidaCorretiva: db.medida_corretiva,
+    responsavel: db.responsavel
+});
+
+const mapCloroToDB = (app: HydroCloroEntry) => ({
+    id: app.id,
+    sede_id: app.sedeId,
+    date: app.date,
+    cl: app.cl,
+    ph: app.ph,
+    medida_corretiva: app.medidaCorretiva,
+    responsavel: app.responsavel
+});
+
+const mapFiltroFromDB = (db: any): HydroFiltro => ({
+    id: db.id,
+    sedeId: db.sede_id,
+    patrimonio: db.patrimonio,
+    bebedouro: db.bebedouro,
+    local: db.local,
+    dataTroca: db.data_troca,
+    proximaTroca: db.proxima_troca
+});
+
+const mapFiltroToDB = (app: HydroFiltro) => ({
+    id: app.id,
+    sede_id: app.sedeId,
+    patrimonio: app.patrimonio,
+    bebedouro: app.bebedouro,
+    local: app.local,
+    data_troca: app.dataTroca,
+    proxima_troca: app.proximaTroca
+});
+
+const mapReservatorioFromDB = (db: any): any => ({
+    id: db.id,
+    sedeId: db.sede_id,
+    tipo: db.tipo,
+    local: db.local,
+    responsavel: db.responsavel,
+    dataUltimaLimpeza: db.data_ultima_limpeza,
+    proximaLimpeza: db.proxima_limpeza,
+    situacaoLimpeza: db.situacao_limpeza,
+    // Poço fields
+    bairro: db.bairro,
+    referenciaBomba: db.referencia_bomba,
+    fichaOperacional: db.ficha_operacional,
+    ultimaTrocaFiltro: db.ultima_troca_filtro,
+    proximaTrocaFiltro: db.proxima_troca_filtro,
+    situacaoFiltro: db.situacao_filtro,
+    refil: db.refil,
+    // Caixa/Cisterna fields
+    numCelulas: db.num_celulas,
+    capacidade: db.capacidade,
+    previsaoLimpeza1: db.previsao_limpeza_1,
+    dataLimpeza1: db.data_limpeza_1,
+    previsaoLimpeza2: db.previsao_limpeza_2,
+    dataLimpeza2: db.data_limpeza_2
+});
+
+const mapReservatorioToDB = (app: any) => ({
+    id: app.id,
+    sede_id: app.sedeId,
+    tipo: app.tipo,
+    local: app.local,
+    responsavel: app.responsavel,
+    data_ultima_limpeza: app.dataUltimaLimpeza,
+    proxima_limpeza: app.proximaLimpeza,
+    situacao_limpeza: app.situacaoLimpeza,
+    // Poço
+    bairro: app.bairro,
+    referencia_bomba: app.referenciaBomba,
+    ficha_operacional: app.fichaOperacional,
+    ultima_troca_filtro: app.ultimaTrocaFiltro,
+    proxima_troca_filtro: app.proximaTrocaFiltro,
+    situacao_filtro: app.situacaoFiltro,
+    refil: app.refil,
+    // Caixa/Cisterna
+    num_celulas: app.numCelulas,
+    capacidade: app.capacidade,
+    previsao_limpeza_1: app.previsaoLimpeza1,
+    data_limpeza_1: app.dataLimpeza1,
+    previsao_limpeza_2: app.previsaoLimpeza2,
+    data_limpeza_2: app.dataLimpeza2
+});
+
+const mapSettingsFromDB = (db: any): HydroSettings => ({
+    validadeCertificadoMeses: db.validade_certificado_meses,
+    validadeFiltroMeses: db.validade_filtro_meses,
+    validadeLimpezaMeses: db.validade_limpeza_meses,
+    cloroMin: db.cloro_min,
+    cloroMax: db.cloro_max,
+    phMin: db.ph_min,
+    phMax: db.ph_max
+});
+
+const mapSettingsToDB = (app: HydroSettings) => ({
+    id: 'default', // Singleton ID
+    validade_certificado_meses: app.validadeCertificadoMeses,
+    validade_filtro_meses: app.validadeFiltroMeses,
+    validade_limpeza_meses: app.validadeLimpezaMeses,
+    cloro_min: app.cloroMin,
+    cloro_max: app.cloroMax,
+    ph_min: app.phMin,
+    ph_max: app.phMax
+});
+
 // Helper de filtragem por escopo de usuário
 const filterByScope = <T extends { sedeId: string }>(data: T[], user: User): T[] => {
   if (user.role === UserRole.ADMIN) return data;
@@ -21,14 +168,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_certificados').select('*');
         if (error) throw error;
-        return filterByScope(data || [], user);
+        const mapped = (data || []).map(mapCertificadoFromDB);
+        return filterByScope(mapped, user);
     } catch (e) {
         return filterByScope(MOCK_HYDRO_CERTIFICADOS, user);
     }
   },
   saveCertificado: async (item: HydroCertificado) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(item);
-    // In Mock mode, we don't persist writes permanently
+    if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
   },
   deleteCertificado: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').delete().eq('id', id);
@@ -40,13 +187,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_cloro').select('*');
         if (error) throw error;
-        return filterByScope(data || [], user);
+        const mapped = (data || []).map(mapCloroFromDB);
+        return filterByScope(mapped, user);
     } catch (e) {
-        return []; // No mock data for Cloro initially
+        return [];
     }
   },
   saveCloro: async (entry: HydroCloroEntry) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(entry);
+    if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
   },
 
   // --- FILTROS ---
@@ -55,13 +203,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_filtros').select('*');
         if (error) throw error;
-        return filterByScope(data || [], user);
+        const mapped = (data || []).map(mapFiltroFromDB);
+        return filterByScope(mapped, user);
     } catch (e) {
         return filterByScope(MOCK_HYDRO_FILTROS, user);
     }
   },
   saveFiltro: async (item: HydroFiltro) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(item);
+    if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
   },
   deleteFiltro: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').delete().eq('id', id);
@@ -75,13 +224,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'POCO');
         if (error) throw error;
-        return filterByScope((data || []) as HydroPoco[], user);
+        const mapped = (data || []).map(mapReservatorioFromDB);
+        return filterByScope(mapped as HydroPoco[], user);
     } catch (e) {
         return filterByScope(MOCK_HYDRO_RESERVATORIOS.filter(r => r.tipo === 'POCO'), user);
     }
   },
   savePoco: async (item: HydroPoco) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert({ ...item, tipo: 'POCO' });
+    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
   },
 
   // Cisternas
@@ -90,13 +240,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'CISTERNA');
         if (error) throw error;
-        return filterByScope((data || []) as HydroCisterna[], user);
+        const mapped = (data || []).map(mapReservatorioFromDB);
+        return filterByScope(mapped as HydroCisterna[], user);
     } catch (e) {
         return filterByScope(MOCK_HYDRO_RESERVATORIOS.filter(r => r.tipo === 'CISTERNA'), user);
     }
   },
   saveCisterna: async (item: HydroCisterna) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert({ ...item, tipo: 'CISTERNA' });
+    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CISTERNA' }));
   },
 
   // Caixas
@@ -105,13 +256,14 @@ export const hydroService = {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'CAIXA');
         if (error) throw error;
-        return filterByScope((data || []) as HydroCaixa[], user);
+        const mapped = (data || []).map(mapReservatorioFromDB);
+        return filterByScope(mapped as HydroCaixa[], user);
     } catch (e) {
         return filterByScope(MOCK_HYDRO_RESERVATORIOS.filter(r => r.tipo === 'CAIXA'), user);
     }
   },
   saveCaixa: async (item: HydroCaixa) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert({ ...item, tipo: 'CAIXA' });
+    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CAIXA' }));
   },
 
   // --- SETTINGS ---
@@ -119,7 +271,7 @@ export const hydroService = {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
         const { data } = await supabase.from('hydro_settings').select('*').single();
-        if (data) return data;
+        if (data) return mapSettingsFromDB(data);
         throw new Error("No settings");
     } catch (e) {
         return {
@@ -135,6 +287,6 @@ export const hydroService = {
   },
 
   saveSettings: async (settings: HydroSettings) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_settings').upsert({ ...settings, id: 'default' });
+    if (isSupabaseConfigured()) await supabase.from('hydro_settings').upsert(mapSettingsToDB(settings));
   }
 };

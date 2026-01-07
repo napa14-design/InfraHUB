@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
-import { orgService } from './services/orgService'; // Import OrgService
+import { orgService } from './services/orgService'; 
+import { supabase } from './lib/supabase'; // Import supabase client
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { Layout } from './components/Layout';
@@ -20,6 +21,7 @@ import { HydroReservatorios } from './components/HydroSys/HydroReservatorios';
 import { HydroConfig } from './components/HydroSys/HydroConfig';
 import { HydroSysAnalytics } from './components/HydroSys/HydroAnalytics';
 import { ThemeProvider } from './components/ThemeContext';
+import { Instructions } from './supabase_setup';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +29,14 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const initApp = async () => {
+        try {
+            // 0. Ensure Session is restored before fetching data
+            // This is critical for RLS policies to recognize the user
+            await supabase.auth.getSession();
+        } catch (e) {
+            console.warn("Session check failed", e);
+        }
+
         // 1. Load Org Cache (Critical for UI labels)
         await orgService.initialize();
 
@@ -47,6 +57,8 @@ const App: React.FC = () => {
     
     if (foundUser) {
       setUser(foundUser);
+      // Re-fetch org data on login to ensure we have fresh data with new permissions
+      await orgService.initialize();
       return true;
     }
     return false;
@@ -71,6 +83,8 @@ const App: React.FC = () => {
     <ThemeProvider>
       <Router>
         <Routes>
+          <Route path="/setup" element={<Instructions />} />
+          
           <Route 
             path="/login" 
             element={

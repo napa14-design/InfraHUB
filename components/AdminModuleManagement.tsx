@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, Laptop } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, Laptop, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppModule, UserRole, ModuleStatus, ModuleType } from '../types';
 import { moduleService } from '../services/moduleService';
@@ -8,6 +9,8 @@ export const AdminModuleManagement: React.FC = () => {
   const navigate = useNavigate();
   const [modules, setModules] = useState<AppModule[]>([]);
   const [isEditing, setIsEditing] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [moduleToDelete, setModuleToDelete] = useState<AppModule | null>(null);
   
   // Empty state for form
   const initialFormState: AppModule = {
@@ -48,10 +51,17 @@ export const AdminModuleManagement: React.FC = () => {
     setIsEditing(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Tem certeza? Isso removerá o acesso ao módulo para todos.')) {
-      moduleService.delete(id);
+  const requestDelete = (module: AppModule) => {
+    setModuleToDelete(module);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (moduleToDelete) {
+      moduleService.delete(moduleToDelete.id);
       setModules(moduleService.getAll());
+      setDeleteModalOpen(false);
+      setModuleToDelete(null);
     }
   };
 
@@ -225,7 +235,7 @@ export const AdminModuleManagement: React.FC = () => {
                    <Edit2 size={18} />
                  </button>
                  <button 
-                  onClick={() => handleDelete(module.id)}
+                  onClick={() => requestDelete(module)}
                   className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
                 >
                    <Trash2 size={18} />
@@ -233,6 +243,38 @@ export const AdminModuleManagement: React.FC = () => {
                </div>
              </div>
           ))}
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && moduleToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50 dark:border-red-900/20">
+                    <AlertCircle size={32} />
+                </div>
+                
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Excluir Aplicativo?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Você está prestes a remover o módulo <strong>{moduleToDelete.title}</strong>. <br/>
+                    Todos os usuários perderão acesso a ele.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setDeleteModalOpen(false)}
+                      className="py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                      onClick={confirmDelete}
+                      className="py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors"
+                    >
+                        Sim, Excluir
+                    </button>
+                </div>
+            </div>
         </div>
       )}
     </div>

@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
-import { X, Check, Info, AlertTriangle, CheckCircle, AlertCircle, Bell, ArrowRight, Filter } from 'lucide-react';
+import { X, Check, Info, AlertTriangle, CheckCircle, AlertCircle, Bell, ArrowRight, Filter, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AppNotification, NotificationType } from '../types';
+import { AppNotification, NotificationType, UserRole } from '../types';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface NotificationCenterProps {
   onMarkAllRead: () => void;
   activeFilter: NotificationType | 'ALL';
   onFilterChange: (filter: NotificationType | 'ALL') => void;
+  userRole?: UserRole;
 }
 
 const IconMap = {
@@ -27,7 +29,8 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   onMarkRead,
   onMarkAllRead,
   activeFilter,
-  onFilterChange
+  onFilterChange,
+  userRole
 }) => {
   const navigate = useNavigate();
 
@@ -35,6 +38,11 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
       onMarkRead(id);
       onClose();
       navigate(link);
+  };
+
+  const handleConfigClick = () => {
+      onClose();
+      navigate('/admin/notifications');
   };
 
   const filteredNotifications = activeFilter === 'ALL' 
@@ -89,6 +97,15 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             <h2 className="font-bold text-slate-800 dark:text-white">Notificações</h2>
           </div>
           <div className="flex items-center gap-2">
+            {userRole === UserRole.ADMIN && (
+                <button 
+                  onClick={handleConfigClick}
+                  className="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500 transition-colors"
+                  title="Configurar Regras de Alerta"
+                >
+                  <Settings size={18} />
+                </button>
+            )}
             <button 
               onClick={onMarkAllRead}
               className="text-xs font-medium text-brand-600 hover:text-brand-800 dark:text-brand-400 dark:hover:text-brand-300 px-2 py-1 hover:bg-brand-50 dark:hover:bg-brand-900/20 rounded transition-colors"

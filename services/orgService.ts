@@ -11,15 +11,19 @@ let cache = {
   locais: [] as Local[]
 };
 
+let usingMocks = false;
+
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
   initialize: async () => {
+    usingMocks = false;
     try {
       if (!isSupabaseConfigured()) {
           console.warn("Supabase not configured. Using Mock Data for OrgService.");
           throw new Error("Mock Mode");
       }
 
+      console.log("[OrgService] Fetching data...");
       const [o, r, s, l] = await Promise.all([
         supabase.from('organizations').select('*'),
         supabase.from('regions').select('*'),
@@ -27,21 +31,60 @@ export const orgService = {
         supabase.from('locais').select('*')
       ]);
 
+      if (o.error) console.error("[OrgService] Error fetching Orgs:", o.error);
+      if (r.error) console.error("[OrgService] Error fetching Regions:", r.error);
+      
       if (o.error || r.error || s.error || l.error) throw new Error("Database error");
 
-      if (o.data) cache.orgs = o.data;
-      if (r.data) cache.regions = r.data;
-      if (s.data) cache.sedes = s.data;
-      if (l.data) cache.locais = l.data;
+      // MAPPING: Convert Supabase snake_case to Frontend camelCase
+      if (o.data) {
+          cache.orgs = o.data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              logoUrl: item.logo_url // Map logo_url -> logoUrl
+          }));
+      }
+
+      if (r.data) {
+          cache.regions = r.data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              organizationId: item.organization_id // CRITICAL FIX: organization_id -> organizationId
+          }));
+      }
+
+      if (s.data) {
+          cache.sedes = s.data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              address: item.address,
+              regionId: item.region_id // CRITICAL FIX: region_id -> regionId
+          }));
+      }
+
+      if (l.data) {
+          cache.locais = l.data.map((item: any) => ({
+              id: item.id,
+              name: item.name,
+              tipo: item.tipo,
+              sedeId: item.sede_id // CRITICAL FIX: sede_id -> sedeId
+          }));
+      }
+
+      console.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
 
     } catch (err) {
-      console.log("Using Fallback Data for OrgService.");
+      console.log("Using Fallback Data for OrgService due to error or config.");
+      usingMocks = true;
       cache.orgs = MOCK_ORGS;
       cache.regions = MOCK_REGIONS;
       cache.sedes = MOCK_SEDES;
       cache.locais = MOCK_LOCAIS;
     }
   },
+
+  // Verifica se está usando dados mockados
+  isMockMode: () => usingMocks,
 
   // Leituras (Síncronas via Cache)
   getOrgs: () => [...cache.orgs],
@@ -55,10 +98,11 @@ export const orgService = {
   getLocalById: (id: string) => cache.locais.find(l => l.id === id),
 
   // Escritas (Assíncronas + Atualização de Cache)
+  // Nota: Ao salvar, convertemos de volta para snake_case para o Supabase
   saveOrg: async (item: Organization) => {
     if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.from('organizations').upsert(item).select().single();
-        if (data && !error) item = data;
+        const payload = { id: item.id, name: item.name, logo_url: item.logoUrl };
+        await supabase.from('organizations').upsert(payload);
     }
     // Update Cache
     const idx = cache.orgs.findIndex(x => x.id === item.id);
@@ -73,8 +117,8 @@ export const orgService = {
 
   saveRegion: async (item: Region) => {
     if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.from('regions').upsert(item).select().single();
-        if (data && !error) item = data;
+        const payload = { id: item.id, name: item.name, organization_id: item.organizationId };
+        await supabase.from('regions').upsert(payload);
     }
     const idx = cache.regions.findIndex(x => x.id === item.id);
     if (idx >= 0) cache.regions[idx] = item; else cache.regions.push(item);
@@ -88,8 +132,8 @@ export const orgService = {
 
   saveSede: async (item: Sede) => {
     if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.from('sedes').upsert(item).select().single();
-        if (data && !error) item = data;
+        const payload = { id: item.id, name: item.name, address: item.address, region_id: item.regionId };
+        await supabase.from('sedes').upsert(payload);
     }
     const idx = cache.sedes.findIndex(x => x.id === item.id);
     if (idx >= 0) cache.sedes[idx] = item; else cache.sedes.push(item);
@@ -103,8 +147,8 @@ export const orgService = {
 
   saveLocal: async (item: Local) => {
     if (isSupabaseConfigured()) {
-        const { data, error } = await supabase.from('locais').upsert(item).select().single();
-        if (data && !error) item = data;
+        const payload = { id: item.id, name: item.name, tipo: item.tipo, sede_id: item.sedeId };
+        await supabase.from('locais').upsert(payload);
     }
     const idx = cache.locais.findIndex(x => x.id === item.id);
     if (idx >= 0) cache.locais[idx] = item; else cache.locais.push(item);

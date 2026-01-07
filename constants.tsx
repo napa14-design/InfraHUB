@@ -176,7 +176,7 @@ export const INITIAL_MODULES: AppModule[] = [
   {
     id: 'hydrosys',
     title: 'HydroSys',
-    description: 'Gestão completa de qualidade da água e reservatórios.',
+    description: 'Gestão completa de qualidade da água, certificados e reservatórios.',
     iconName: 'Droplets',
     minRole: UserRole.OPERATIONAL,
     path: '/module/hydrosys',

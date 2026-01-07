@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
 import { orgService } from '../services/orgService';
+import { notificationService } from '../services/notificationService';
 
 export const AdminUserManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -20,6 +22,10 @@ export const AdminUserManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Delete Modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
   // Form State
   const initialFormState: Partial<User> = {
@@ -42,6 +48,9 @@ export const AdminUserManagement: React.FC = () => {
   }, [currentUser?.id]);
 
   const loadData = async () => {
+    // FORCE REFRESH ORG STRUCTURE TO ENSURE DROPDOWNS ARE UP TO DATE
+    await orgService.initialize();
+
     let allUsers = await authService.getAllUsers();
     
     // Permission Logic: Gestor sees only users from their Sede(s) logic?
@@ -58,7 +67,10 @@ export const AdminUserManagement: React.FC = () => {
 
   // --- ACTIONS ---
 
-  const handleStartNew = () => {
+  const handleStartNew = async () => {
+    // REFRESH DATA BEFORE OPENING TO CATCH NEW SQL INSERTS
+    await loadData();
+
     setIsEditing(false);
     setEditingId(null);
     setCreatedUserPass(null);
@@ -70,12 +82,14 @@ export const AdminUserManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleStartEdit = (user: User) => {
+  const handleStartEdit = async (user: User) => {
       // Permission Check: Gestor cannot edit Admin
       if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
           alert("Você não tem permissão para editar Administradores.");
           return;
       }
+
+      await loadData(); // Refresh data
 
       setIsEditing(true);
       setEditingId(user.id);
@@ -92,21 +106,37 @@ export const AdminUserManagement: React.FC = () => {
       setIsModalOpen(true);
   };
 
-  const handleDelete = (targetUser: User) => {
+  const requestDelete = (targetUser: User) => {
     if (targetUser.id === currentUser?.id) {
         alert("Você não pode excluir a si mesmo.");
         return;
     }
-
-    // Permission Check: Gestor cannot delete Admin
     if (currentUser?.role !== UserRole.ADMIN && targetUser.role === UserRole.ADMIN) {
         alert("Você não tem permissão para excluir Administradores.");
         return;
     }
+    setUserToDelete(targetUser);
+    setDeleteModalOpen(true);
+  };
 
-    if (confirm(`Tem certeza que deseja remover o usuário ${targetUser.name}?`)) {
-      authService.deleteUser(targetUser.id);
+  const confirmDelete = async () => {
+    if (userToDelete) {
+      await authService.deleteUser(userToDelete.id);
+      
+      // Notify
+      await notificationService.add({
+        id: `del-user-${Date.now()}`,
+        title: 'Usuário Removido',
+        message: `${userToDelete.name} foi removido do sistema por ${currentUser?.name}.`,
+        type: 'WARNING',
+        read: false,
+        timestamp: new Date(),
+        moduleSource: 'UserManagement'
+      });
+
       loadData();
+      setDeleteModalOpen(false);
+      setUserToDelete(null);
     }
   };
 
@@ -116,11 +146,33 @@ export const AdminUserManagement: React.FC = () => {
     if (isEditing && editingId) {
         // UPDATE
         await authService.updateUser(editingId, formData);
+        
+        await notificationService.add({
+            id: `upd-user-${Date.now()}`,
+            title: 'Usuário Atualizado',
+            message: `Dados de ${formData.name} atualizados por ${currentUser?.name}.`,
+            type: 'INFO',
+            read: false,
+            timestamp: new Date(),
+            moduleSource: 'UserManagement'
+        });
+
         loadData();
         setIsModalOpen(false); // Close immediately on edit
     } else {
         // CREATE
         const created = await authService.createUser(formData);
+        
+        await notificationService.add({
+            id: `new-user-${Date.now()}`,
+            title: 'Novo Usuário',
+            message: `${formData.name} foi adicionado ao sistema por ${currentUser?.name}.`,
+            type: 'SUCCESS',
+            read: false,
+            timestamp: new Date(),
+            moduleSource: 'UserManagement'
+        });
+
         loadData();
         if (created) {
            setCreatedUserPass(created.password || 'Erro'); // Show password screen
@@ -136,13 +188,27 @@ export const AdminUserManagement: React.FC = () => {
     setFormData(initialFormState);
   };
 
-  const toggleStatus = (user: User) => {
+  const toggleStatus = async (user: User) => {
     // Permission check
     if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
         return; 
     }
     const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-    authService.updateUser(user.id, { status: newStatus });
+    await authService.updateUser(user.id, { status: newStatus });
+    
+    // Optional: Notify on status change
+    if (newStatus === 'INACTIVE') {
+         await notificationService.add({
+            id: `status-user-${Date.now()}`,
+            title: 'Acesso Revogado',
+            message: `O acesso de ${user.name} foi inativado.`,
+            type: 'WARNING',
+            read: false,
+            timestamp: new Date(),
+            moduleSource: 'UserManagement'
+        });
+    }
+
     loadData();
   };
 
@@ -157,11 +223,12 @@ export const AdminUserManagement: React.FC = () => {
   };
 
   const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(filter.toLowerCase()) ||
-    u.email.toLowerCase().includes(filter.toLowerCase())
+    (u.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+    (u.email || '').toLowerCase().includes(filter.toLowerCase())
   );
 
   // Derived options for Cascading Dropdowns
+  // Using explicit check for organizationId to handle possible mismatches during loading
   const availableRegions = regions.filter(r => !formData.organizationId || r.organizationId === formData.organizationId);
   const availableSedes = sedes.filter(s => !formData.regionId || s.regionId === formData.regionId);
 
@@ -230,16 +297,20 @@ export const AdminUserManagement: React.FC = () => {
                     : userSedes.length === 1 
                         ? sedes.find(s => s.id === userSedes[0])?.name || userSedes[0]
                         : 'Sem Sede';
+                  
+                  // Safe access to name
+                  const displayName = user.name || 'Sem Nome';
+                  const initial = displayName.charAt(0) || '?';
 
                   return (
                     <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                     <td className="px-6 py-4">
                         <div className="flex items-center">
                         <div className="h-10 w-10 rounded-full mr-3 bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 font-bold border border-slate-200 dark:border-slate-600">
-                            {user.name.charAt(0)}
+                            {initial}
                         </div>
                         <div>
-                            <div className="font-medium text-slate-900 dark:text-white">{user.name}</div>
+                            <div className="font-medium text-slate-900 dark:text-white">{displayName}</div>
                             <div className="text-sm text-slate-500 dark:text-slate-400">{user.email}</div>
                         </div>
                         </div>
@@ -276,7 +347,7 @@ export const AdminUserManagement: React.FC = () => {
                         <Edit2 size={18} />
                         </button>
                         <button 
-                        onClick={() => handleDelete(user)}
+                        onClick={() => requestDelete(user)}
                         className={`text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors ${currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN ? 'opacity-30 cursor-not-allowed' : ''}`}
                         >
                         <Trash2 size={18} />
@@ -418,6 +489,9 @@ export const AdminUserManagement: React.FC = () => {
                                         ))}
                                     </select>
                                 </div>
+                                {formData.organizationId && availableRegions.length === 0 && (
+                                    <p className="text-xs text-amber-500 mt-1">Nenhuma região encontrada para esta instituição.</p>
+                                )}
                           </div>
 
                           {/* Multi-Sede Selection */}
@@ -466,6 +540,38 @@ export const AdminUserManagement: React.FC = () => {
                   )}
               </div>
           </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && userToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 text-center">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50 dark:border-red-900/20">
+                    <AlertCircle size={32} />
+                </div>
+                
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Excluir Usuário?</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                    Você está prestes a remover o acesso de <strong>{userToDelete.name}</strong>. <br/>
+                    Esta ação não pode ser desfeita.
+                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <button 
+                      onClick={() => setDeleteModalOpen(false)}
+                      className="py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button 
+                      onClick={confirmDelete}
+                      className="py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors"
+                    >
+                        Sim, Excluir
+                    </button>
+                </div>
+            </div>
+        </div>
       )}
     </div>
   );

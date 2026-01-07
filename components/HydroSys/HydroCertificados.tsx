@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { User, HydroCertificado, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { notificationService } from '../../services/notificationService';
 import { EmptyState } from '../Shared/EmptyState';
 
 // --- HELPERS ---
@@ -137,6 +138,19 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleSave = async () => {
     await hydroService.saveCertificado(formData);
+    
+    // Notify
+    const actionType = sheetMode === 'RENEW' ? 'Renovação' : sheetMode === 'NEW' ? 'Criação' : 'Edição';
+    await notificationService.add({
+        id: `cert-${sheetMode}-${Date.now()}`,
+        title: `Certificado - ${actionType}`,
+        message: `${actionType} de certificado para ${formData.parceiro} realizada com sucesso por ${user.name}.`,
+        type: 'SUCCESS',
+        read: false,
+        timestamp: new Date(),
+        moduleSource: 'HydroSys'
+    });
+
     const res = await hydroService.getCertificados(user);
     setData(res);
     setIsSheetOpen(false);
@@ -145,6 +159,17 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const handleDelete = async (id: string) => {
       if(confirm("Deseja remover este certificado?")) {
         await hydroService.deleteCertificado(id);
+        
+        await notificationService.add({
+            id: `del-cert-${Date.now()}`,
+            title: 'Certificado Removido',
+            message: `Um certificado foi removido do sistema.`,
+            type: 'WARNING',
+            read: false,
+            timestamp: new Date(),
+            moduleSource: 'HydroSys'
+        });
+
         const res = await hydroService.getCertificados(user);
         setData(res);
       }

@@ -29,7 +29,10 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  MoreVertical
+  MoreVertical,
+  Database,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -55,6 +58,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Check if we are inside HydroSys module
   const isHydroSys = location.pathname.includes('/module/hydrosys');
+  
+  // Safe User Name access
+  const userName = user.name || 'Usuário';
+  const userInitial = userName.charAt(0) || 'U';
+
+  // Check Data Source
+  const isMockData = orgService.isMockMode();
+
+  // Derived Notification State
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const hasCritical = notifications.some(n => n.type === 'ERROR' && !n.read);
 
   const fetchNotifications = async () => {
       // 1. Run checks (Async)
@@ -95,22 +109,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       setIsNotifOpen(true);
   };
 
-  const unreadCount = notifications.filter(n => !n.read).length;
-  const hasCritical = notifications.some(n => !n.read && n.type === 'ERROR');
-
   // --- COMPONENT: NAV ITEM ---
   const NavItem = ({ to, icon: Icon, label, onClick }: { to: string, icon: any, label: string, onClick?: () => void }) => {
     const isActive = location.pathname === to;
     
+    // If "to" is "#", render a button-like behavior with Link preventing default
+    const isButton = to === '#';
+
     return (
       <Link 
         to={to} 
-        onClick={() => {
+        onClick={(e) => {
+            if (isButton) e.preventDefault();
             if(onClick) onClick();
             setIsSidebarOpen(false);
         }}
         className={`
-          group relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 mb-1
+          group relative flex items-center px-3 py-3 rounded-xl transition-all duration-200 mb-1 cursor-pointer
           ${isActive 
             ? 'bg-gradient-to-r from-brand-50 to-white dark:from-brand-900/20 dark:to-transparent text-brand-600 dark:text-brand-400 font-bold' 
             : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'}
@@ -205,7 +220,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         {isAdmin && <NavItem to="/admin/org" icon={Building2} label="Estrutura Org." />}
         {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão Usuários" />}
         {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo Apps" />}
-        {isAdmin && <NavItem to="/admin/notifications" icon={Bell} label="Notificações" />}
+        
+        {/* Changed: Opens Drawer instead of Route */}
+        {isAdmin && (
+            <NavItem 
+                to="#" 
+                onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} 
+                icon={Bell} 
+                label="Central de Alertas" 
+            />
+        )}
       </>
     );
   };
@@ -220,6 +244,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         onMarkAllRead={handleMarkAllRead}
         activeFilter={notifFilter}
         onFilterChange={setNotifFilter}
+        userRole={user.role} // Pass role to allow access to settings
       />
 
       {/* Mobile Sidebar Overlay */}
@@ -252,9 +277,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   
                   {!isCollapsed && (
                       <div className="animate-in fade-in duration-300 whitespace-nowrap overflow-hidden">
-                        <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">Nexus</span>
+                        <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
+                            {isHydroSys ? 'HydroSys' : 'InfraHub'}
+                        </span>
                         <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
-                          {isHydroSys ? 'HydroSys' : 'Corporativo'}
+                          {isHydroSys ? 'Gestão de Água' : 'Infraestrutura'}
                         </span>
                       </div>
                   )}
@@ -278,6 +305,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           {/* 3. Footer (User Profile & Collapse) */}
           <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-2">
              
+             {/* Database Status Indicator */}
+             {!isCollapsed && (
+                <div className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 mb-1 border ${isMockData ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
+                    {isMockData ? <WifiOff size={12}/> : <Wifi size={12}/>}
+                    {isMockData ? 'Modo Demo (Local)' : 'Supabase Conectado'}
+                </div>
+             )}
+
              {/* Collapse Button (Desktop Only) */}
              <div className={`hidden lg:flex ${isCollapsed ? 'justify-center' : 'justify-end'} mb-2`}>
                  <button 
@@ -297,14 +332,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     <div className="flex items-center gap-3">
                         <div className="relative flex-shrink-0">
                             <div className="w-9 h-9 rounded-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold border-2 border-white dark:border-slate-900">
-                                {user.name.charAt(0)}
+                                {userInitial}
                             </div>
-                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white dark:border-slate-800 rounded-full"></div>
+                            <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 border-2 border-white dark:border-slate-800 rounded-full ${isMockData ? 'bg-amber-500' : 'bg-emerald-500'}`}></div>
                         </div>
                         
                         {!isCollapsed && (
                             <div className="overflow-hidden">
-                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">{user.name.split(' ')[0]}</p>
+                                <p className="text-sm font-bold text-slate-800 dark:text-slate-200 truncate max-w-[120px]">{userName.split(' ')[0]}</p>
                                 <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">{user.role}</p>
                             </div>
                         )}
@@ -353,7 +388,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               <Menu size={24} />
             </button>
             <span className="font-bold text-slate-900 dark:text-white">
-              {isHydroSys ? 'HydroSys' : 'Nexus Hub'}
+              {isHydroSys ? 'HydroSys' : 'InfraHub'}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -364,7 +399,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
               )}
             </button>
             <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">
-                {user.name.charAt(0)}
+                {userInitial}
             </div>
           </div>
         </header>

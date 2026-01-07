@@ -12,7 +12,8 @@ export const notificationService = {
         const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(100);
         return (data as any[])?.map(n => ({
             ...n,
-            timestamp: new Date(n.timestamp)
+            timestamp: new Date(n.timestamp),
+            moduleSource: n.module_source // MAP DB snake_case -> App camelCase
         })) || [];
     } catch (e) {
         return []; // Return empty if offline/mock
@@ -22,7 +23,13 @@ export const notificationService = {
   add: async (notification: AppNotification) => {
     if (isSupabaseConfigured()) {
         const { error } = await supabase.from('notifications').upsert({
-            ...notification,
+            id: notification.id,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+            read: notification.read,
+            link: notification.link,
+            module_source: notification.moduleSource, // MAP App camelCase -> DB snake_case
             timestamp: notification.timestamp.toISOString()
         });
         if (error) console.error("Erro ao criar notificação", error);
@@ -37,7 +44,7 @@ export const notificationService = {
     if (isSupabaseConfigured()) await supabase.from('notifications').update({ read: true }).neq('read', true);
   },
 
-  // Lógica Principal de Verificação (Agora Assíncrona)
+  // Lógica Principal de Verificação (Assíncrona)
   checkSystemStatus: async (user: User) => {
     if (user.role === UserRole.OPERATIONAL) return;
 
@@ -68,7 +75,8 @@ export const notificationService = {
                     type: 'ERROR',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/certificados'
+                    link: '/module/hydrosys/certificados',
+                    moduleSource: 'hydrosys'
                 });
             } else if (days <= certRule.warningDays) {
                 await notificationService.add({
@@ -78,7 +86,8 @@ export const notificationService = {
                     type: 'WARNING',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/certificados'
+                    link: '/module/hydrosys/certificados',
+                    moduleSource: 'hydrosys'
                 });
             }
         }
@@ -100,7 +109,8 @@ export const notificationService = {
                     type: 'ERROR',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/filtros'
+                    link: '/module/hydrosys/filtros',
+                    moduleSource: 'hydrosys'
                 });
             } else if (days <= filtroRule.warningDays) {
                 await notificationService.add({
@@ -110,7 +120,8 @@ export const notificationService = {
                     type: 'WARNING',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/filtros'
+                    link: '/module/hydrosys/filtros',
+                    moduleSource: 'hydrosys'
                 });
             }
         }
@@ -132,7 +143,8 @@ export const notificationService = {
                     type: 'ERROR',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/reservatorios'
+                    link: '/module/hydrosys/reservatorios',
+                    moduleSource: 'hydrosys'
                 });
             } else if (days <= resRule.warningDays) {
                 await notificationService.add({
@@ -142,7 +154,8 @@ export const notificationService = {
                     type: 'WARNING',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/reservatorios'
+                    link: '/module/hydrosys/reservatorios',
+                    moduleSource: 'hydrosys'
                 });
             }
         }
