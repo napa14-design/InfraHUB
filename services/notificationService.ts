@@ -1,51 +1,49 @@
+
 import { AppNotification, NotificationType, User, UserRole } from '../types';
 import { hydroService } from './hydroService';
 import { configService } from './configService';
 import { orgService } from './orgService';
-
-const STORAGE_KEY = 'nexus_notifications';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 export const notificationService = {
-  getAll: (): AppNotification[] => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+  getAll: async (): Promise<AppNotification[]> => {
+    try {
+        if (!isSupabaseConfigured()) throw new Error("Mock");
+        const { data } = await supabase.from('notifications').select('*').order('timestamp', { ascending: false }).limit(100);
+        return (data as any[])?.map(n => ({
+            ...n,
+            timestamp: new Date(n.timestamp)
+        })) || [];
+    } catch (e) {
+        return []; // Return empty if offline/mock
+    }
   },
 
-  add: (notification: AppNotification) => {
-    const current = notificationService.getAll();
-    // Avoid duplicates based on Title and Message
-    const exists = current.find(n => n.title === notification.title && n.message === notification.message && !n.read);
-    
-    if (exists) return current;
-
-    const updated = [notification, ...current].slice(0, 100); // Limit to 100
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+  add: async (notification: AppNotification) => {
+    if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('notifications').upsert({
+            ...notification,
+            timestamp: notification.timestamp.toISOString()
+        });
+        if (error) console.error("Erro ao criar notificação", error);
+    }
   },
 
-  markAsRead: (id: string) => {
-    const current = notificationService.getAll();
-    const updated = current.map(n => n.id === id ? { ...n, read: true } : n);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+  markAsRead: async (id: string) => {
+    if (isSupabaseConfigured()) await supabase.from('notifications').update({ read: true }).eq('id', id);
   },
 
-  markAllRead: () => {
-    const current = notificationService.getAll();
-    const updated = current.map(n => ({ ...n, read: true }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updated;
+  markAllRead: async () => {
+    if (isSupabaseConfigured()) await supabase.from('notifications').update({ read: true }).neq('read', true);
   },
 
-  // MAIN LOGIC: Checks system data against Configured Rules
-  checkSystemStatus: (user: User) => {
-    // Only Admins and Gestors receive these system alerts
+  // Lógica Principal de Verificação (Agora Assíncrona)
+  checkSystemStatus: async (user: User) => {
     if (user.role === UserRole.OPERATIONAL) return;
 
-    const rules = configService.getNotificationRules();
+    const rules = await configService.getNotificationRules();
     const today = new Date();
 
-    // Helper to calc days diff
     const getDiffDays = (dateStr: string) => {
         if (!dateStr) return 999;
         const target = new Date(dateStr);
@@ -53,16 +51,17 @@ export const notificationService = {
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     };
 
-    // 1. Check HydroSys Certificates
+    // 1. HydroSys Certificates
     const certRule = rules.find(r => r.id === 'rule_cert');
     if (certRule && certRule.enabled) {
-        const certs = hydroService.getCertificados(user); // Automatically filters by Sede for Gestor
-        certs.forEach(cert => {
+        const certs = await hydroService.getCertificados(user);
+        for (const cert of certs) {
             const days = getDiffDays(cert.validade);
             const sedeName = orgService.getSedeById(cert.sedeId)?.name || 'Unidade';
-
+            
+            // Usamos ID determinístico para upsert evitar spam
             if (days <= certRule.criticalDays) {
-                notificationService.add({
+                await notificationService.add({
                     id: `cert-crit-${cert.id}`,
                     title: 'Certificado Vencido/Crítico',
                     message: `O certificado de ${cert.parceiro} em ${sedeName} expirou ou vence hoje!`,
@@ -72,7 +71,7 @@ export const notificationService = {
                     link: '/module/hydrosys/certificados'
                 });
             } else if (days <= certRule.warningDays) {
-                notificationService.add({
+                await notificationService.add({
                     id: `cert-warn-${cert.id}`,
                     title: 'Certificado a Vencer',
                     message: `O certificado de ${cert.parceiro} em ${sedeName} vence em ${days} dias.`,
@@ -82,19 +81,19 @@ export const notificationService = {
                     link: '/module/hydrosys/certificados'
                 });
             }
-        });
+        }
     }
 
-    // 2. Check HydroSys Filters
+    // 2. Filtros
     const filtroRule = rules.find(r => r.id === 'rule_filtros');
     if (filtroRule && filtroRule.enabled) {
-        const filtros = hydroService.getFiltros(user);
-        filtros.forEach(filtro => {
+        const filtros = await hydroService.getFiltros(user);
+        for (const filtro of filtros) {
             const days = getDiffDays(filtro.proximaTroca);
             const sedeName = orgService.getSedeById(filtro.sedeId)?.name || 'Unidade';
             
             if (days <= filtroRule.criticalDays) {
-                notificationService.add({
+                await notificationService.add({
                     id: `filt-crit-${filtro.id}`,
                     title: 'Troca de Filtro Atrasada',
                     message: `Filtro ${filtro.patrimonio} (${filtro.local}) em ${sedeName} precisa de troca imediata.`,
@@ -104,7 +103,7 @@ export const notificationService = {
                     link: '/module/hydrosys/filtros'
                 });
             } else if (days <= filtroRule.warningDays) {
-                notificationService.add({
+                await notificationService.add({
                     id: `filt-warn-${filtro.id}`,
                     title: 'Troca de Filtro Próxima',
                     message: `Filtro ${filtro.patrimonio} vence em ${days} dias.`,
@@ -114,19 +113,19 @@ export const notificationService = {
                     link: '/module/hydrosys/filtros'
                 });
             }
-        });
+        }
     }
 
-    // 3. Check Reservoirs (Pocos only for example)
+    // 3. Reservatórios
     const resRule = rules.find(r => r.id === 'rule_res');
     if (resRule && resRule.enabled) {
-        const pocos = hydroService.getPocos(user);
-        pocos.forEach(poco => {
-            const days = getDiffDays(poco.previsaoLimpeza1_2026); // Using example field
+        const pocos = await hydroService.getPocos(user);
+        for (const poco of pocos) {
+            const days = getDiffDays(poco.proximaLimpeza);
             const sedeName = orgService.getSedeById(poco.sedeId)?.name || 'Unidade';
 
             if (days <= resRule.criticalDays) {
-                notificationService.add({
+                await notificationService.add({
                     id: `res-crit-${poco.id}`,
                     title: 'Limpeza de Reservatório',
                     message: `Limpeza do Poço (${poco.local}) em ${sedeName} está atrasada ou crítica.`,
@@ -136,7 +135,7 @@ export const notificationService = {
                     link: '/module/hydrosys/reservatorios'
                 });
             } else if (days <= resRule.warningDays) {
-                 notificationService.add({
+                await notificationService.add({
                     id: `res-warn-${poco.id}`,
                     title: 'Limpeza Próxima',
                     message: `Limpeza do Poço (${poco.local}) agendada para ${days} dias.`,
@@ -146,19 +145,7 @@ export const notificationService = {
                     link: '/module/hydrosys/reservatorios'
                 });
             }
-        });
+        }
     }
-  },
-
-  // Simulates receiving a notification from a socket (Keep for demo purposes of other types)
-  simulateIncoming: (): AppNotification => {
-    return {
-      id: Date.now().toString(),
-      title: 'Atualização de Sistema',
-      message: 'Nova versão do Nexus Hub disponível.',
-      type: 'INFO',
-      read: false,
-      timestamp: new Date()
-    };
   }
 };

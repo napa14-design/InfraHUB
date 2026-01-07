@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
+import { orgService } from './services/orgService'; // Import OrgService
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { Layout } from './components/Layout';
@@ -24,18 +26,23 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for persisted session
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
-    setLoading(false);
+    const initApp = async () => {
+        // 1. Load Org Cache (Critical for UI labels)
+        await orgService.initialize();
+
+        // 2. Check Session
+        const currentUser = authService.getCurrentUser();
+        if (currentUser) {
+            setUser(currentUser);
+        }
+        setLoading(false);
+    };
+
+    initApp();
   }, []);
 
   const handleLogin = async (email: string) => {
-    // In this mock implementation, we retrieve the user by email since authentication 
-    // was already handled by the Login component.
-    const users = authService.getAllUsers();
+    const users = await authService.getAllUsers();
     const foundUser = users.find(u => u.email === email);
     
     if (foundUser) {
@@ -52,7 +59,10 @@ const App: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+        <div className="flex flex-col items-center gap-4">
+             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
+             <p className="text-slate-500 font-medium animate-pulse">Carregando Hub...</p>
+        </div>
       </div>
     );
   }

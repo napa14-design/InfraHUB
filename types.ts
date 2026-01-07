@@ -28,7 +28,7 @@ export interface Local {
   id: string;
   sedeId: string;
   name: string;
-  tipo?: string; // Ex: Bebedouro, Piscina, Cozinha
+  tipo?: string; // Ex: BEBEDOURO, PISCINA, POCO, CISTERNA
 }
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE';
@@ -38,17 +38,15 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
-  avatarUrl?: string;
   status: UserStatus;
   
-  // Auth fields (Mock only - in real app password is never exposed like this)
-  password?: string; 
+  // Auth fields
   isFirstLogin: boolean;
 
   // Link user to hierarchy
   organizationId?: string;
   regionId?: string;
-  sedeIds: string[]; // Changed from sedeId string to string array
+  sedeIds: string[]; // IDs das sedes que o usuário tem acesso
 }
 
 export enum ModuleStatus {
@@ -89,17 +87,17 @@ export interface AppNotification {
   type: NotificationType;
   read: boolean;
   timestamp: Date;
-  link?: string; // Optional link to navigate to the issue
+  link?: string;
   moduleSource?: string;
 }
 
 export interface NotificationRule {
   id: string;
   moduleId: string;
-  name: string; // Ex: "Validade de Certificados"
+  name: string;
   description: string;
-  warningDays: number; // Ex: 30 dias antes
-  criticalDays: number; // Ex: 0 dias (Vencido) ou 7 dias antes
+  warningDays: number;
+  criticalDays: number;
   enabled: boolean;
 }
 
@@ -117,15 +115,15 @@ export interface HydroSettings {
 
 export interface HydroCertificado {
   id: string;
-  sedeId: string; // Para controle de acesso
+  sedeId: string;
   parceiro: string;
   status: 'VIGENTE' | 'VENCIDO' | 'PROXIMO';
   semestre: string;
   validadeSemestre: string;
   dataAnalise: string;
   validade: string;
-  linkMicro: string; // Link Drive
-  linkFisico: string; // Link Drive
+  linkMicro: string;
+  linkFisico: string;
   empresa: string;
   agendamento: string;
   observacao?: string;
@@ -151,49 +149,46 @@ export interface HydroFiltro {
   proximaTroca: string;
 }
 
-// Reservatórios divididos em 3 tipos
-export interface HydroPoco {
+// RESERVATÓRIOS UNIFICADOS (Superset Type)
+// Este tipo cobre Poços, Cisternas e Caixas d'água com campos opcionais
+export type TipoReservatorio = 'POCO' | 'CISTERNA' | 'CAIXA';
+
+export interface HydroReservatorio {
   id: string;
   sedeId: string;
-  bairro: string;
-  responsavel: string;
+  tipo: TipoReservatorio;
   local: string;
-  dataUltimaLimpeza: string;
-  referenciaBomba: string;
-  dataLimpeza: string;
-  situacaoLimpeza: string;
-  fichaOperacional: string;
-  previsaoLimpeza1_2026: string;
-  ultimaTrocaFiltro: string;
-  situacaoFiltro: string;
-  proximaTrocaFiltro: string;
-  refil: string;
+  responsavel: string;
+  
+  // Controle de Limpeza (Comum a todos)
+  dataUltimaLimpeza?: string; // Data realizada
+  proximaLimpeza: string; // Data prevista
+  situacaoLimpeza: 'DENTRO DO PRAZO' | 'FORA DO PRAZO' | 'PENDENTE' | 'DESATIVADO';
+  
+  // Específico: Poços
+  bairro?: string;
+  referenciaBomba?: string;
+  fichaOperacional?: string;
+  
+  // Específico: Filtro do Poço
+  ultimaTrocaFiltro?: string;
+  proximaTrocaFiltro?: string;
+  situacaoFiltro?: string;
+  refil?: string;
+
+  // Específico: Cisternas e Caixas
+  numCelulas?: number;
+  capacidade?: string;
+  
+  // Campos de Cronograma Semestral (Comum para Caixas/Cisternas)
+  previsaoLimpeza1?: string;
+  dataLimpeza1?: string; // Realizado sem 1
+  previsaoLimpeza2?: string;
+  dataLimpeza2?: string; // Realizado sem 2
 }
 
-export interface HydroCisterna {
-  id: string;
-  sedeId: string;
-  responsavel: string;
-  local: string;
-  numCelulas: number;
-  capacidade: string;
-  previsaoLimpeza1_2025: string;
-  dataLimpeza1: string;
-  previsaoLimpeza2_2025: string;
-  dataLimpeza2: string;
-  situacao: string;
-}
-
-export interface HydroCaixa {
-  id: string;
-  sedeId: string;
-  responsavel: string;
-  local: string;
-  numCelulas: number;
-  capacidade: string;
-  previsaoLimpeza1_2025: string;
-  dataLimpeza1: string;
-  previsaoLimpeza2_2025: string;
-  dataLimpeza2: string;
-  situacao: string;
-}
+// Alias para manter compatibilidade com componentes antigos temporariamente, 
+// mas idealmente o código deve migrar para usar HydroReservatorio
+export type HydroPoco = HydroReservatorio;
+export type HydroCisterna = HydroReservatorio;
+export type HydroCaixa = HydroReservatorio;

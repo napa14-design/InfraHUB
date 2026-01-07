@@ -12,15 +12,26 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const [selectedDateStr, setSelectedDateStr] = useState('');
   
   // Settings State
-  const [settings, setSettings] = useState<HydroSettings>(hydroService.getSettings());
+  const [settings, setSettings] = useState<HydroSettings>({
+    validadeCertificadoMeses: 6,
+    validadeFiltroMeses: 6,
+    validadeLimpezaMeses: 6,
+    cloroMin: 1.0,
+    cloroMax: 3.0,
+    phMin: 7.4,
+    phMax: 7.6
+  });
 
   const [form, setForm] = useState<Partial<HydroCloroEntry>>({
     cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name
   });
 
   useEffect(() => {
-    setEntries(hydroService.getCloro(user));
-    setSettings(hydroService.getSettings());
+    const load = async () => {
+      setEntries(await hydroService.getCloro(user));
+      setSettings(await hydroService.getSettings());
+    };
+    load();
   }, [user]);
 
   const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -47,11 +58,11 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const primarySedeId = (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : null;
 
     if (selectedDateStr && primarySedeId) {
-        hydroService.saveCloro({
+        await hydroService.saveCloro({
             id: Date.now().toString(),
             sedeId: primarySedeId,
             date: selectedDateStr,
@@ -60,7 +71,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             medidaCorretiva: form.medidaCorretiva,
             responsavel: form.responsavel || user.name
         });
-        setEntries(hydroService.getCloro(user));
+        setEntries(await hydroService.getCloro(user));
         setIsModalOpen(false);
     }
   };

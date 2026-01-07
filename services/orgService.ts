@@ -1,83 +1,118 @@
+
 import { Organization, Region, Sede, Local } from '../types';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_ORGS, MOCK_REGIONS, MOCK_SEDES, MOCK_LOCAIS } from '../constants';
 
-const ORG_KEY = 'nexus_orgs';
-const REGION_KEY = 'nexus_regions';
-const SEDE_KEY = 'nexus_sedes';
-const LOCAL_KEY = 'nexus_locais';
+// Cache em memória
+let cache = {
+  orgs: [] as Organization[],
+  regions: [] as Region[],
+  sedes: [] as Sede[],
+  locais: [] as Local[]
+};
 
 export const orgService = {
-  // Organizations
-  getOrgs: (): Organization[] => {
-    const stored = localStorage.getItem(ORG_KEY);
-    return stored ? JSON.parse(stored) : MOCK_ORGS;
-  },
-  saveOrg: (org: Organization) => {
-    const all = orgService.getOrgs();
-    const index = all.findIndex(i => i.id === org.id);
-    if (index >= 0) all[index] = org;
-    else all.push(org);
-    localStorage.setItem(ORG_KEY, JSON.stringify(all));
-  },
-  deleteOrg: (id: string) => {
-    const all = orgService.getOrgs().filter(i => i.id !== id);
-    localStorage.setItem(ORG_KEY, JSON.stringify(all));
+  // Inicializa o cache buscando do Supabase ou usando Mocks
+  initialize: async () => {
+    try {
+      if (!isSupabaseConfigured()) {
+          console.warn("Supabase not configured. Using Mock Data for OrgService.");
+          throw new Error("Mock Mode");
+      }
+
+      const [o, r, s, l] = await Promise.all([
+        supabase.from('organizations').select('*'),
+        supabase.from('regions').select('*'),
+        supabase.from('sedes').select('*'),
+        supabase.from('locais').select('*')
+      ]);
+
+      if (o.error || r.error || s.error || l.error) throw new Error("Database error");
+
+      if (o.data) cache.orgs = o.data;
+      if (r.data) cache.regions = r.data;
+      if (s.data) cache.sedes = s.data;
+      if (l.data) cache.locais = l.data;
+
+    } catch (err) {
+      console.log("Using Fallback Data for OrgService.");
+      cache.orgs = MOCK_ORGS;
+      cache.regions = MOCK_REGIONS;
+      cache.sedes = MOCK_SEDES;
+      cache.locais = MOCK_LOCAIS;
+    }
   },
 
-  // Regions
-  getRegions: (): Region[] => {
-    const stored = localStorage.getItem(REGION_KEY);
-    return stored ? JSON.parse(stored) : MOCK_REGIONS;
+  // Leituras (Síncronas via Cache)
+  getOrgs: () => [...cache.orgs],
+  getRegions: () => [...cache.regions],
+  getSedes: () => [...cache.sedes],
+  getLocais: () => [...cache.locais],
+
+  getOrgById: (id: string) => cache.orgs.find(o => o.id === id),
+  getRegionById: (id: string) => cache.regions.find(r => r.id === id),
+  getSedeById: (id: string) => cache.sedes.find(s => s.id === id),
+  getLocalById: (id: string) => cache.locais.find(l => l.id === id),
+
+  // Escritas (Assíncronas + Atualização de Cache)
+  saveOrg: async (item: Organization) => {
+    if (isSupabaseConfigured()) {
+        const { data, error } = await supabase.from('organizations').upsert(item).select().single();
+        if (data && !error) item = data;
+    }
+    // Update Cache
+    const idx = cache.orgs.findIndex(x => x.id === item.id);
+    if (idx >= 0) cache.orgs[idx] = item; else cache.orgs.push(item);
+    return { data: item, error: null };
   },
-  saveRegion: (item: Region) => {
-    const all = orgService.getRegions();
-    const index = all.findIndex(i => i.id === item.id);
-    if (index >= 0) all[index] = item;
-    else all.push(item);
-    localStorage.setItem(REGION_KEY, JSON.stringify(all));
-  },
-  deleteRegion: (id: string) => {
-    const all = orgService.getRegions().filter(i => i.id !== id);
-    localStorage.setItem(REGION_KEY, JSON.stringify(all));
+  
+  deleteOrg: async (id: string) => {
+    if (isSupabaseConfigured()) await supabase.from('organizations').delete().eq('id', id);
+    cache.orgs = cache.orgs.filter(x => x.id !== id);
   },
 
-  // Sedes
-  getSedes: (): Sede[] => {
-    const stored = localStorage.getItem(SEDE_KEY);
-    return stored ? JSON.parse(stored) : MOCK_SEDES;
+  saveRegion: async (item: Region) => {
+    if (isSupabaseConfigured()) {
+        const { data, error } = await supabase.from('regions').upsert(item).select().single();
+        if (data && !error) item = data;
+    }
+    const idx = cache.regions.findIndex(x => x.id === item.id);
+    if (idx >= 0) cache.regions[idx] = item; else cache.regions.push(item);
+    return { data: item, error: null };
   },
-  saveSede: (item: Sede) => {
-    const all = orgService.getSedes();
-    const index = all.findIndex(i => i.id === item.id);
-    if (index >= 0) all[index] = item;
-    else all.push(item);
-    localStorage.setItem(SEDE_KEY, JSON.stringify(all));
-  },
-  deleteSede: (id: string) => {
-    const all = orgService.getSedes().filter(i => i.id !== id);
-    localStorage.setItem(SEDE_KEY, JSON.stringify(all));
+  
+  deleteRegion: async (id: string) => {
+    if (isSupabaseConfigured()) await supabase.from('regions').delete().eq('id', id);
+    cache.regions = cache.regions.filter(x => x.id !== id);
   },
 
-  // Locais
-  getLocais: (): Local[] => {
-    const stored = localStorage.getItem(LOCAL_KEY);
-    return stored ? JSON.parse(stored) : MOCK_LOCAIS;
+  saveSede: async (item: Sede) => {
+    if (isSupabaseConfigured()) {
+        const { data, error } = await supabase.from('sedes').upsert(item).select().single();
+        if (data && !error) item = data;
+    }
+    const idx = cache.sedes.findIndex(x => x.id === item.id);
+    if (idx >= 0) cache.sedes[idx] = item; else cache.sedes.push(item);
+    return { data: item, error: null };
   },
-  saveLocal: (item: Local) => {
-    const all = orgService.getLocais();
-    const index = all.findIndex(i => i.id === item.id);
-    if (index >= 0) all[index] = item;
-    else all.push(item);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
-  },
-  deleteLocal: (id: string) => {
-    const all = orgService.getLocais().filter(i => i.id !== id);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(all));
+  
+  deleteSede: async (id: string) => {
+    if (isSupabaseConfigured()) await supabase.from('sedes').delete().eq('id', id);
+    cache.sedes = cache.sedes.filter(x => x.id !== id);
   },
 
-  // Helpers
-  getSedeById: (id: string) => orgService.getSedes().find(s => s.id === id),
-  getRegionById: (id: string) => orgService.getRegions().find(r => r.id === id),
-  getOrgById: (id: string) => orgService.getOrgs().find(o => o.id === id),
-  getLocalById: (id: string) => orgService.getLocais().find(l => l.id === id),
+  saveLocal: async (item: Local) => {
+    if (isSupabaseConfigured()) {
+        const { data, error } = await supabase.from('locais').upsert(item).select().single();
+        if (data && !error) item = data;
+    }
+    const idx = cache.locais.findIndex(x => x.id === item.id);
+    if (idx >= 0) cache.locais[idx] = item; else cache.locais.push(item);
+    return { data: item, error: null };
+  },
+  
+  deleteLocal: async (id: string) => {
+    if (isSupabaseConfigured()) await supabase.from('locais').delete().eq('id', id);
+    cache.locais = cache.locais.filter(x => x.id !== id);
+  }
 };

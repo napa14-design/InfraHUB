@@ -39,8 +39,8 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
     loadSedes();
   }, [user]);
 
-  const loadData = () => {
-      setData(hydroService.getFiltros(user));
+  const loadData = async () => {
+      setData(await hydroService.getFiltros(user));
   };
 
   const loadSedes = () => {
@@ -89,7 +89,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
     setIsExchangeModalOpen(true);
   };
 
-  const confirmExchange = () => {
+  const confirmExchange = async () => {
     if (selectedItem && todayDate) {
         const updated: HydroFiltro = {
             ...selectedItem,
@@ -97,8 +97,8 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
             proximaTroca: nextDate
         };
         
-        hydroService.saveFiltro(updated);
-        loadData();
+        await hydroService.saveFiltro(updated);
+        await loadData();
         setIsExchangeModalOpen(false);
     }
   };
@@ -114,10 +114,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
       setIsDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
       if (itemToDelete) {
-          hydroService.deleteFiltro(itemToDelete.id);
-          loadData();
+          await hydroService.deleteFiltro(itemToDelete.id);
+          await loadData();
           setIsDeleteModalOpen(false);
           setItemToDelete(null);
       }
@@ -141,7 +141,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
       setIsAddModalOpen(true);
   };
 
-  const confirmAdd = () => {
+  const confirmAdd = async () => {
       if (newFilter.sedeId && newFilter.patrimonio && newFilter.local && newFilter.dataTroca) {
           // Auto calc next date based on input
           const next = new Date(newFilter.dataTroca);
@@ -158,8 +158,8 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
               proximaTroca: nextStr
           };
 
-          hydroService.saveFiltro(newItem);
-          loadData();
+          await hydroService.saveFiltro(newItem);
+          await loadData();
           setIsAddModalOpen(false);
           setNewFilter(initialNewFilter);
       } else {

@@ -1,6 +1,7 @@
-import { NotificationRule } from '../types';
 
-const RULES_KEY = 'nexus_notif_rules';
+import { NotificationRule } from '../types';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { MOCK_RULES } from '../constants';
 
 const DEFAULT_RULES: NotificationRule[] = [
   {
@@ -8,8 +9,8 @@ const DEFAULT_RULES: NotificationRule[] = [
     moduleId: 'hydrosys',
     name: 'Certificados de Potabilidade',
     description: 'Monitora a data de validade dos laudos.',
-    warningDays: 30, // Avisar com 30 dias
-    criticalDays: 0, // Crítico quando vencer (0 dias restantes)
+    warningDays: 30,
+    criticalDays: 0,
     enabled: true
   },
   {
@@ -33,26 +34,27 @@ const DEFAULT_RULES: NotificationRule[] = [
 ];
 
 export const configService = {
-  getNotificationRules: (): NotificationRule[] => {
-    const stored = localStorage.getItem(RULES_KEY);
-    if (!stored) {
-      localStorage.setItem(RULES_KEY, JSON.stringify(DEFAULT_RULES));
-      return DEFAULT_RULES;
-    }
-    return JSON.parse(stored);
-  },
-
-  saveRule: (updatedRule: NotificationRule) => {
-    const rules = configService.getNotificationRules();
-    const index = rules.findIndex(r => r.id === updatedRule.id);
-    if (index >= 0) {
-      rules[index] = updatedRule;
-      localStorage.setItem(RULES_KEY, JSON.stringify(rules));
+  getNotificationRules: async (): Promise<NotificationRule[]> => {
+    try {
+        if (!isSupabaseConfigured()) throw new Error("Mock");
+        const { data } = await supabase.from('notification_rules').select('*');
+        if (data && data.length > 0) return data;
+        return DEFAULT_RULES;
+    } catch (e) {
+        return MOCK_RULES || DEFAULT_RULES;
     }
   },
 
-  resetDefaults: () => {
-    localStorage.setItem(RULES_KEY, JSON.stringify(DEFAULT_RULES));
+  saveRule: async (updatedRule: NotificationRule) => {
+    if (isSupabaseConfigured()) await supabase.from('notification_rules').upsert(updatedRule);
+  },
+
+  resetDefaults: async () => {
+    if (isSupabaseConfigured()) {
+        for (const rule of DEFAULT_RULES) {
+            await supabase.from('notification_rules').upsert(rule);
+        }
+    }
     return DEFAULT_RULES;
   }
 };

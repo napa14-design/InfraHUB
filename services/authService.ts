@@ -1,56 +1,64 @@
-import { User, UserRole, UserStatus } from '../types';
+
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
 
 const SESSION_KEY = 'nexus_auth_user';
-const USERS_DB_KEY = 'nexus_users_db';
-
-// Helper to get users from "DB" (LocalStorage) or Init with Mock
-const getUsersDB = (): User[] => {
-  const stored = localStorage.getItem(USERS_DB_KEY);
-  if (stored) return JSON.parse(stored);
-  // Initialize DB with mocks
-  localStorage.setItem(USERS_DB_KEY, JSON.stringify(MOCK_USERS));
-  return MOCK_USERS;
-};
-
-const saveUsersDB = (users: User[]) => {
-  localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
-};
 
 export const authService = {
-  // Login with Password and Status Check
-  login: async (email: string, passwordInput: string = '123'): Promise<{ user: User | null; error?: string }> => {
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 600));
+  // Login with Supabase or Mock
+  login: async (email: string, passwordInput: string): Promise<{ user: User | null; error?: string }> => {
+    try {
+      // 1. Try Supabase Auth first if configured
+      if (isSupabaseConfigured()) {
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password: passwordInput,
+          });
 
-    const users = getUsersDB();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+          if (!authError && authData.user) {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authData.user.id)
+                .single();
 
-    if (!user) {
-      return { user: null, error: 'Usuário não encontrado.' };
+              if (profileData) {
+                  const appUser: User = {
+                    id: authData.user.id,
+                    email: authData.user.email || '',
+                    name: profileData.name || 'Usuário',
+                    role: profileData.role as UserRole,
+                    status: profileData.status,
+                    isFirstLogin: false,
+                    organizationId: profileData.organization_id,
+                    regionId: profileData.region_id,
+                    sedeIds: profileData.sede_ids || [],
+                  };
+                  localStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
+                  return { user: appUser };
+              }
+          }
+      }
+
+      // 2. Fallback to MOCK_USERS if Supabase failed or not configured
+      console.warn("Using Mock Auth Login");
+      const mockUser = MOCK_USERS.find(u => u.email === email);
+      if (mockUser) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
+          return { user: mockUser };
+      }
+
+      return { user: null, error: 'E-mail ou senha incorretos.' };
+
+    } catch (err) {
+      console.error(err);
+      return { user: null, error: 'Erro inesperado na conexão.' };
     }
-
-    if (user.status === 'INACTIVE') {
-      return { user: null, error: 'Conta inativa. Contate o administrador.' };
-    }
-
-    // In a real app, hash comparison happens here.
-    // For mock, we check plain text or default '123' if not set
-    const validPassword = user.password === passwordInput;
-    
-    if (!validPassword) {
-      return { user: null, error: 'Senha incorreta.' };
-    }
-
-    // Don't save to session yet if it's first login (needs password change)
-    if (!user.isFirstLogin) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-    }
-
-    return { user };
   },
 
-  logout: () => {
+  logout: async () => {
+    if (isSupabaseConfigured()) await supabase.auth.signOut();
     localStorage.removeItem(SESSION_KEY);
   },
 
@@ -59,84 +67,59 @@ export const authService = {
     return stored ? JSON.parse(stored) : null;
   },
 
-  // --- USER MANAGEMENT ---
-
-  getAllUsers: (): User[] => {
-    return getUsersDB();
+  getAllUsers: async (): Promise<User[]> => {
+    try {
+        if (!isSupabaseConfigured()) throw new Error("Mock");
+        const { data, error } = await supabase.from('profiles').select('*');
+        if (error) throw error;
+        return data.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            email: p.email,
+            role: p.role as UserRole,
+            status: p.status,
+            isFirstLogin: false,
+            organizationId: p.organization_id,
+            regionId: p.region_id,
+            sedeIds: p.sede_ids || []
+        }));
+    } catch (e) {
+        return MOCK_USERS;
+    }
   },
 
-  createUser: (userData: Partial<User>): User => {
-    const users = getUsersDB();
-    
-    // Generate Random Password
-    const tempPassword = Math.random().toString(36).slice(-8);
-    
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: userData.name || 'Novo Usuário',
-      email: userData.email || '',
-      role: userData.role || UserRole.OPERATIONAL,
-      status: 'ACTIVE',
-      isFirstLogin: true, // Forces password change
-      password: tempPassword,
-      avatarUrl: '', // Default no avatar
-      organizationId: userData.organizationId,
-      regionId: userData.regionId,
-      sedeIds: userData.sedeIds || [],
-    };
-
-    users.push(newUser);
-    saveUsersDB(users);
-    return newUser;
+  createUser: async (userData: Partial<User>): Promise<any> => {
+     console.warn("Create user not fully supported in frontend-only mode.");
+     return null;
   },
 
-  updateUser: (id: string, updates: Partial<User>): User | null => {
-    const users = getUsersDB();
-    const index = users.findIndex(u => u.id === id);
-    if (index === -1) return null;
+  updateUser: async (id: string, updates: Partial<User>): Promise<User | null> => {
+    if (isSupabaseConfigured()) {
+        const dbUpdates: any = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.role) dbUpdates.role = updates.role;
+        if (updates.status) dbUpdates.status = updates.status;
+        if (updates.sedeIds) dbUpdates.sede_ids = updates.sedeIds;
+        if (updates.organizationId) dbUpdates.organization_id = updates.organizationId;
+        if (updates.regionId) dbUpdates.region_id = updates.regionId;
 
-    users[index] = { ...users[index], ...updates };
-    saveUsersDB(users);
-    
-    // If updating current user, update session too
-    const currentUser = authService.getCurrentUser();
-    if (currentUser && currentUser.id === id) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(users[index]));
+        await supabase.from('profiles').update(dbUpdates).eq('id', id);
     }
     
-    return users[index];
+    // Update local storage if self
+    const currentUser = authService.getCurrentUser();
+    if (currentUser && currentUser.id === id) {
+       const merged = { ...currentUser, ...updates };
+       localStorage.setItem(SESSION_KEY, JSON.stringify(merged));
+       return merged;
+    }
+    return null;
   },
 
-  deleteUser: (id: string) => {
-    const users = getUsersDB();
-    const filtered = users.filter(u => u.id !== id);
-    saveUsersDB(filtered);
-  },
-
-  // --- PASSWORD OPERATIONS ---
-
-  changePassword: (userId: string, newPassword: string): boolean => {
-    const users = getUsersDB();
-    const index = users.findIndex(u => u.id === userId);
-    if (index === -1) return false;
-
-    users[index].password = newPassword;
-    users[index].isFirstLogin = false; // Clear first login flag
-    saveUsersDB(users);
-
-    // Set session immediately after password change
-    localStorage.setItem(SESSION_KEY, JSON.stringify(users[index]));
-    
-    return true;
-  },
-
-  resetPasswordRequest: async (email: string): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    const users = getUsersDB();
-    const user = users.find(u => u.email === email);
-    // In real app, send email. Here just return true if user exists.
-    return !!user;
+  deleteUser: async (id: string) => {
+    if (isSupabaseConfigured()) {
+        await supabase.from('profiles').delete().eq('id', id);
+    }
   },
 
   hasPermission: (userRole: UserRole, requiredRole: UserRole): boolean => {
@@ -146,5 +129,21 @@ export const authService = {
       [UserRole.ADMIN]: 3
     };
     return levels[userRole] >= levels[requiredRole];
+  },
+  
+  changePassword: async (userId: string, newPassword: string): Promise<boolean> => {
+      if (isSupabaseConfigured()) {
+          const { error } = await supabase.auth.updateUser({ password: newPassword });
+          return !error;
+      }
+      return true;
+  },
+
+  resetPasswordRequest: async (email: string): Promise<boolean> => {
+      if (isSupabaseConfigured()) {
+          const { error } = await supabase.auth.resetPasswordForEmail(email);
+          return !error;
+      }
+      return true;
   }
 };

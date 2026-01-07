@@ -5,7 +5,7 @@ import {
   Waves, Box, History, User as UserIcon, AlertTriangle, ChevronRight,
   Download
 } from 'lucide-react';
-import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole } from '../../types';
+import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroReservatorio } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { EmptyState } from '../Shared/EmptyState';
 
@@ -25,13 +25,18 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [historyItem, setHistoryItem] = useState<any>(null);
 
   useEffect(() => {
+    const refreshData = async () => {
+      setPocos(await hydroService.getPocos(user));
+      setCisternas(await hydroService.getCisternas(user));
+      setCaixas(await hydroService.getCaixas(user));
+    };
     refreshData();
   }, [user]);
 
-  const refreshData = () => {
-    setPocos(hydroService.getPocos(user));
-    setCisternas(hydroService.getCisternas(user));
-    setCaixas(hydroService.getCaixas(user));
+  const refreshData = async () => {
+    setPocos(await hydroService.getPocos(user));
+    setCisternas(await hydroService.getCisternas(user));
+    setCaixas(await hydroService.getCaixas(user));
   };
 
   const handleEdit = (item: any) => {
@@ -44,11 +49,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       setIsHistoryOpen(true);
   };
 
-  const handleSave = () => {
-      if (activeTab === 'pocos') hydroService.savePoco(editItem);
-      else if (activeTab === 'cisternas') hydroService.saveCisterna(editItem);
-      else hydroService.saveCaixa(editItem);
-      refreshData();
+  const handleSave = async () => {
+      if (activeTab === 'pocos') await hydroService.savePoco(editItem);
+      else if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
+      else await hydroService.saveCaixa(editItem);
+      await refreshData();
       setIsModalOpen(false);
   };
 
@@ -139,11 +144,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                     Cronograma de Higienização
                 </div>
                 <div className="flex items-center gap-2">
-                    {renderTimelineDate('Última', item.dataUltimaLimpeza, 'done')}
+                    {renderTimelineDate('Última', item.dataUltimaLimpeza || '', 'done')}
                     <ChevronRight size={16} className="text-slate-300 mt-5"/>
-                    {renderTimelineDate('Atual', item.dataLimpeza, item.dataLimpeza ? 'done' : 'pending')}
+                    {renderTimelineDate('Atual', item.dataLimpeza1 || '', item.dataLimpeza1 ? 'done' : 'pending')}
                     <ChevronRight size={16} className="text-slate-300 mt-5"/>
-                    {renderTimelineDate('Próxima', item.previsaoLimpeza1_2026, 'future')}
+                    {renderTimelineDate('Próxima', item.proximaLimpeza, 'future')}
                 </div>
             </div>
 
@@ -237,8 +242,8 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                 </div>
             </div>
-            <div className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider ${getStatusColor(item.situacao)}`}>
-                 {item.situacao}
+            <div className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider ${getStatusColor(item.situacaoLimpeza)}`}>
+                 {item.situacaoLimpeza}
             </div>
         </div>
 
@@ -261,7 +266,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             ) : (
                                 <div className="text-sm font-medium text-slate-500">
-                                    Previsão: <span className="font-bold text-slate-700 dark:text-slate-300">{item.previsaoLimpeza1_2025 || 'Não agendado'}</span>
+                                    Previsão: <span className="font-bold text-slate-700 dark:text-slate-300">{item.previsaoLimpeza1 || 'Não agendado'}</span>
                                 </div>
                             )}
                         </div>
@@ -280,7 +285,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             ) : (
                                 <div className="text-sm font-medium text-slate-500">
-                                    Previsão: <span className="font-bold text-slate-700 dark:text-slate-300">{item.previsaoLimpeza2_2025 || 'Não agendado'}</span>
+                                    Previsão: <span className="font-bold text-slate-700 dark:text-slate-300">{item.previsaoLimpeza2 || 'Não agendado'}</span>
                                 </div>
                             )}
                         </div>
@@ -413,11 +418,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                    </div>
                                    <div>
                                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Atual (2025)</label>
-                                       <input type="date" className="w-full p-2 rounded-lg border border-slate-200 text-sm" value={editItem.dataLimpeza || ''} onChange={e => setEditItem({...editItem, dataLimpeza: e.target.value})} />
+                                       <input type="date" className="w-full p-2 rounded-lg border border-slate-200 text-sm" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} />
                                    </div>
                                    <div className="col-span-2">
-                                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Previsão 2026</label>
-                                       <input type="date" className="w-full p-2 rounded-lg border border-slate-200 text-sm" value={editItem.previsaoLimpeza1_2026 || ''} onChange={e => setEditItem({...editItem, previsaoLimpeza1_2026: e.target.value})} />
+                                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Previsão Próxima</label>
+                                       <input type="date" className="w-full p-2 rounded-lg border border-slate-200 text-sm" value={editItem.proximaLimpeza || ''} onChange={e => setEditItem({...editItem, proximaLimpeza: e.target.value})} />
                                    </div>
                                </div>
                            </div>
@@ -507,10 +512,10 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                         )}
 
                         {/* Current Cleaning */}
-                        {historyItem.dataLimpeza ? (
+                        {historyItem.dataLimpeza1 ? (
                             <div className="relative">
                                 <div className="absolute -left-[31px] top-1 h-4 w-4 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900"></div>
-                                <p className="text-xs font-bold text-emerald-600 mb-1">{new Date(historyItem.dataLimpeza).toLocaleDateString()}</p>
+                                <p className="text-xs font-bold text-emerald-600 mb-1">{new Date(historyItem.dataLimpeza1).toLocaleDateString()}</p>
                                 <div className="bg-emerald-50 dark:bg-emerald-900/10 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
                                     <p className="font-bold text-sm text-emerald-800 dark:text-emerald-400">Ciclo Atual Concluído</p>
                                     <p className="text-xs text-emerald-600/80">Registro ativo no sistema.</p>

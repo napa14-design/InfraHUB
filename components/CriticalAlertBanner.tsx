@@ -12,8 +12,8 @@ export const CriticalAlertBanner: React.FC<Props> = ({ onViewCritical }) => {
 
   useEffect(() => {
     // Check immediately and then every 5 seconds
-    const checkCriticals = () => {
-      const all = notificationService.getAll();
+    const checkCriticals = async () => {
+      const all = await notificationService.getAll();
       // Filter only unread ERRORS (Critical/Delays)
       const critical = all.filter(n => n.type === 'ERROR' && !n.read);
       setCriticalNotifs(critical);

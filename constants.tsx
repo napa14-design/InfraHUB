@@ -1,4 +1,5 @@
-import { UserRole, AppModule, ModuleStatus, User, ModuleType, Organization, Region, Sede, Local } from './types';
+
+import { UserRole, AppModule, ModuleStatus, User, ModuleType, Organization, Region, Sede, Local, HydroCertificado, HydroFiltro, HydroPoco, NotificationRule } from './types';
 
 // --- ESTRUTURA ORGANIZACIONAL ---
 
@@ -83,7 +84,6 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-dt',
     sedeIds: ['DT'],
     status: 'ACTIVE',
-    password: '123',
     isFirstLogin: false
   },
   {
@@ -95,7 +95,6 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-ald-col',
     sedeIds: ['BS', 'SP', 'PNV'], // Gestor com múltiplas sedes
     status: 'ACTIVE',
-    password: '123',
     isFirstLogin: false
   },
   {
@@ -107,7 +106,6 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-campus',
     sedeIds: ['PQL3'], 
     status: 'ACTIVE',
-    password: '123',
     isFirstLogin: false 
   },
   {
@@ -119,8 +117,57 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-campus',
     sedeIds: ['ALD'], // Vê tudo que é mapeado para ALD
     status: 'ACTIVE',
-    password: '123',
     isFirstLogin: false 
+  }
+];
+
+// --- HYDROSYS MOCK DATA ---
+
+export const MOCK_HYDRO_CERTIFICADOS: HydroCertificado[] = [
+  { id: 'cert-ald-vl', sedeId: 'ALD', parceiro: 'ALD - VL', status: 'VIGENTE', semestre: '2º/2025', validadeSemestre: '2026-02-18', dataAnalise: '2025-08-22', validade: '2026-02-18', linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: '' },
+  { id: 'cert-pe', sedeId: 'PE', parceiro: 'PE', status: 'VIGENTE', semestre: '2º/2025', validadeSemestre: '2026-03-25', dataAnalise: '2025-09-26', validade: '2026-03-25', linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: '' },
+  { id: 'cert-pjf', sedeId: 'PJF', parceiro: 'PJF', status: 'VENCIDO', semestre: '2º/2025', validadeSemestre: '', dataAnalise: '2024-01-01', validade: '2024-07-01', linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: '' },
+  { id: 'cert-dt', sedeId: 'DT', parceiro: 'DT', status: 'VIGENTE', semestre: '2º/2025', validadeSemestre: '2026-03-04', dataAnalise: '2025-09-05', validade: '2026-03-04', linkMicro: '', linkFisico: '', empresa: 'Nexus Group', agendamento: '' }
+];
+
+export const MOCK_HYDRO_FILTROS: HydroFiltro[] = [
+  { id: 'pe-1', sedeId: 'PE', patrimonio: '1098', bebedouro: 'Bebedouro', local: '10º ANDAR', dataTroca: '2025-07-07', proximaTroca: '2026-01-01' },
+  { id: 'pe-2', sedeId: 'PE', patrimonio: '1281', bebedouro: 'Bebedouro', local: '9º ANDAR', dataTroca: '2025-07-07', proximaTroca: '2026-01-01' }
+];
+
+export const MOCK_HYDRO_RESERVATORIOS: HydroPoco[] = [
+  { id: 'p-1', sedeId: 'ALD', tipo: 'POCO', local: 'SUBSOLO', responsavel: 'JOSY', dataUltimaLimpeza: '2024-01-24', proximaLimpeza: '2026-07-09', situacaoLimpeza: 'DENTRO DO PRAZO', dataLimpeza1: '2025-07-09', proximaTrocaFiltro: '2026-01-05', situacaoFiltro: 'DENTRO DO PRAZO', refil: '10"' },
+  { id: 'p-2', sedeId: 'ALD', tipo: 'POCO', local: 'SUBSOLO', responsavel: 'JOSY', dataUltimaLimpeza: '2024-01-24', proximaLimpeza: '2026-07-14', situacaoLimpeza: 'DENTRO DO PRAZO', dataLimpeza1: '2025-07-14', proximaTrocaFiltro: '2026-01-10', situacaoFiltro: 'DENTRO DO PRAZO', refil: '10"' },
+  { id: 'p-3', sedeId: 'BN', tipo: 'POCO', local: 'CORREDOR (BOSQUE)', responsavel: 'REBECCA', dataUltimaLimpeza: '2024-01-01', proximaLimpeza: '2026-04-19', situacaoLimpeza: 'DENTRO DO PRAZO', dataLimpeza1: '2025-04-19', proximaTrocaFiltro: '2025-10-16', situacaoFiltro: 'DENTRO DO PRAZO', refil: '20"' }
+];
+
+export const MOCK_RULES: NotificationRule[] = [
+  {
+    id: 'rule_cert',
+    moduleId: 'hydrosys',
+    name: 'Certificados de Potabilidade',
+    description: 'Monitora a data de validade dos laudos.',
+    warningDays: 30,
+    criticalDays: 0,
+    enabled: true
+  },
+  {
+    id: 'rule_filtros',
+    moduleId: 'hydrosys',
+    name: 'Troca de Filtros',
+    description: 'Monitora a data da próxima troca de elementos filtrantes.',
+    warningDays: 15,
+    criticalDays: 0,
+    enabled: true
+  },
+  {
+    id: 'rule_res',
+    moduleId: 'hydrosys',
+    name: 'Limpeza de Reservatórios',
+    description: 'Monitora datas de limpeza de Caixas e Cisternas.',
+    warningDays: 30,
+    criticalDays: 7,
+    enabled: true
   }
 ];
 

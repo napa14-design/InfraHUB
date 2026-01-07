@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
 import { LayoutGrid, Lock, User, ShieldCheck, Zap, ArrowRight, CheckCircle2, AlertCircle, X, Key } from 'lucide-react';
-import { MOCK_USERS } from '../constants';
 import { authService } from '../services/authService';
 import { User as UserType } from '../types';
 
@@ -13,12 +13,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  // Modals
   const [showForgot, setShowForgot] = useState(false);
-  const [firstLoginUser, setFirstLoginUser] = useState<UserType | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +21,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      // Direct call to auth service to get granular error or first login object
       const result = await authService.login(email, password);
       
       if (result.error) {
@@ -35,15 +29,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
          return;
       }
 
-      if (result.user?.isFirstLogin) {
-         setFirstLoginUser(result.user);
-         setIsLoading(false);
-         return;
-      }
-
-      // Success normal login
       if (result.user) {
-         // This triggers the parent App state update
          await onLogin(result.user.email);
       }
 
@@ -54,26 +40,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
-  const handlePasswordChange = async () => {
-      if (newPassword !== confirmPassword) {
-          setError('As senhas não coincidem.');
-          return;
-      }
-      if (newPassword.length < 4) {
-          setError('A senha deve ter no mínimo 4 caracteres.');
-          return;
-      }
-
-      if (firstLoginUser) {
-          const success = authService.changePassword(firstLoginUser.id, newPassword);
-          if (success) {
-              await onLogin(firstLoginUser.email); // Auto login
-          } else {
-              setError('Erro ao alterar senha.');
-          }
-      }
-  };
-
   const handleForgotSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       setIsLoading(true);
@@ -82,12 +48,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       alert('Se o e-mail existir, um link de redefinição foi enviado.');
       setShowForgot(false);
   };
-
-  const demoAccounts = MOCK_USERS.map(u => ({
-    email: u.email,
-    role: u.role,
-    name: u.name
-  }));
 
   return (
     <div className="min-h-screen flex w-full bg-white dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-white transition-colors">
@@ -178,20 +138,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </button>
             </form>
 
-            {/* Demo Buttons */}
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                <p className="text-xs text-center text-slate-400 mb-3">Login de Demonstração (Senha: 123)</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                    {demoAccounts.map(acc => (
-                        <button 
-                            key={acc.email} 
-                            onClick={() => { setEmail(acc.email); setPassword('123'); }}
-                            className="text-[10px] bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 transition-colors"
-                        >
-                            {acc.role}
-                        </button>
-                    ))}
-                </div>
+            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
+                 <p className="text-xs text-slate-400">
+                     Certifique-se de que sua conta foi criada no Supabase Authentication.
+                 </p>
             </div>
         </div>
       </div>
@@ -216,46 +166,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                       />
                       <button type="submit" className="w-full py-3 bg-brand-600 text-white font-bold rounded-xl">Enviar Link</button>
                   </form>
-              </div>
-          </div>
-      )}
-
-      {/* First Login Change Password Modal */}
-      {firstLoginUser && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-8 animate-in zoom-in-95 text-center">
-                  <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Key size={32} />
-                  </div>
-                  <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Primeiro Acesso</h3>
-                  <p className="text-slate-500 mb-6">Por segurança, você deve definir uma nova senha antes de continuar.</p>
-                  
-                  <div className="space-y-4 text-left">
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">Nova Senha</label>
-                          <input 
-                              type="password" 
-                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none"
-                              value={newPassword}
-                              onChange={e => setNewPassword(e.target.value)}
-                          />
-                      </div>
-                      <div>
-                          <label className="text-xs font-bold text-slate-500 uppercase">Confirmar Senha</label>
-                          <input 
-                              type="password" 
-                              className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none"
-                              value={confirmPassword}
-                              onChange={e => setConfirmPassword(e.target.value)}
-                          />
-                      </div>
-                      
-                      {error && <p className="text-red-500 text-sm font-bold text-center">{error}</p>}
-
-                      <button onClick={handlePasswordChange} className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl mt-2">
-                          Definir Senha e Entrar
-                      </button>
-                  </div>
               </div>
           </div>
       )}

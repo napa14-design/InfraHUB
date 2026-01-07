@@ -19,11 +19,14 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setSettings(hydroService.getSettings());
+    const load = async () => {
+        setSettings(await hydroService.getSettings());
+    };
+    load();
   }, []);
 
-  const handleSave = () => {
-    hydroService.saveSettings(settings);
+  const handleSave = async () => {
+    await hydroService.saveSettings(settings);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

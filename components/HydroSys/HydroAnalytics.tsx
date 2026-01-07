@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   PieChart, BarChart3, AlertTriangle, CheckCircle2, Droplets, Filter, 
   ArrowUpRight, Building2, TrendingUp, Calendar, ArrowRight, Activity,
   AlertCircle
 } from 'lucide-react';
-import { User, UserRole } from '../../types';
+import { User, UserRole, HydroCertificado, HydroFiltro, HydroPoco } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { EmptyState } from '../Shared/EmptyState';
 import { useNavigate } from 'react-router-dom';
@@ -119,13 +119,38 @@ const StatCard = ({ title, value, subtext, icon: Icon, trend, trendUp }: any) =>
 export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
     const navigate = useNavigate();
     
-    // 1. Fetch Data
-    const certificados = useMemo(() => hydroService.getCertificados(user), [user]);
-    const filtros = useMemo(() => hydroService.getFiltros(user), [user]);
-    const pocos = useMemo(() => hydroService.getPocos(user), [user]);
+    // Replace useMemo with state to handle async loading
+    const [certificados, setCertificados] = useState<HydroCertificado[]>([]);
+    const [filtros, setFiltros] = useState<HydroFiltro[]>([]);
+    const [pocos, setPocos] = useState<HydroPoco[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const load = async () => {
+            const [c, f, p] = await Promise.all([
+                hydroService.getCertificados(user),
+                hydroService.getFiltros(user),
+                hydroService.getPocos(user)
+            ]);
+            setCertificados(c);
+            setFiltros(f);
+            setPocos(p);
+            setLoading(false);
+        };
+        load();
+    }, [user]);
 
     // 2. Calculations
     const totalAssets = certificados.length + filtros.length + pocos.length;
+    
+    if (loading) {
+        return (
+             <div className="p-8 animate-in fade-in">
+                 <h1 className="text-2xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white"><PieChart className="text-cyan-600"/> Analytics</h1>
+                 <p>Carregando dados analíticos...</p>
+             </div>
+        );
+    }
     
     if (totalAssets === 0) {
         return (
@@ -180,8 +205,8 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
     // Poços Vencidos/Críticos (Limpeza)
     pocos.forEach(p => {
-        if (p.previsaoLimpeza1_2026) { // Usando campo exemplo
-             const diff = Math.ceil((new Date(p.previsaoLimpeza1_2026).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (p.proximaLimpeza) { // Updated property name
+             const diff = Math.ceil((new Date(p.proximaLimpeza).getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
              if (diff <= 30) {
                 criticalItems.push({
                     id: p.id,

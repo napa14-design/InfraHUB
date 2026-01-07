@@ -10,7 +10,10 @@ export const AdminNotificationConfig: React.FC = () => {
   const [hasChanges, setHasChanges] = useState(false);
 
   useEffect(() => {
-    setRules(configService.getNotificationRules());
+    const load = async () => {
+        setRules(await configService.getNotificationRules());
+    }
+    load();
   }, []);
 
   const handleUpdate = (id: string, field: keyof NotificationRule, value: any) => {
@@ -18,15 +21,17 @@ export const AdminNotificationConfig: React.FC = () => {
     setHasChanges(true);
   };
 
-  const handleSave = () => {
-    rules.forEach(r => configService.saveRule(r));
+  const handleSave = async () => {
+    for (const r of rules) {
+        await configService.saveRule(r);
+    }
     setHasChanges(false);
     alert('Regras de notificação atualizadas com sucesso!');
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
       if(confirm('Restaurar padrões?')) {
-          setRules(configService.resetDefaults());
+          setRules(await configService.resetDefaults());
           setHasChanges(false);
       }
   }

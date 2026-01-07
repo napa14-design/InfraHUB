@@ -41,8 +41,8 @@ export const AdminUserManagement: React.FC = () => {
     loadData();
   }, [currentUser?.id]);
 
-  const loadData = () => {
-    let allUsers = authService.getAllUsers();
+  const loadData = async () => {
+    let allUsers = await authService.getAllUsers();
     
     // Permission Logic: Gestor sees only users from their Sede(s) logic?
     // Simplified: Gestors can see everyone in their Organization
@@ -110,19 +110,21 @@ export const AdminUserManagement: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (isEditing && editingId) {
         // UPDATE
-        authService.updateUser(editingId, formData);
+        await authService.updateUser(editingId, formData);
         loadData();
         setIsModalOpen(false); // Close immediately on edit
     } else {
         // CREATE
-        const created = authService.createUser(formData);
+        const created = await authService.createUser(formData);
         loadData();
-        setCreatedUserPass(created.password || 'Erro'); // Show password screen
+        if (created) {
+           setCreatedUserPass(created.password || 'Erro'); // Show password screen
+        }
     }
   };
 

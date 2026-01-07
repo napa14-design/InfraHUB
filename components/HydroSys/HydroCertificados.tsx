@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   Award, FileText, Calendar, Plus, Edit, Save, X, History, Clock, 
@@ -92,7 +93,11 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const [formData, setFormData] = useState<HydroCertificado>(initialForm);
 
   useEffect(() => {
-    setData(hydroService.getCertificados(user));
+    const load = async () => {
+       const res = await hydroService.getCertificados(user);
+       setData(res);
+    };
+    load();
   }, [user]);
 
   // --- ACTIONS ---
@@ -130,16 +135,18 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     setIsSheetOpen(true);
   };
 
-  const handleSave = () => {
-    hydroService.saveCertificado(formData);
-    setData(hydroService.getCertificados(user));
+  const handleSave = async () => {
+    await hydroService.saveCertificado(formData);
+    const res = await hydroService.getCertificados(user);
+    setData(res);
     setIsSheetOpen(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
       if(confirm("Deseja remover este certificado?")) {
-        // Mock delete functionality would go here
-        alert("Função de deletar simulada.");
+        await hydroService.deleteCertificado(id);
+        const res = await hydroService.getCertificados(user);
+        setData(res);
       }
   }
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, AppNotification, NotificationType } from '../types';
 import { authService } from '../services/authService';
@@ -52,19 +53,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const userSedeCount = user.sedeIds ? user.sedeIds.length : 0;
-  const primarySede = userSedeCount > 0 ? orgService.getSedeById(user.sedeIds[0]) : null;
-  const userRegion = user.regionId ? orgService.getRegionById(user.regionId) : null;
-
   // Check if we are inside HydroSys module
   const isHydroSys = location.pathname.includes('/module/hydrosys');
 
+  const fetchNotifications = async () => {
+      // 1. Run checks (Async)
+      await notificationService.checkSystemStatus(user);
+      // 2. Fetch recent (Async)
+      const data = await notificationService.getAll();
+      setNotifications(data);
+  };
+
+  const handleMarkRead = async (id: string) => {
+      await notificationService.markAsRead(id);
+      fetchNotifications();
+  };
+
+  const handleMarkAllRead = async () => {
+      await notificationService.markAllRead();
+      fetchNotifications();
+  };
+
   useEffect(() => {
-    notificationService.checkSystemStatus(user);
-    setNotifications(notificationService.getAll());
+    fetchNotifications();
+    
+    // Polling every minute
     const interval = setInterval(() => {
-      notificationService.checkSystemStatus(user);
-      setNotifications(notificationService.getAll());
+      fetchNotifications();
     }, 60000);
     return () => clearInterval(interval);
   }, [user]);
@@ -201,8 +216,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         isOpen={isNotifOpen} 
         onClose={() => setIsNotifOpen(false)}
         notifications={notifications}
-        onMarkRead={(id) => setNotifications(notificationService.markAsRead(id))}
-        onMarkAllRead={() => setNotifications(notificationService.markAllRead())}
+        onMarkRead={handleMarkRead}
+        onMarkAllRead={handleMarkAllRead}
         activeFilter={notifFilter}
         onFilterChange={setNotifFilter}
       />
