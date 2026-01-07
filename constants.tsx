@@ -95,7 +95,7 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-ald-col',
     sedeIds: ['BS', 'SP', 'PNV'], // Gestor com múltiplas sedes
     status: 'ACTIVE',
-    isFirstLogin: false
+    isFirstLogin: true // Force modal test
   },
   {
     id: '3',
@@ -106,7 +106,7 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-campus',
     sedeIds: ['PQL3'], 
     status: 'ACTIVE',
-    isFirstLogin: false 
+    isFirstLogin: false
   },
   {
     id: '4',
@@ -117,7 +117,7 @@ export const MOCK_USERS: User[] = [
     regionId: 'reg-campus',
     sedeIds: ['ALD'], // Vê tudo que é mapeado para ALD
     status: 'ACTIVE',
-    isFirstLogin: false 
+    isFirstLogin: false
   }
 ];
 

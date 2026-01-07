@@ -87,15 +87,19 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     if (entry) {
         setForm(entry);
     } else {
-        setForm({ cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name });
+        // Reset form but keep responsible name if set, otherwise default
+        setForm({ id: undefined, cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name });
     }
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
     if (selectedDateStr && selectedSedeId) {
+        // Use existing ID if editing, otherwise generate new one
+        const entryId = form.id || Date.now().toString();
+
         await hydroService.saveCloro({
-            id: Date.now().toString(),
+            id: entryId,
             sedeId: selectedSedeId, // Use Selected Sede explicitly
             date: selectedDateStr,
             cl: Number(form.cl),
@@ -103,6 +107,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             medidaCorretiva: form.medidaCorretiva,
             responsavel: form.responsavel || user.name
         });
+        
+        // Refresh data to reflect update
         setEntries(await hydroService.getCloro(user));
         setIsModalOpen(false);
     }

@@ -4,7 +4,7 @@ import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'reac
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
-import { supabase } from './lib/supabase'; // Import supabase client
+import { supabase, isSupabaseConfigured } from './lib/supabase'; // Import supabase client
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { Layout } from './components/Layout';
@@ -29,7 +29,9 @@ const AuthObserver = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!isSupabaseConfigured()) return;
+
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
       // FORCE redirect to update-password when recovery link is clicked
       if (event === 'PASSWORD_RECOVERY') {
         console.log("Password Recovery Event Detected - Redirecting...");
@@ -38,7 +40,7 @@ const AuthObserver = () => {
     });
 
     return () => {
-      subscription.unsubscribe();
+      if (data && data.subscription) data.subscription.unsubscribe();
     };
   }, [navigate]);
 
@@ -54,7 +56,9 @@ const App: React.FC = () => {
         try {
             // 0. Ensure Session is restored before fetching data
             // This is critical for RLS policies to recognize the user
-            await supabase.auth.getSession();
+            if (isSupabaseConfigured()) {
+                await supabase.auth.getSession();
+            }
         } catch (e) {
             console.warn("Session check failed", e);
         }
@@ -88,6 +92,12 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
+  };
+
+  // Callback to update user state after password change without logging out
+  const refreshUser = () => {
+      const updated = authService.getCurrentUser();
+      setUser(updated);
   };
 
   if (loading) {

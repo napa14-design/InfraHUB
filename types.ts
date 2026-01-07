@@ -39,10 +39,8 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
+  isFirstLogin?: boolean; // Flag para forçar troca de senha via Modal
   
-  // Auth fields
-  isFirstLogin: boolean;
-
   // Link user to hierarchy
   organizationId?: string;
   regionId?: string;

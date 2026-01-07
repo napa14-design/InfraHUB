@@ -8,6 +8,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { CriticalAlertBanner } from './CriticalAlertBanner';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
+import { FirstLoginSetup } from './FirstLoginSetup';
 import { 
   LogOut, 
   Menu, 
@@ -51,6 +52,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const [notifFilter, setNotifFilter] = useState<NotificationType | 'ALL'>('ALL');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   
+  // First Login Modal State
+  const [showFirstLogin, setShowFirstLogin] = useState(false);
+
   const { theme, toggleTheme } = useTheme();
   
   const navigate = useNavigate();
@@ -65,6 +69,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   // Check Data Source
   const isMockData = orgService.isMockMode();
+
+  // PERMISSION CHECK: Only Admin and Gestor can see alerts/notifications
+  const canViewAlerts = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
 
   // Derived Notification State
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -88,20 +95,33 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       fetchNotifications();
   };
 
+  // CHECK FIRST LOGIN ON MOUNT
   useEffect(() => {
-    fetchNotifications();
-    
-    // Polling every minute
-    const interval = setInterval(() => {
-      fetchNotifications();
-    }, 60000);
-    return () => clearInterval(interval);
-  }, [user]);
+      if (user.isFirstLogin) {
+          setShowFirstLogin(true);
+      }
+  }, [user.isFirstLogin]);
+
+  useEffect(() => {
+    if (canViewAlerts) {
+        fetchNotifications();
+        // Polling every minute
+        const interval = setInterval(() => {
+          fetchNotifications();
+        }, 60000);
+        return () => clearInterval(interval);
+    }
+  }, [user, canViewAlerts]);
 
   const handleLogout = () => {
     authService.logout();
     onLogout();
     navigate('/login');
+  };
+
+  const handleFirstLoginComplete = () => {
+      setShowFirstLogin(false);
+      // Optional: Force a small delay reload to refresh context if needed, but react state update should suffice
   };
 
   const handleOpenCriticalNotifications = () => {
@@ -236,16 +256,23 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 flex">
-      <NotificationCenter 
-        isOpen={isNotifOpen} 
-        onClose={() => setIsNotifOpen(false)}
-        notifications={notifications}
-        onMarkRead={handleMarkRead}
-        onMarkAllRead={handleMarkAllRead}
-        activeFilter={notifFilter}
-        onFilterChange={setNotifFilter}
-        userRole={user.role} // Pass role to allow access to settings
-      />
+      {/* FIRST LOGIN MODAL OVERLAY */}
+      {showFirstLogin && (
+          <FirstLoginSetup user={user} onComplete={handleFirstLoginComplete} />
+      )}
+
+      {canViewAlerts && (
+          <NotificationCenter 
+            isOpen={isNotifOpen} 
+            onClose={() => setIsNotifOpen(false)}
+            notifications={notifications}
+            onMarkRead={handleMarkRead}
+            onMarkAllRead={handleMarkAllRead}
+            activeFilter={notifFilter}
+            onFilterChange={setNotifFilter}
+            userRole={user.role} // Pass role to allow access to settings
+          />
+      )}
 
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
@@ -392,12 +419,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} className="relative text-slate-500 dark:text-slate-400">
-              <Bell size={24} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
-              {unreadCount > 0 && (
-                <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${hasCritical ? 'bg-red-600' : 'bg-brand-500'}`}></span>
-              )}
-            </button>
+            {canViewAlerts && (
+                <button onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} className="relative text-slate-500 dark:text-slate-400">
+                <Bell size={24} className={hasCritical ? 'text-red-500 animate-pulse' : ''} />
+                {unreadCount > 0 && (
+                    <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900 ${hasCritical ? 'bg-red-600' : 'bg-brand-500'}`}></span>
+                )}
+                </button>
+            )}
             <div className="w-8 h-8 rounded-full border border-slate-200 dark:border-slate-700 bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold">
                 {userInitial}
             </div>
@@ -407,8 +436,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         {/* Scrollable Area */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
           <div className="max-w-7xl mx-auto">
-             {/* CRITICAL ALERT BANNER - ONLY ON DASHBOARD */}
-             {location.pathname === '/' && (
+             {/* CRITICAL ALERT BANNER - ONLY ON DASHBOARD AND FOR ADMIN/GESTOR */}
+             {location.pathname === '/' && canViewAlerts && (
                  <CriticalAlertBanner onViewCritical={handleOpenCriticalNotifications} />
              )}
             

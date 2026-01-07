@@ -1,10 +1,15 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { createClient } from '@supabase/supabase-js'; // Import createClient specifically
+import { createClient } from '@supabase/supabase-js'; 
 import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
 
 const SESSION_KEY = 'nexus_auth_user';
+
+// Helper for generating IDs safely in all environments
+const generateId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+};
 
 export const authService = {
   // Login with Supabase or Mock
@@ -53,7 +58,7 @@ export const authService = {
                     name: profileData.name || 'Usuário',
                     role: profileData.role as UserRole,
                     status: profileData.status,
-                    isFirstLogin: false,
+                    isFirstLogin: profileData.is_first_login ?? false, // Map from DB
                     organizationId: profileData.organization_id,
                     regionId: profileData.region_id,
                     sedeIds: profileData.sede_ids || [],
@@ -69,8 +74,6 @@ export const authService = {
       // 2. Fallback to MOCK_USERS if Supabase failed or not configured
       const mockUser = MOCK_USERS.find(u => u.email === email);
       if (mockUser) {
-          // Verify password for mock (simple check if we had passwords, but mocks usually allow any)
-          // For now, accept any password for mocks as we don't store them in code
           console.log("[Auth] Mock user found.");
           localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
           return { user: mockUser };
@@ -116,11 +119,11 @@ export const authService = {
         if (error) throw error;
         return data.map((p: any) => ({
             id: p.id,
-            name: p.name || 'Sem Nome', // Fallback crucial para evitar erro de charAt
+            name: p.name || 'Sem Nome', 
             email: p.email || '',
             role: p.role as UserRole,
             status: p.status,
-            isFirstLogin: false,
+            isFirstLogin: p.is_first_login ?? false,
             organizationId: p.organization_id,
             regionId: p.region_id,
             sedeIds: p.sede_ids || []
@@ -131,9 +134,9 @@ export const authService = {
   },
 
   createUser: async (userData: Partial<User>, customPassword?: string): Promise<any> => {
-     let tempId: string = crypto.randomUUID(); 
+     let tempId: string = generateId(); 
      
-     // Generate robust password: at least 10 chars
+     // Generate robust password
      const generatedPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
      const finalGeneratedPassword = generatedPassword.slice(0, 10).toUpperCase(); 
      
@@ -145,13 +148,8 @@ export const authService = {
 
      if (isSupabaseConfigured()) {
          try {
-             // CRITICAL FIX FOR 23503 ERROR:
-             // To insert into 'profiles', the ID must exist in 'auth.users'.
-             // We can't use 'supabase.auth.signUp' because it logs the current admin out.
-             // SOLUTION: Create a secondary "Shadow Client" that doesn't persist session to storage.
-             
-             // Extract URL and Key from the main client instance
-             // @ts-ignore - Accessing protected properties for this workaround
+             // Accessing protected properties for this workaround
+             // @ts-ignore
              const sbUrl = supabase.supabaseUrl;
              // @ts-ignore
              const sbKey = supabase.supabaseKey;
@@ -159,7 +157,7 @@ export const authService = {
              if (sbUrl && sbKey && userData.email) {
                  const tempClient = createClient(sbUrl, sbKey, {
                      auth: {
-                         persistSession: false, // DO NOT SAVE TO LOCAL STORAGE
+                         persistSession: false,
                          autoRefreshToken: false,
                          detectSessionInUrl: false
                      }
@@ -179,21 +177,14 @@ export const authService = {
 
                  if (authError) {
                      console.error("[Auth] Error creating Auth User:", authError.message);
-                     // RETURN ERROR immediately. Do not attempt DB insert if Auth failed.
-                     // This prevents the 23503 Foreign Key error.
                      return { error: authError.message };
                  } 
                  
                  let emailConfirmationRequired = false;
 
                  if (authData.user) {
-                     console.log("[Auth] Auth User created successfully. ID:", authData.user.id);
                      tempId = authData.user.id; // USE THE REAL ID
-                     
-                     // CHECK IF EMAIL CONFIRMATION IS REQUIRED
-                     // We try to sign in immediately. If it fails with "Email not confirmed", we know status.
                      if (!authData.session) {
-                         // Some configurations don't return session on signup if email confirm is on
                          emailConfirmationRequired = true;
                      }
                  } else {
@@ -201,9 +192,7 @@ export const authService = {
                  }
 
                  // Insert into profiles table
-                 // Use UPSERT to avoid 23505 (Duplicate Key) if profile exists
-                 // Add DEFAULT values to ensure NOT NULL constraints don't fail silently
-                 const { data, error } = await supabase.from('profiles').upsert({
+                 const { error } = await supabase.from('profiles').upsert({
                      id: tempId, 
                      email: userData.email,
                      name: userData.name || 'Novo Usuário',
@@ -211,14 +200,13 @@ export const authService = {
                      organization_id: userData.organizationId || null,
                      region_id: userData.regionId || null,
                      sede_ids: userData.sedeIds || [],
-                     status: 'ACTIVE'
+                     status: 'ACTIVE',
+                     is_first_login: true // FORCE FIRST LOGIN FLAG
                  }).select().single();
 
                  if (error) {
                      console.error("Error creating/updating profile in DB:", error.code, error.message);
                      return { error: `Erro no banco de dados: ${error.message}` };
-                 } else {
-                     console.log("[Auth] Profile created/updated in DB successfully.");
                  }
 
                  return { 
@@ -235,7 +223,6 @@ export const authService = {
      }
      
      // Always update Mock/Local state so UI feels responsive
-     // If the DB insert worked, this local state will be overwritten on next fetch anyway.
      MOCK_USERS.push({
          id: tempId,
          name: userData.name || 'Novo Usuário',
@@ -251,7 +238,7 @@ export const authService = {
      return { 
          id: tempId, 
          email: userData.email, 
-         password: tempPassword // Return the password so Admin can share it
+         password: tempPassword
      };
   },
 
@@ -264,6 +251,7 @@ export const authService = {
         if (updates.sedeIds) dbUpdates.sede_ids = updates.sedeIds;
         if (updates.organizationId) dbUpdates.organization_id = updates.organizationId;
         if (updates.regionId) dbUpdates.region_id = updates.regionId;
+        if (updates.isFirstLogin !== undefined) dbUpdates.is_first_login = updates.isFirstLogin;
 
         await supabase.from('profiles').update(dbUpdates).eq('id', id);
     }
@@ -296,18 +284,14 @@ export const authService = {
     return levels[userRole] >= levels[requiredRole];
   },
   
-  // Method used by Admin to change others' passwords OR by user to change own (if logged in)
   changePassword: async (userId: string, newPassword: string): Promise<boolean> => {
       if (isSupabaseConfigured()) {
-          // updateUser updates the *currently logged in user* or requires service role for others.
-          // Since client-side only has access to self, this works for reset flow.
           const { error } = await supabase.auth.updateUser({ password: newPassword });
           return !error;
       }
       return true;
   },
 
-  // Specific method for the Password Reset Flow
   confirmPasswordReset: async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
       if (isSupabaseConfigured()) {
           const { error } = await supabase.auth.updateUser({ password: newPassword });
@@ -319,13 +303,35 @@ export const authService = {
 
   resetPasswordRequest: async (email: string): Promise<boolean> => {
       if (isSupabaseConfigured()) {
-          // You must set the Redirect URL in Supabase Dashboard -> Auth -> URL Configuration
-          // Example: https://your-site.com/#/update-password
           const { error } = await supabase.auth.resetPasswordForEmail(email, {
               redirectTo: `${window.location.origin}/#/update-password`,
           });
           return !error;
       }
       return true;
+  },
+
+  completeFirstLogin: async (userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+      if (isSupabaseConfigured()) {
+          // 1. Update Auth Password
+          const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
+          if (authError) return { success: false, error: authError.message };
+
+          // 2. Update Profile Flag
+          const { error: dbError } = await supabase.from('profiles')
+            .update({ is_first_login: false })
+            .eq('id', userId);
+            
+          if (dbError) return { success: false, error: "Senha alterada, mas falha ao atualizar perfil." };
+      }
+
+      // Update Local Storage
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+          currentUser.isFirstLogin = false;
+          localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+      }
+
+      return { success: true };
   }
 };
