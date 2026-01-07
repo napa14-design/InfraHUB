@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, Laptop, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, Laptop, AlertCircle, Box } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppModule, UserRole, ModuleStatus, ModuleType } from '../types';
 import { moduleService } from '../services/moduleService';
@@ -66,108 +66,121 @@ export const AdminModuleManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="relative min-h-screen space-y-6 pb-20">
+      
+      {/* ARCHITECTURAL BACKGROUND */}
+      <div className="absolute inset-0 pointer-events-none -z-10 fixed">
+        <div 
+          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] text-brand-600 dark:text-brand-500"
+          style={{ backgroundImage: `linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)`, backgroundSize: '60px 60px' }}
+        />
+        <div 
+          className="absolute inset-0 opacity-[0.02] dark:opacity-[0.02] text-slate-900 dark:text-white"
+          style={{ backgroundImage: `linear-gradient(currentColor 0.5px, transparent 0.5px), linear-gradient(90deg, currentColor 0.5px, transparent 0.5px)`, backgroundSize: '12px 12px' }}
+        />
+      </div>
+
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4">
         <div>
-          <button 
-            onClick={() => navigate('/')}
-            className="flex items-center text-slate-500 dark:text-slate-400 hover:text-brand-600 transition-colors text-sm font-medium mb-2"
-          >
-            <ArrowLeft size={16} className="mr-1" />
-            Voltar
+          <button onClick={() => navigate('/')} className="flex items-center text-slate-500 dark:text-slate-400 hover:text-brand-600 transition-colors text-xs font-mono uppercase tracking-widest mb-2">
+            <ArrowLeft size={14} className="mr-1" /> Voltar
           </button>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Layout className="text-brand-600" />
-            Gestão de Módulos
+          <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
+            <Layout className="text-brand-600 dark:text-brand-400" size={28} />
+            CATÁLOGO DE APLICAÇÕES
           </h1>
+          <p className="text-sm text-slate-500 font-mono">Registro de ferramentas e dashboards.</p>
         </div>
         
         {!isEditing && (
           <button 
             onClick={() => { setFormData(initialFormState); setIsEditing(true); }}
-            className="flex items-center justify-center px-4 py-2 bg-brand-600 text-white rounded-lg font-medium hover:bg-brand-700 transition-colors shadow-sm"
+            className="flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
           >
-            <Plus size={18} className="mr-2" />
-            Novo Módulo
+            <Plus size={16} className="mr-2" />
+            NOVO_MODULO
           </button>
         )}
       </div>
 
       {isEditing ? (
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-lg p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-              {formData.id ? 'Editar Módulo' : 'Novo Módulo'}
+        <div className="bg-[#0C0C0E] border border-slate-700 shadow-xl p-8 relative overflow-hidden max-w-4xl mx-auto">
+          {/* Tech lines */}
+          <div className="absolute top-0 left-0 w-full h-1 bg-brand-600"></div>
+          
+          <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
+            <h2 className="text-lg font-mono font-bold text-white uppercase tracking-widest">
+              {formData.id ? `EDIT // ${formData.id}` : 'CREATE_NEW_ENTRY'}
             </h2>
-            <button onClick={() => setIsEditing(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-              <X size={20} />
+            <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-white transition-colors">
+              <X size={24} />
             </button>
           </div>
 
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Título</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">NOME_EXIBICAO</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Ícone (Nome Lucide)</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">ICONE_LIB (LUCIDE)</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.iconName}
                   onChange={e => setFormData({...formData, iconName: e.target.value})}
                 />
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">DESCRICAO_FUNCIONAL</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo de Aplicação</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">TIPO_APLICACAO</label>
                 <select
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
                   value={formData.type}
                   onChange={e => setFormData({...formData, type: e.target.value as ModuleType})}
                 >
-                  <option value={ModuleType.INTERNAL}>Interna (App View)</option>
-                  <option value={ModuleType.EXTERNAL}>Externa (Link)</option>
+                  <option value={ModuleType.INTERNAL}>INTERNAL_ROUTE</option>
+                  <option value={ModuleType.EXTERNAL}>EXTERNAL_LINK</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                  {formData.type === ModuleType.INTERNAL ? 'Rota Interna (/module/...)' : 'URL Externa (https://...)'}
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">
+                  {formData.type === ModuleType.INTERNAL ? 'ROTA_INTERNA' : 'URL_DESTINO'}
                 </label>
                 <input 
                   type="text" 
                   required
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.path}
                   onChange={e => setFormData({...formData, path: e.target.value})}
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Permissão Mínima</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">PERMISSAO_MINIMA</label>
                 <select
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
                   value={formData.minRole}
                   onChange={e => setFormData({...formData, minRole: e.target.value as UserRole})}
                 >
@@ -177,10 +190,10 @@ export const AdminModuleManagement: React.FC = () => {
                 </select>
               </div>
 
-               <div>
-                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
+               <div className="space-y-1">
+                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">STATUS_SISTEMA</label>
                 <select
-                  className="w-full px-4 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none dark:text-white"
+                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
                   value={formData.status}
                   onChange={e => setFormData({...formData, status: e.target.value as ModuleStatus})}
                 >
@@ -191,20 +204,20 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                className="px-6 py-3 text-slate-400 font-mono text-xs uppercase hover:text-white transition-colors"
               >
-                Cancelar
+                Cancel
               </button>
               <button
                 type="submit"
-                className="flex items-center px-6 py-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 shadow-md transition-all hover:shadow-lg"
+                className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
               >
-                <Save size={18} className="mr-2" />
-                Salvar Módulo
+                <Save size={16} className="mr-2" />
+                Commit Save
               </button>
             </div>
           </form>
@@ -212,31 +225,34 @@ export const AdminModuleManagement: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 gap-4">
           {modules.map(module => (
-             <div key={module.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-brand-200 dark:hover:border-slate-700 transition-colors">
-               <div className="flex items-center gap-4">
-                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${module.type === ModuleType.EXTERNAL ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400'}`}>
-                    {module.type === ModuleType.EXTERNAL ? <Globe size={20} /> : <Laptop size={20} />}
+             <div key={module.id} className="group bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 relative overflow-hidden">
+               {/* Hover Accent */}
+               <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+               
+               <div className="flex items-center gap-5">
+                 <div className={`w-12 h-12 flex items-center justify-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:text-brand-500 group-hover:border-brand-500/50 transition-colors`}>
+                    {module.type === ModuleType.EXTERNAL ? <Globe size={24} strokeWidth={1.5} /> : <Box size={24} strokeWidth={1.5} />}
                  </div>
                  <div>
-                   <h3 className="font-semibold text-slate-900 dark:text-white">{module.title}</h3>
-                   <div className="flex gap-2 text-xs text-slate-500 dark:text-slate-400 mt-1">
-                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">{module.category}</span>
-                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">{module.minRole}</span>
-                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">{module.status}</span>
+                   <h3 className="font-mono font-bold text-slate-900 dark:text-white text-lg">{module.title}</h3>
+                   <div className="flex gap-3 text-xs font-mono text-slate-500 dark:text-slate-400 mt-1 uppercase">
+                     <span className="bg-slate-100 dark:bg-slate-800 px-2 py-0.5">{module.category}</span>
+                     <span className="text-brand-600 dark:text-brand-400">REQ: {module.minRole}</span>
+                     <span>{module.status}</span>
                    </div>
                  </div>
                </div>
                
-               <div className="flex gap-2">
+               <div className="flex gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                  <button 
                   onClick={() => handleEdit(module)}
-                  className="p-2 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-brand-50 dark:hover:bg-brand-900/10 rounded-lg transition-colors"
+                  className="p-2 text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                 >
                    <Edit2 size={18} />
                  </button>
                  <button 
                   onClick={() => requestDelete(module)}
-                  className="p-2 text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 rounded-lg transition-colors"
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
                 >
                    <Trash2 size={18} />
                  </button>
@@ -248,30 +264,30 @@ export const AdminModuleManagement: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && moduleToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-sm p-8 animate-in zoom-in-95 text-center">
-                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-red-50 dark:border-red-900/20">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-[#0C0C0E] border border-red-900/50 w-full max-w-sm p-8 text-center relative">
+                <div className="w-16 h-16 bg-red-900/20 text-red-500 flex items-center justify-center mx-auto mb-4">
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Excluir Aplicativo?</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
-                    Você está prestes a remover o módulo <strong>{moduleToDelete.title}</strong>. <br/>
-                    Todos os usuários perderão acesso a ele.
+                <h3 className="text-lg font-mono font-bold text-white mb-2 uppercase tracking-widest">CONFIRM REMOVAL</h3>
+                <p className="text-xs font-mono text-slate-400 mb-6">
+                    TARGET: <span className="text-white font-bold">[{moduleToDelete.title}]</span><br/>
+                    ACCESS WILL BE REVOKED FOR ALL USERS.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setDeleteModalOpen(false)}
-                      className="py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                      className="py-3 bg-slate-900 text-slate-400 font-mono text-xs hover:bg-slate-800 transition-colors uppercase"
                     >
-                        Cancelar
+                        Abort
                     </button>
                     <button 
                       onClick={confirmDelete}
-                      className="py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-500/30 transition-colors"
+                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase"
                     >
-                        Sim, Excluir
+                        Confirm
                     </button>
                 </div>
             </div>
