@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCloroEntry, HydroSettings } from '../../types';
+import { User, HydroCloroEntry, HydroSettings, Sede } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { orgService } from '../../services/orgService';
 
 export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
@@ -11,6 +13,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDateStr, setSelectedDateStr] = useState('');
   
+  // Sede Filtering
+  const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [selectedSedeId, setSelectedSedeId] = useState<string>('');
+
   // Settings State
   const [settings, setSettings] = useState<HydroSettings>({
     validadeCertificadoMeses: 6,
@@ -28,8 +34,27 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
   useEffect(() => {
     const load = async () => {
+      // Load All User's Data
       setEntries(await hydroService.getCloro(user));
       setSettings(await hydroService.getSettings());
+      
+      // Setup Sede Selector
+      const allSedes = orgService.getSedes();
+      let userSedes: Sede[] = [];
+      
+      if (user.sedeIds && user.sedeIds.length > 0) {
+          userSedes = allSedes.filter(s => user.sedeIds.includes(s.id));
+      } else {
+          // Fallback if no sedes mapped
+          userSedes = [];
+      }
+      
+      setAvailableSedes(userSedes);
+      
+      // Auto-select first
+      if (userSedes.length > 0) {
+          setSelectedSedeId(userSedes[0].id);
+      }
     };
     load();
   }, [user]);
@@ -40,12 +65,21 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
 
-  const getEntry = (date: string) => entries.find(e => e.date === date);
+  // FILTERED ENTRY GETTER: MATCHES DATE AND SELECTED SEDE
+  const getEntry = (date: string) => {
+      if (!selectedSedeId) return undefined;
+      return entries.find(e => e.date === date && e.sedeId === selectedSedeId);
+  };
 
   // Helper to check safety range based on settings
   const isSafe = (val: number, min: number, max: number) => val >= min && val <= max;
 
   const handleDayClick = (day: number) => {
+    if (!selectedSedeId) {
+        alert("Selecione uma sede primeiro.");
+        return;
+    }
+
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     setSelectedDateStr(dateStr);
     
@@ -59,12 +93,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleSave = async () => {
-    const primarySedeId = (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : null;
-
-    if (selectedDateStr && primarySedeId) {
+    if (selectedDateStr && selectedSedeId) {
         await hydroService.saveCloro({
             id: Date.now().toString(),
-            sedeId: primarySedeId,
+            sedeId: selectedSedeId, // Use Selected Sede explicitly
             date: selectedDateStr,
             cl: Number(form.cl),
             ph: Number(form.ph),
@@ -98,6 +130,25 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             </p>
           </div>
         </div>
+
+        {/* SEDE SELECTOR */}
+        {availableSedes.length > 0 && (
+            <div className="w-full lg:w-64">
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1 ml-1">Unidade Monitorada</label>
+                <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <select 
+                        className="w-full pl-10 pr-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm"
+                        value={selectedSedeId}
+                        onChange={(e) => setSelectedSedeId(e.target.value)}
+                    >
+                        {availableSedes.map(sede => (
+                            <option key={sede.id} value={sede.id}>{sede.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+        )}
       </div>
 
       {/* --- CALENDAR --- */}
@@ -109,92 +160,101 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
               <button onClick={handleNextMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors"><ChevronRight size={20} /></button>
           </div>
 
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-3 mb-4 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
-              <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
-          </div>
+          {!selectedSedeId ? (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                  <Building2 size={48} className="mb-4 opacity-50" />
+                  <p>Selecione uma unidade para visualizar os dados.</p>
+              </div>
+          ) : (
+            <>
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 gap-3 mb-4 text-center text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+                </div>
 
-          <div className="grid grid-cols-7 gap-3 lg:gap-4 relative z-10">
-              {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
-              
-              {Array.from({ length: daysInMonth }).map((_, i) => {
-                  const day = i + 1;
-                  const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const entry = getEntry(dateStr);
-                  
-                  let cardStyle = "bg-yellow-50/50 dark:bg-yellow-900/5 border border-dashed border-yellow-200 text-yellow-600/60";
-                  let statusLabel = "FUTURO";
-                  let Icon = Clock;
-                  let iconColor = "text-yellow-400";
+                <div className="grid grid-cols-7 gap-3 lg:gap-4 relative z-10">
+                    {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
+                    
+                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                        const day = i + 1;
+                        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const entry = getEntry(dateStr);
+                        
+                        let cardStyle = "bg-yellow-50/50 dark:bg-yellow-900/5 border border-dashed border-yellow-200 text-yellow-600/60";
+                        let statusLabel = "FUTURO";
+                        let Icon = Clock;
+                        let iconColor = "text-yellow-400";
 
-                  if (dateStr < todayStr) {
-                      if (entry) {
-                          const clSafe = isSafe(entry.cl, settings.cloroMin, settings.cloroMax);
-                          const phSafe = isSafe(entry.ph, settings.phMin, settings.phMax);
-                          
-                          if (clSafe && phSafe) {
-                              cardStyle = "bg-white dark:bg-slate-800 border-2 border-emerald-100 dark:border-emerald-900/30 shadow-sm";
-                              statusLabel = "REGISTRADO";
-                              Icon = CheckCircle2;
-                              iconColor = "text-emerald-500";
-                          } else {
-                              cardStyle = "bg-red-50 dark:bg-red-900/20 border-2 border-red-200";
-                              statusLabel = "FORA DO PADRÃO";
-                              Icon = AlertTriangle;
-                              iconColor = "text-red-500";
-                          }
-                      } else {
-                          cardStyle = "bg-red-50 dark:bg-red-900/10 border-2 border-red-100 text-red-400";
-                          statusLabel = "PENDENTE";
-                          Icon = AlertTriangle;
-                          iconColor = "text-red-400";
-                      }
-                  } else if (dateStr === todayStr) {
-                      if (entry) {
-                           cardStyle = "bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 shadow-md shadow-emerald-500/10";
-                           statusLabel = "HOJE (OK)";
-                           Icon = CheckCircle2;
-                           iconColor = "text-emerald-600";
-                      } else {
-                           cardStyle = "bg-white dark:bg-slate-800 border-2 border-red-400 ring-4 ring-red-50 dark:ring-red-900/20";
-                           statusLabel = "HOJE";
-                           Icon = AlertTriangle;
-                           iconColor = "text-red-500 animate-pulse";
-                      }
-                  }
+                        if (dateStr < todayStr) {
+                            if (entry) {
+                                const clSafe = isSafe(entry.cl, settings.cloroMin, settings.cloroMax);
+                                const phSafe = isSafe(entry.ph, settings.phMin, settings.phMax);
+                                
+                                if (clSafe && phSafe) {
+                                    cardStyle = "bg-white dark:bg-slate-800 border-2 border-emerald-100 dark:border-emerald-900/30 shadow-sm";
+                                    statusLabel = "REGISTRADO";
+                                    Icon = CheckCircle2;
+                                    iconColor = "text-emerald-500";
+                                } else {
+                                    cardStyle = "bg-red-50 dark:bg-red-900/20 border-2 border-red-200";
+                                    statusLabel = "FORA DO PADRÃO";
+                                    Icon = AlertTriangle;
+                                    iconColor = "text-red-500";
+                                }
+                            } else {
+                                cardStyle = "bg-red-50 dark:bg-red-900/10 border-2 border-red-100 text-red-400";
+                                statusLabel = "PENDENTE";
+                                Icon = AlertTriangle;
+                                iconColor = "text-red-400";
+                            }
+                        } else if (dateStr === todayStr) {
+                            if (entry) {
+                                cardStyle = "bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-500 shadow-md shadow-emerald-500/10";
+                                statusLabel = "HOJE (OK)";
+                                Icon = CheckCircle2;
+                                iconColor = "text-emerald-600";
+                            } else {
+                                cardStyle = "bg-white dark:bg-slate-800 border-2 border-red-400 ring-4 ring-red-50 dark:ring-red-900/20";
+                                statusLabel = "HOJE";
+                                Icon = AlertTriangle;
+                                iconColor = "text-red-500 animate-pulse";
+                            }
+                        }
 
-                  return (
-                      <button 
-                        key={day}
-                        onClick={() => handleDayClick(day)}
-                        className={`
-                            group h-24 md:h-32 rounded-2xl flex flex-col justify-between p-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
-                            ${cardStyle}
-                        `}
-                      >
-                          <div className="flex justify-between items-start w-full">
-                              <span className={`text-lg font-bold ${dateStr === todayStr ? 'text-slate-900' : 'opacity-70'}`}>{day}</span>
-                              <Icon size={16} className={iconColor} />
-                          </div>
+                        return (
+                            <button 
+                                key={day}
+                                onClick={() => handleDayClick(day)}
+                                className={`
+                                    group h-24 md:h-32 rounded-2xl flex flex-col justify-between p-3 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg
+                                    ${cardStyle}
+                                `}
+                            >
+                                <div className="flex justify-between items-start w-full">
+                                    <span className={`text-lg font-bold ${dateStr === todayStr ? 'text-slate-900' : 'opacity-70'}`}>{day}</span>
+                                    <Icon size={16} className={iconColor} />
+                                </div>
 
-                          <div className="w-full">
-                              {entry ? (
-                                  <div className="flex flex-col gap-1">
-                                      <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.cl, settings.cloroMin, settings.cloroMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
-                                          <span>CL</span> <span>{entry.cl}</span>
-                                      </div>
-                                      <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.ph, settings.phMin, settings.phMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
-                                          <span>pH</span> <span>{entry.ph}</span>
-                                      </div>
-                                  </div>
-                              ) : (
-                                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 flex justify-center">{statusLabel}</span>
-                              )}
-                          </div>
-                      </button>
-                  );
-              })}
-          </div>
+                                <div className="w-full">
+                                    {entry ? (
+                                        <div className="flex flex-col gap-1">
+                                            <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.cl, settings.cloroMin, settings.cloroMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
+                                                <span>CL</span> <span>{entry.cl}</span>
+                                            </div>
+                                            <div className={`flex justify-between items-center text-xs px-2 py-1 rounded-lg font-bold ${isSafe(entry.ph, settings.phMin, settings.phMax) ? 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
+                                                <span>pH</span> <span>{entry.ph}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-60 flex justify-center">{statusLabel}</span>
+                                    )}
+                                </div>
+                            </button>
+                        );
+                    })}
+                </div>
+            </>
+          )}
           <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-cyan-500/5 to-transparent rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
       </div>
 

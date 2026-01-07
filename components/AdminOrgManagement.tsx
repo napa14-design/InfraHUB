@@ -121,7 +121,7 @@ export const AdminOrgManagement: React.FC = () => {
         <div className="col-span-6 px-4">
             {activeTab === 'region' && (
             <select 
-                className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
+                className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
                 value={editForm.organizationId}
                 onChange={e => setEditForm({...editForm, organizationId: e.target.value})}
             >
@@ -131,14 +131,14 @@ export const AdminOrgManagement: React.FC = () => {
             {activeTab === 'sede' && (
             <div className="space-y-2">
                 <select 
-                    className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
                     value={editForm.regionId}
                     onChange={e => setEditForm({...editForm, regionId: e.target.value})}
                 >
                     {regions.map(r => <option key={r.id} value={r.id}>{r.name} ({orgs.find(o => o.id === r.organizationId)?.name})</option>)}
                 </select>
                 <input 
-                    className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
                     placeholder="ENDERECO_FISICO"
                     value={editForm.address}
                     onChange={e => setEditForm({...editForm, address: e.target.value})}
@@ -148,14 +148,14 @@ export const AdminOrgManagement: React.FC = () => {
             {activeTab === 'local' && (
             <div className="space-y-2">
                 <select 
-                    className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
                     value={editForm.sedeId}
                     onChange={e => setEditForm({...editForm, sedeId: e.target.value})}
                 >
                     {sedes.map(s => <option key={s.id} value={s.id}>{s.name} ({regions.find(r => r.id === s.regionId)?.name})</option>)}
                 </select>
                 <input 
-                    className="w-full bg-slate-900 border border-slate-700 text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
+                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
                     placeholder="TIPO (EX: BEBEDOURO)"
                     value={editForm.tipo}
                     onChange={e => setEditForm({...editForm, tipo: e.target.value})}
@@ -313,21 +313,22 @@ export const AdminOrgManagement: React.FC = () => {
       {/* Delete Confirmation Modal - Industrial */}
       {deleteModalOpen && itemToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#0C0C0E] border border-red-900/50 w-full max-w-sm p-8 text-center relative">
-                <div className="w-16 h-16 bg-red-900/20 text-red-500 flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white dark:bg-[#0C0C0E] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-red-600"></div>
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-4">
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-lg font-mono font-bold text-white mb-2 uppercase tracking-widest">CRITICAL_WARNING</h3>
-                <p className="text-xs font-mono text-slate-400 mb-6">
-                    DELETE ENTRY <span className="text-white font-bold">[{itemToDelete.name}]</span>?<br/>
+                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CRITICAL_WARNING</h3>
+                <p className="text-xs font-mono text-red-500 dark:text-slate-400 mb-6">
+                    DELETE ENTRY <span className="text-slate-900 dark:text-white font-bold">[{itemToDelete.name}]</span>?<br/>
                     CASCADING DATA MAY BE LOST.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setDeleteModalOpen(false)}
-                      className="py-3 bg-slate-900 text-slate-400 font-mono text-xs hover:bg-slate-800 transition-colors uppercase"
+                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
                     >
                         Abort
                     </button>

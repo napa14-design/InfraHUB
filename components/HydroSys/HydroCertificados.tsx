@@ -76,6 +76,8 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyTargetId, setHistoryTargetId] = useState<string | null>(null);
 
+  const canCreate = user.role !== UserRole.OPERATIONAL;
+
   const initialForm: HydroCertificado = {
     id: '',
     sedeId: (user.sedeIds && user.sedeIds.length > 0) ? user.sedeIds[0] : '',
@@ -204,13 +206,15 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
           </div>
         </div>
 
-        <button 
-          onClick={handleNew}
-          className="h-12 px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Novo Certificado
-        </button>
+        {canCreate && (
+            <button 
+            onClick={handleNew}
+            className="h-12 px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-bold shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] transition-all flex items-center gap-2"
+            >
+            <Plus size={20} />
+            Novo Certificado
+            </button>
+        )}
       </div>
 
       {/* KPI CARDS */}
@@ -259,8 +263,8 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
             icon={FileText}
             title="Nenhum Certificado"
             description={filterStatus ? `Não há certificados com status "${filterStatus}".` : "Nenhum certificado registrado nesta unidade ainda."}
-            actionLabel={!filterStatus ? "Adicionar Primeiro" : undefined}
-            onAction={!filterStatus ? handleNew : undefined}
+            actionLabel={(!filterStatus && canCreate) ? "Adicionar Primeiro" : undefined}
+            onAction={(!filterStatus && canCreate) ? handleNew : undefined}
           />
       ) : (
         <>
@@ -348,13 +352,15 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                             <div className="p-2 flex items-center justify-between bg-white dark:bg-slate-900">
                                 <div className="flex gap-1">
                                     {/* Renovar */}
-                                    <button 
-                                        onClick={() => handleRenovar(item)}
-                                        className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform"
-                                        title="Renovar"
-                                    >
-                                        <FlaskConical size={16} />
-                                    </button>
+                                    {canCreate && (
+                                        <button 
+                                            onClick={() => handleRenovar(item)}
+                                            className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform"
+                                            title="Renovar"
+                                        >
+                                            <FlaskConical size={16} />
+                                        </button>
+                                    )}
                                     {/* Editar */}
                                     <button 
                                         onClick={() => handleEdit(item)}
@@ -373,12 +379,14 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                     </button>
                                 </div>
                                 {/* Delete */}
-                                <button 
-                                    onClick={() => handleDelete(item.id)}
-                                    className="h-9 w-9 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                                {canCreate && (
+                                    <button 
+                                        onClick={() => handleDelete(item.id)}
+                                        className="h-9 w-9 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 flex items-center justify-center transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     );
@@ -442,10 +450,14 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                     </td>
                                     <td className="py-4 px-6 text-right">
                                         <div className="flex justify-end items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={() => handleRenovar(item)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Renovar"><FlaskConical size={16}/></button>
+                                            {canCreate && (
+                                                <button onClick={() => handleRenovar(item)} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors" title="Renovar"><FlaskConical size={16}/></button>
+                                            )}
                                             <button onClick={() => handleEdit(item)} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Editar"><Edit size={16}/></button>
                                             <button onClick={() => { setHistoryTargetId(item.sedeId); setIsHistoryOpen(true); }} className="p-2 hover:bg-slate-100 text-slate-500 rounded-lg transition-colors" title="Histórico"><History size={16}/></button>
-                                            <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" title="Excluir"><Trash2 size={16}/></button>
+                                            {canCreate && (
+                                                <button onClick={() => handleDelete(item.id)} className="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-colors" title="Excluir"><Trash2 size={16}/></button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

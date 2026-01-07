@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
@@ -22,6 +22,28 @@ import { HydroConfig } from './components/HydroSys/HydroConfig';
 import { HydroSysAnalytics } from './components/HydroSys/HydroAnalytics';
 import { ThemeProvider } from './components/ThemeContext';
 import { Instructions } from './supabase_setup';
+import { UpdatePassword } from './components/UpdatePassword';
+
+// Component to handle Supabase Auth Events (Like Password Recovery Redirects)
+const AuthObserver = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // FORCE redirect to update-password when recovery link is clicked
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("Password Recovery Event Detected - Redirecting...");
+        navigate('/update-password');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [navigate]);
+
+  return null;
+};
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -82,6 +104,7 @@ const App: React.FC = () => {
   return (
     <ThemeProvider>
       <Router>
+        <AuthObserver /> {/* Listens for Password Recovery events inside Router */}
         <Routes>
           <Route path="/setup" element={<Instructions />} />
           
@@ -91,6 +114,9 @@ const App: React.FC = () => {
               user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
             } 
           />
+
+          {/* Password Reset Route (No Auth Required) */}
+          <Route path="/update-password" element={<UpdatePassword />} />
 
           {/* Protected Routes Wrapper */}
           <Route

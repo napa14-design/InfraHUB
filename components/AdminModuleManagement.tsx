@@ -104,15 +104,15 @@ export const AdminModuleManagement: React.FC = () => {
       </div>
 
       {isEditing ? (
-        <div className="bg-[#0C0C0E] border border-slate-700 shadow-xl p-8 relative overflow-hidden max-w-4xl mx-auto">
+        <div className="bg-white dark:bg-[#0C0C0E] border border-slate-200 dark:border-slate-700 shadow-xl p-8 relative overflow-hidden max-w-4xl mx-auto">
           {/* Tech lines */}
           <div className="absolute top-0 left-0 w-full h-1 bg-brand-600"></div>
           
-          <div className="flex justify-between items-center mb-8 border-b border-slate-800 pb-4">
-            <h2 className="text-lg font-mono font-bold text-white uppercase tracking-widest">
+          <div className="flex justify-between items-center mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
+            <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-widest">
               {formData.id ? `EDIT // ${formData.id}` : 'CREATE_NEW_ENTRY'}
             </h2>
-            <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-white transition-colors">
+            <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
               <X size={24} />
             </button>
           </div>
@@ -120,42 +120,42 @@ export const AdminModuleManagement: React.FC = () => {
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">NOME_EXIBICAO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME_EXIBICAO</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.title}
                   onChange={e => setFormData({...formData, title: e.target.value})}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">ICONE_LIB (LUCIDE)</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">ICONE_LIB (LUCIDE)</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.iconName}
                   onChange={e => setFormData({...formData, iconName: e.target.value})}
                 />
               </div>
 
               <div className="md:col-span-2 space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">DESCRICAO_FUNCIONAL</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">DESCRICAO_FUNCIONAL</label>
                 <input 
                   type="text" 
                   required
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.description}
                   onChange={e => setFormData({...formData, description: e.target.value})}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">TIPO_APLICACAO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">TIPO_APLICACAO</label>
                 <select
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.type}
                   onChange={e => setFormData({...formData, type: e.target.value as ModuleType})}
                 >
@@ -165,22 +165,22 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">
                   {formData.type === ModuleType.INTERNAL ? 'ROTA_INTERNA' : 'URL_DESTINO'}
                 </label>
                 <input 
                   type="text" 
                   required
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono placeholder-slate-600 focus:border-brand-500 outline-none"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 outline-none"
                   value={formData.path}
                   onChange={e => setFormData({...formData, path: e.target.value})}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">PERMISSAO_MINIMA</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">PERMISSAO_MINIMA</label>
                 <select
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.minRole}
                   onChange={e => setFormData({...formData, minRole: e.target.value as UserRole})}
                 >
@@ -191,9 +191,9 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
                <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-500 uppercase tracking-widest">STATUS_SISTEMA</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">STATUS_SISTEMA</label>
                 <select
-                  className="w-full bg-slate-900 border border-slate-700 p-3 text-white font-mono outline-none focus:border-brand-500"
+                  className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.status}
                   onChange={e => setFormData({...formData, status: e.target.value as ModuleStatus})}
                 >
@@ -204,17 +204,17 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t border-slate-800">
+            <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-6 py-3 text-slate-400 font-mono text-xs uppercase hover:text-white transition-colors"
+                className="px-6 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
+                className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
               >
                 <Save size={16} className="mr-2" />
                 Commit Save
@@ -265,21 +265,21 @@ export const AdminModuleManagement: React.FC = () => {
       {/* Delete Confirmation Modal */}
       {deleteModalOpen && moduleToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-[#0C0C0E] border border-red-900/50 w-full max-w-sm p-8 text-center relative">
-                <div className="w-16 h-16 bg-red-900/20 text-red-500 flex items-center justify-center mx-auto mb-4">
+            <div className="bg-white dark:bg-[#0C0C0E] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative">
+                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-4">
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-lg font-mono font-bold text-white mb-2 uppercase tracking-widest">CONFIRM REMOVAL</h3>
-                <p className="text-xs font-mono text-slate-400 mb-6">
-                    TARGET: <span className="text-white font-bold">[{moduleToDelete.title}]</span><br/>
+                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CONFIRM REMOVAL</h3>
+                <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-6">
+                    TARGET: <span className="text-slate-900 dark:text-white font-bold">[{moduleToDelete.title}]</span><br/>
                     ACCESS WILL BE REVOKED FOR ALL USERS.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setDeleteModalOpen(false)}
-                      className="py-3 bg-slate-900 text-slate-400 font-mono text-xs hover:bg-slate-800 transition-colors uppercase"
+                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
                     >
                         Abort
                     </button>
