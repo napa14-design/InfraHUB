@@ -104,6 +104,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
   useEffect(() => {
     if (canViewAlerts) {
+        // Request Permission for Mobile Push / Desktop Notifications
+        notificationService.requestPermission();
+
         fetchNotifications();
         // Polling every minute
         const interval = setInterval(() => {

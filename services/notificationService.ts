@@ -1,4 +1,3 @@
-
 import { AppNotification, NotificationType, User, UserRole } from '../types';
 import { hydroService } from './hydroService';
 import { configService } from './configService';
@@ -21,6 +20,7 @@ export const notificationService = {
   },
 
   add: async (notification: AppNotification) => {
+    // 1. Save to DB/Supabase
     if (isSupabaseConfigured()) {
         const { error } = await supabase.from('notifications').upsert({
             id: notification.id,
@@ -34,6 +34,12 @@ export const notificationService = {
         });
         if (error) console.error("Erro ao criar notificação", error);
     }
+
+    // 2. Trigger Native Browser Notification (Mobile/Desktop Push)
+    // Only for Critical Errors to avoid spam
+    if (notification.type === 'ERROR') {
+        notificationService.sendBrowserNotification(notification);
+    }
   },
 
   markAsRead: async (id: string) => {
@@ -42,6 +48,51 @@ export const notificationService = {
 
   markAllRead: async () => {
     if (isSupabaseConfigured()) await supabase.from('notifications').update({ read: true }).neq('read', true);
+  },
+
+  // --- BROWSER NATIVE NOTIFICATIONS ---
+  
+  requestPermission: async () => {
+      if (!("Notification" in window)) {
+          console.log("Este navegador não suporta notificações de sistema.");
+          return;
+      }
+      
+      if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+          await Notification.requestPermission();
+      }
+  },
+
+  sendBrowserNotification: (notification: AppNotification) => {
+      if (!("Notification" in window)) return;
+
+      if (Notification.permission === "granted") {
+          try {
+              // Try to interact with Service Worker if available (better for Mobile PWA)
+              navigator.serviceWorker.ready.then(registration => {
+                  registration.showNotification(`ALERTA CRÍTICO: ${notification.title}`, {
+                      body: notification.message,
+                      icon: '/vite.svg', // Ensure this icon exists in public
+                      vibrate: [200, 100, 200],
+                      tag: notification.id,
+                      data: { url: window.location.origin + (notification.link || '/') }
+                  } as any);
+              }).catch(() => {
+                  // Fallback to standard Notification API
+                  const n = new Notification(`ALERTA CRÍTICO: ${notification.title}`, {
+                      body: notification.message,
+                      icon: '/vite.svg',
+                      vibrate: [200, 100, 200]
+                  } as any);
+                  n.onclick = () => {
+                      window.focus();
+                      if (notification.link) window.location.href = `/#${notification.link}`;
+                  };
+              });
+          } catch (e) {
+              console.error("Failed to send native notification", e);
+          }
+      }
   },
 
   // Lógica Principal de Verificação (Assíncrona)
