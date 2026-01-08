@@ -98,7 +98,7 @@ export const AdminModuleManagement: React.FC = () => {
             className="flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
           >
             <Plus size={16} className="mr-2" />
-            NOVO_MODULO
+            NOVO MÓDULO
           </button>
         )}
       </div>
@@ -110,7 +110,7 @@ export const AdminModuleManagement: React.FC = () => {
           
           <div className="flex justify-between items-center mb-8 border-b border-slate-200 dark:border-slate-800 pb-4">
             <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-widest">
-              {formData.id ? `EDIT // ${formData.id}` : 'CREATE_NEW_ENTRY'}
+              {formData.id ? `EDITAR // ${formData.id}` : 'NOVO REGISTRO'}
             </h2>
             <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
               <X size={24} />
@@ -120,7 +120,7 @@ export const AdminModuleManagement: React.FC = () => {
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME_EXIBICAO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME DE EXIBIÇÃO</label>
                 <input 
                   type="text" 
                   required
@@ -131,7 +131,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">ICONE_LIB (LUCIDE)</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">ÍCONE (LUCIDE LIB)</label>
                 <input 
                   type="text" 
                   required
@@ -142,7 +142,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="md:col-span-2 space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">DESCRICAO_FUNCIONAL</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">DESCRIÇÃO FUNCIONAL</label>
                 <input 
                   type="text" 
                   required
@@ -153,20 +153,20 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">TIPO_APLICACAO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">TIPO DE APLICAÇÃO</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.type}
                   onChange={e => setFormData({...formData, type: e.target.value as ModuleType})}
                 >
-                  <option value={ModuleType.INTERNAL}>INTERNAL_ROUTE</option>
-                  <option value={ModuleType.EXTERNAL}>EXTERNAL_LINK</option>
+                  <option value={ModuleType.INTERNAL}>ROTA INTERNA</option>
+                  <option value={ModuleType.EXTERNAL}>LINK EXTERNO</option>
                 </select>
               </div>
 
               <div className="space-y-1">
                 <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">
-                  {formData.type === ModuleType.INTERNAL ? 'ROTA_INTERNA' : 'URL_DESTINO'}
+                  {formData.type === ModuleType.INTERNAL ? 'ROTA INTERNA' : 'URL DE DESTINO'}
                 </label>
                 <input 
                   type="text" 
@@ -178,7 +178,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">PERMISSAO_MINIMA</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">PERMISSÃO MÍNIMA</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.minRole}
@@ -191,7 +191,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
                <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">STATUS_SISTEMA</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">STATUS DO SISTEMA</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.status}
@@ -210,14 +210,14 @@ export const AdminModuleManagement: React.FC = () => {
                 onClick={() => setIsEditing(false)}
                 className="px-6 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white transition-colors"
               >
-                Cancel
+                Cancelar
               </button>
               <button
                 type="submit"
                 className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
               >
                 <Save size={16} className="mr-2" />
-                Commit Save
+                Salvar Alterações
               </button>
             </div>
           </form>
@@ -270,10 +270,10 @@ export const AdminModuleManagement: React.FC = () => {
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CONFIRM REMOVAL</h3>
+                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CONFIRMAR REMOÇÃO</h3>
                 <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-6">
-                    TARGET: <span className="text-slate-900 dark:text-white font-bold">[{moduleToDelete.title}]</span><br/>
-                    ACCESS WILL BE REVOKED FOR ALL USERS.
+                    ALVO: <span className="text-slate-900 dark:text-white font-bold">[{moduleToDelete.title}]</span><br/>
+                    O ACESSO SERÁ REVOGADO PARA TODOS.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -281,13 +281,13 @@ export const AdminModuleManagement: React.FC = () => {
                       onClick={() => setDeleteModalOpen(false)}
                       className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
                     >
-                        Abort
+                        Cancelar
                     </button>
                     <button 
                       onClick={confirmDelete}
                       className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase"
                     >
-                        Confirm
+                        Confirmar
                     </button>
                 </div>
             </div>

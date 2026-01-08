@@ -54,7 +54,7 @@ export const AdminNotificationConfig: React.FC = () => {
   };
 
   const handleReset = async () => {
-      if(confirm('RESET TO DEFAULTS?')) {
+      if(confirm('RESETAR PARA PADRÕES?')) {
           setRules(await configService.resetDefaults());
           setHasChanges(false);
       }
@@ -93,7 +93,7 @@ export const AdminNotificationConfig: React.FC = () => {
                 className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
                 <RefreshCw size={16} className="mr-2" />
-                DEFAULTS
+                PADRÕES
             </button>
             <button 
                 onClick={handleSave}
@@ -111,7 +111,7 @@ export const AdminNotificationConfig: React.FC = () => {
                 ) : (
                     <Save size={16} className="mr-2" />
                 )}
-                {saveStatus === 'SUCCESS' ? 'SAVED' : saveStatus === 'ERROR' ? 'ERROR' : 'APPLY_CONFIG'}
+                {saveStatus === 'SUCCESS' ? 'SALVO' : saveStatus === 'ERROR' ? 'ERRO' : 'SALVAR CONFIG'}
             </button>
         </div>
       </div>
@@ -120,8 +120,8 @@ export const AdminNotificationConfig: React.FC = () => {
           <div className="p-4 bg-red-950/30 border border-red-900 text-red-400 font-mono text-xs flex items-center gap-3">
               <XCircle size={16} />
               <div>
-                  <p className="font-bold uppercase">WRITE_FAILURE</p>
-                  <p>{errorMessage || 'DATABASE_CONNECTION_ERROR'}</p>
+                  <p className="font-bold uppercase">FALHA AO SALVAR</p>
+                  <p>{errorMessage || 'ERRO DE CONEXÃO BD'}</p>
               </div>
           </div>
       )}
@@ -165,7 +165,7 @@ export const AdminNotificationConfig: React.FC = () => {
                       <div className="space-y-2">
                           <div className="flex items-center gap-2 text-amber-600 font-mono text-xs font-bold uppercase">
                               <AlertTriangle size={14} />
-                              <span>THRESHOLD_WARNING</span>
+                              <span>LIMITE DE ALERTA</span>
                           </div>
                           <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 w-fit">
                               <input 
@@ -182,7 +182,7 @@ export const AdminNotificationConfig: React.FC = () => {
                       <div className="space-y-2">
                           <div className="flex items-center gap-2 text-red-600 font-mono text-xs font-bold uppercase">
                               <AlertCircle size={14} />
-                              <span>THRESHOLD_CRITICAL</span>
+                              <span>LIMITE CRÍTICO</span>
                           </div>
                           <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 w-fit">
                               <input 

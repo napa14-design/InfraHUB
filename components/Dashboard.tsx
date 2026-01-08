@@ -269,9 +269,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       {/* Technical Footer */}
       <div className="fixed bottom-4 left-0 right-0 text-center pointer-events-none z-0">
           <div className="inline-flex items-center gap-4 text-[10px] font-mono text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">
-              <span>System v2.0</span>
+              <span>Sistema v2.0</span>
               <span className="w-1 h-1 bg-slate-300 dark:bg-slate-700 rounded-full"></span>
-              <span>Secure Connection</span>
+              <span>Conexão Segura</span>
           </div>
       </div>
     </div>

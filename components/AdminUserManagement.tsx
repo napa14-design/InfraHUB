@@ -308,11 +308,11 @@ export const AdminUserManagement: React.FC = () => {
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
               <tr>
-                <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Identidade</th>
+                <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Identidade / Nome</th>
                 <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Cargo</th>
                 <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Acesso Local</th>
                 <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest">Status</th>
-                <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Comandos</th>
+                <th className="px-6 py-4 font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
@@ -403,7 +403,7 @@ export const AdminUserManagement: React.FC = () => {
                   <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                       <div className="flex items-center gap-3">
                           <Terminal className="text-brand-600 dark:text-brand-500" size={20} />
-                          <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">{isEditing ? 'UPDATE_USER_PROFILE' : 'INIT_NEW_USER'}</h3>
+                          <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">{isEditing ? 'ATUALIZAR PERFIL' : 'NOVO CADASTRO'}</h3>
                       </div>
                       <button onClick={closeAndReset}><X className="text-slate-500 hover:text-slate-900 dark:hover:text-white" /></button>
                   </div>
@@ -424,7 +424,7 @@ export const AdminUserManagement: React.FC = () => {
                                   {createdUserPass}
                               </code>
                               <button 
-                                onClick={() => { navigator.clipboard.writeText(createdUserPass); alert("COPY_OK"); }} 
+                                onClick={() => { navigator.clipboard.writeText(createdUserPass); alert("COPIADO"); }} 
                                 className="text-emerald-600 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
                               >
                                   <Copy size={20} />
@@ -444,7 +444,7 @@ export const AdminUserManagement: React.FC = () => {
                           )}
 
                           <button onClick={closeAndReset} className="w-full py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold uppercase tracking-wider transition-colors">
-                              CONFIRM_RECEIPT
+                              CIENTE
                           </button>
                       </div>
                   ) : (
@@ -452,7 +452,7 @@ export const AdminUserManagement: React.FC = () => {
                           {/* Inputs with Tech Style */}
                           <div className="grid grid-cols-1 gap-4">
                               <div className="space-y-1">
-                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME_COMPLETO</label>
+                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME COMPLETO</label>
                                   <input 
                                       required
                                       className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none transition-all"
@@ -462,7 +462,7 @@ export const AdminUserManagement: React.FC = () => {
                                   />
                               </div>
                               <div className="space-y-1">
-                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">EMAIL_CORPORATIVO</label>
+                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">E-MAIL CORPORATIVO</label>
                                   <input 
                                       required
                                       type="email"
@@ -475,11 +475,11 @@ export const AdminUserManagement: React.FC = () => {
                               
                               {!isEditing && (
                                 <div className="space-y-1">
-                                    <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">SENHA_INICIAL (OPCIONAL, MIN 6 CHARS)</label>
+                                    <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">SENHA INICIAL (OPCIONAL, MIN 6 CARACTERES)</label>
                                     <input 
                                         type="text"
                                         className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono placeholder-slate-400 dark:placeholder-slate-600 focus:border-brand-500 outline-none"
-                                        placeholder="DEIXE EM BRANCO PARA GERAR AUTOMATICA"
+                                        placeholder="VAZIO PARA GERAR AUTOMATICAMENTE"
                                         value={manualPassword}
                                         onChange={e => setManualPassword(e.target.value)}
                                         minLength={6}
@@ -490,7 +490,7 @@ export const AdminUserManagement: React.FC = () => {
 
                           <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-1">
-                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NIVEL_ACESSO</label>
+                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NÍVEL DE ACESSO</label>
                                   <select 
                                       className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                                       value={formData.role}
@@ -503,7 +503,7 @@ export const AdminUserManagement: React.FC = () => {
                                   </select>
                               </div>
                               <div className="space-y-1">
-                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">INSTITUICAO_ID</label>
+                                  <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">INSTITUIÇÃO</label>
                                   <select 
                                       className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500 disabled:opacity-50"
                                       value={formData.organizationId}
@@ -531,14 +531,14 @@ export const AdminUserManagement: React.FC = () => {
                               /* REGULAR LOCATION SELECTORS */
                               <>
                                 <div className="space-y-1">
-                                        <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">REGIAO_OPERACAO</label>
+                                        <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">REGIÃO DE OPERAÇÃO</label>
                                         <select 
                                             className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500 disabled:opacity-50"
                                             value={formData.regionId}
                                             onChange={e => setFormData({...formData, regionId: e.target.value, sedeIds: []})}
                                             disabled={!formData.organizationId}
                                         >
-                                            <option value="">SELECIONE REGIAO...</option>
+                                            <option value="">SELECIONE A REGIÃO...</option>
                                             {availableRegions.map(reg => (
                                                 <option key={reg.id} value={reg.id}>{reg.name.toUpperCase()}</option>
                                             ))}
@@ -547,7 +547,7 @@ export const AdminUserManagement: React.FC = () => {
 
                                 <div className="space-y-1">
                                         <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest mb-2 block">
-                                            UNIDADES_VINCULADAS [MULTI-SELECT]
+                                            UNIDADES VINCULADAS [MULTI-SELEÇÃO]
                                         </label>
                                         {formData.regionId ? (
                                             <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">
@@ -566,12 +566,12 @@ export const AdminUserManagement: React.FC = () => {
                                                         ))}
                                                     </div>
                                                 ) : (
-                                                    <p className="text-xs font-mono text-slate-500 text-center py-2">NO_DATA_FOUND</p>
+                                                    <p className="text-xs font-mono text-slate-500 text-center py-2">NENHUM DADO ENCONTRADO</p>
                                                 )}
                                             </div>
                                         ) : (
                                             <div className="p-3 text-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 text-xs font-mono uppercase">
-                                                AGUARDANDO_REGIAO...
+                                                AGUARDANDO REGIÃO...
                                             </div>
                                         )}
                                 </div>
@@ -580,10 +580,10 @@ export const AdminUserManagement: React.FC = () => {
 
                           {/* Footer Actions */}
                           <div className="pt-4 flex gap-3 border-t border-slate-200 dark:border-slate-800 mt-2">
-                              <button type="button" onClick={closeAndReset} className="flex-1 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">CANCEL_OP</button>
+                              <button type="button" onClick={closeAndReset} className="flex-1 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">CANCELAR</button>
                               <button type="submit" className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2">
                                   {isEditing ? <Save size={14}/> : <Plus size={14}/>}
-                                  <span>{isEditing ? 'COMMIT_CHANGES' : 'EXECUTE_CREATE'}</span>
+                                  <span>{isEditing ? 'SALVAR ALTERAÇÕES' : 'CRIAR USUÁRIO'}</span>
                               </button>
                           </div>
                       </form>
@@ -601,7 +601,7 @@ export const AdminUserManagement: React.FC = () => {
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">CONFIRM_DELETE</h3>
+                <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">CONFIRMAR EXCLUSÃO</h3>
                 <p className="text-xs font-mono text-red-500 dark:text-red-400 mb-8">
                     AÇÃO IRREVERSÍVEL. REMOVER ACESSO DE <br/> <span className="text-slate-900 dark:text-white font-bold text-sm">[{userToDelete.name}]</span>?
                 </p>
@@ -611,13 +611,13 @@ export const AdminUserManagement: React.FC = () => {
                       onClick={() => setDeleteModalOpen(false)}
                       className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
                     >
-                        ABORT
+                        CANCELAR
                     </button>
                     <button 
                       onClick={confirmDelete}
                       className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors"
                     >
-                        CONFIRM
+                        CONFIRMAR
                     </button>
                 </div>
             </div>

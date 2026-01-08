@@ -185,7 +185,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           <div className="hidden sm:flex items-center gap-4">
             <div className="h-px w-20 bg-brand-700 dark:bg-blue-500" />
-            <span className="text-[10px] font-mono text-brand-700 dark:text-blue-500">SCALE 1:100</span>
+            <span className="text-[10px] font-mono text-brand-700 dark:text-blue-500">ESCALA 1:100</span>
             <div className="h-px w-20 bg-brand-700 dark:bg-blue-500" />
           </div>
           <div className="text-[10px] font-mono text-brand-700 dark:text-blue-500">
@@ -228,7 +228,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
               INFRA<span className="text-brand-600 dark:text-orange-500">HUB</span>
             </h2>
             <p className="text-[10px] text-slate-500 dark:text-white/30 font-mono uppercase tracking-[0.2em]">
-              Enterprise Platform
+              Plataforma Corporativa
             </p>
           </div>
         </div>
@@ -258,8 +258,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           <div className="grid grid-cols-3 gap-4 pt-4">
             {[
               { value: '24/7', label: 'Operação' },
-              { value: '99.9%', label: 'Uptime' },
-              { value: 'AES-256', label: 'Encryption' },
+              { value: '99.9%', label: 'Disponibilidade' },
+              { value: 'AES-256', label: 'Criptografia' },
             ].map((item, i) => (
               <div key={i} className="border-l-2 border-slate-200 dark:border-white/10 pl-4">
                 <div className="text-2xl font-bold text-slate-800 dark:text-white font-mono">{item.value}</div>

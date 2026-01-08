@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Building2, Map, MapPin, Plus, Trash2, Edit2, Check, X, Layout, LocateFixed, RefreshCw, AlertCircle, Database } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Building2, Map, MapPin, Plus, Trash2, Edit2, Check, X, Layout, LocateFixed, RefreshCw, AlertCircle, Database, Upload, FileUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Organization, Region, Sede, Local } from '../types';
 import { orgService } from '../services/orgService';
@@ -11,6 +11,7 @@ export const AdminOrgManagement: React.FC = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('org');
   const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [regions, setRegions] = useState<Region[]>([]);
@@ -90,6 +91,72 @@ export const AdminOrgManagement: React.FC = () => {
     }
   };
 
+  // --- CSV IMPORT LOGIC ---
+  const handleImportClick = () => {
+      fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (activeTab !== 'local') {
+          alert("Importação em massa disponível apenas para LOCAIS no momento.");
+          return;
+      }
+
+      setIsLoading(true);
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+          const text = event.target?.result as string;
+          const lines = text.split('\n');
+          let successCount = 0;
+          let errorCount = 0;
+
+          // Expect CSV Format: SEDE_ID, NOME, TIPO
+          // Skip Header if present (simple check: if first line has 'SEDE' or 'TIPO')
+          const startIndex = lines[0].toUpperCase().includes('SEDE') ? 1 : 0;
+
+          for (let i = startIndex; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (!line) continue;
+
+              const parts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+              
+              if (parts.length >= 3) {
+                  const [sedeId, name, tipoRaw] = parts;
+                  const tipo = tipoRaw.toUpperCase(); // Normalize type
+
+                  // Validate Sede
+                  if (sedes.some(s => s.id === sedeId)) {
+                      // Generate ID manually to avoid DB null error
+                      const newId = `loc-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                      
+                      await orgService.saveLocal({
+                          id: newId,
+                          sedeId,
+                          name,
+                          tipo
+                      });
+                      successCount++;
+                  } else {
+                      console.warn(`Sede ID invalido na linha ${i + 1}: ${sedeId}`);
+                      errorCount++;
+                  }
+              } else {
+                  errorCount++;
+              }
+          }
+
+          setIsLoading(false);
+          alert(`Processamento Finalizado!\n\n✅ Importados: ${successCount}\n❌ Falhas/Ignorados: ${errorCount}\n\nNota: Certifique-se que o SEDE_ID existe.`);
+          refreshData();
+          if (fileInputRef.current) fileInputRef.current.value = '';
+      };
+      // FIX: Force ISO-8859-1 for Excel/Brazil compatibility
+      reader.readAsText(file, 'ISO-8859-1');
+  };
+
   const renderTabButton = (tab: Tab, label: string, icon: React.ReactNode) => (
     <button
       onClick={() => { setActiveTab(tab); setEditingId(null); setIsNew(false); }}
@@ -109,9 +176,9 @@ export const AdminOrgManagement: React.FC = () => {
 
   const getHeaderTitle = () => {
       switch(activeTab) {
-          case 'org': return 'ID_REF';
-          case 'region': return 'INSTITUICAO_PAI';
-          case 'sede': return 'REGIAO / ENDERECO';
+          case 'org': return 'REF. ID';
+          case 'region': return 'INSTITUIÇÃO PAI';
+          case 'sede': return 'REGIÃO / ENDEREÇO';
           case 'local': return 'SEDE / TIPO';
       }
   }
@@ -139,7 +206,7 @@ export const AdminOrgManagement: React.FC = () => {
                 </select>
                 <input 
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
-                    placeholder="ENDERECO_FISICO"
+                    placeholder="ENDEREÇO FÍSICO"
                     value={editForm.address}
                     onChange={e => setEditForm({...editForm, address: e.target.value})}
                 />
@@ -154,12 +221,17 @@ export const AdminOrgManagement: React.FC = () => {
                 >
                     {sedes.map(s => <option key={s.id} value={s.id}>{s.name} ({regions.find(r => r.id === s.regionId)?.name})</option>)}
                 </select>
-                <input 
+                <select
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white font-mono text-xs p-2 outline-none focus:border-brand-500"
-                    placeholder="TIPO (EX: BEBEDOURO)"
                     value={editForm.tipo}
                     onChange={e => setEditForm({...editForm, tipo: e.target.value})}
-                />
+                >
+                    <option value="BEBEDOURO">BEBEDOURO / FILTRO</option>
+                    <option value="POCO">POÇO ARTESIANO</option>
+                    <option value="CISTERNA">CISTERNA</option>
+                    <option value="CAIXA">CAIXA D'ÁGUA</option>
+                    <option value="PISCINA">PISCINA</option>
+                </select>
             </div>
             )}
         </div>
@@ -170,7 +242,14 @@ export const AdminOrgManagement: React.FC = () => {
 
   return (
     <div className="relative min-h-screen space-y-8 pb-20">
-      
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFileUpload} 
+        className="hidden" 
+        accept=".csv" 
+      />
+
       {/* ARCHITECTURAL BACKGROUND */}
       <div className="absolute inset-0 pointer-events-none -z-10 fixed">
         <div 
@@ -201,15 +280,27 @@ export const AdminOrgManagement: React.FC = () => {
               className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
             >
               <RefreshCw size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-              SYNC_DB
+              SINCRONIZAR
             </button>
+            
+            {activeTab === 'local' && (
+                <button 
+                    onClick={handleImportClick}
+                    className="flex items-center justify-center px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-emerald-500/20"
+                    title="CSV Format: SEDE_ID, NOME, TIPO"
+                >
+                    <FileUp size={16} className="mr-2" />
+                    IMPORTAR CSV
+                </button>
+            )}
+
             {!editingId && (
               <button 
                 onClick={handleStartNew}
                 className="flex items-center justify-center px-6 py-3 bg-brand-600 text-white font-mono text-xs font-bold uppercase tracking-widest hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20"
               >
                 <Plus size={16} className="mr-2" />
-                ADD_{activeTab.toUpperCase()}
+                ADD {activeTab === 'org' ? 'INSTITUIÇÃO' : activeTab === 'region' ? 'REGIÃO' : activeTab === 'sede' ? 'SEDE' : 'LOCAL'}
               </button>
             )}
         </div>
@@ -217,8 +308,8 @@ export const AdminOrgManagement: React.FC = () => {
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1 border-b border-slate-200 dark:border-slate-800">
-        {renderTabButton('org', 'INSTITUICOES', <Building2 size={16} />)}
-        {renderTabButton('region', 'REGIOES', <Map size={16} />)}
+        {renderTabButton('org', 'INSTITUIÇÕES', <Building2 size={16} />)}
+        {renderTabButton('region', 'REGIÕES', <Map size={16} />)}
         {renderTabButton('sede', 'SEDES', <MapPin size={16} />)}
         {renderTabButton('local', 'LOCAIS', <LocateFixed size={16} />)}
       </div>
@@ -230,9 +321,9 @@ export const AdminOrgManagement: React.FC = () => {
 
         {/* Header Row */}
         <div className="grid grid-cols-12 bg-slate-100 dark:bg-slate-950 p-3 border-b border-slate-200 dark:border-slate-800 text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest">
-          <div className="col-span-4 pl-4">IDENTIFICACAO_NOME</div>
+          <div className="col-span-4 pl-4">NOME / IDENTIFICAÇÃO</div>
           <div className="col-span-6">{getHeaderTitle()}</div>
-          <div className="col-span-2 text-right pr-4">OPERACOES</div>
+          <div className="col-span-2 text-right pr-4">AÇÕES</div>
         </div>
 
         {/* List */}
@@ -261,7 +352,7 @@ export const AdminOrgManagement: React.FC = () => {
                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4 border border-dashed border-slate-300 dark:border-slate-700">
                     <AlertCircle size={24} />
                  </div>
-                 <p className="font-mono text-xs uppercase">NO_RECORDS_FOUND</p>
+                 <p className="font-mono text-xs uppercase">NENHUM REGISTRO</p>
              </div>
           ) : (
              activeData.map((item: any) => (
@@ -319,10 +410,10 @@ export const AdminOrgManagement: React.FC = () => {
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CRITICAL_WARNING</h3>
+                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">ATENÇÃO CRÍTICA</h3>
                 <p className="text-xs font-mono text-red-500 dark:text-slate-400 mb-6">
-                    DELETE ENTRY <span className="text-slate-900 dark:text-white font-bold">[{itemToDelete.name}]</span>?<br/>
-                    CASCADING DATA MAY BE LOST.
+                    EXCLUIR REGISTRO <span className="text-slate-900 dark:text-white font-bold">[{itemToDelete.name}]</span>?<br/>
+                    DADOS VINCULADOS PODEM SER PERDIDOS.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -330,13 +421,13 @@ export const AdminOrgManagement: React.FC = () => {
                       onClick={() => setDeleteModalOpen(false)}
                       className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
                     >
-                        Abort
+                        CANCELAR
                     </button>
                     <button 
                       onClick={confirmDelete}
                       className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase"
                     >
-                        Confirm Delete
+                        CONFIRMAR EXCLUSÃO
                     </button>
                 </div>
             </div>

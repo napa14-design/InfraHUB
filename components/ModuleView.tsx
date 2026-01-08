@@ -33,7 +33,7 @@ export const ModuleView: React.FC = () => {
         className="flex items-center text-slate-500 hover:text-brand-600 transition-colors text-xs font-mono uppercase tracking-widest mb-8 w-fit"
       >
         <ArrowLeft size={16} className="mr-2" />
-        RETURN_TO_HUB
+        VOLTAR AO HUB
       </button>
 
       <div className="flex-1 flex items-center justify-center">
@@ -52,7 +52,7 @@ export const ModuleView: React.FC = () => {
                   </h1>
                   
                   <div className="bg-yellow-500 text-black px-4 py-1 font-mono font-bold text-sm uppercase mb-6">
-                      WORK_IN_PROGRESS
+                      EM DESENVOLVIMENTO
                   </div>
 
                   <p className="text-slate-600 dark:text-slate-400 font-mono text-sm max-w-md leading-relaxed mb-10">
@@ -62,10 +62,10 @@ export const ModuleView: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
                       <button className="py-3 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-mono text-xs hover:border-slate-900 dark:hover:border-white hover:text-slate-900 dark:hover:text-white transition-colors uppercase">
-                          VIEW_SPECS
+                          VER ESPECIFICAÇÕES
                       </button>
                       <button className="py-3 bg-slate-900 dark:bg-slate-800 text-white font-mono text-xs hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors uppercase">
-                          NOTIFY_ME
+                          NOTIFICAR-ME
                       </button>
                   </div>
               </div>

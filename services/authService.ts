@@ -11,6 +11,24 @@ const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+// --- TRANSLATION HELPER ---
+const translateAuthError = (message: string): string => {
+    const m = message.toLowerCase();
+    if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
+    if (m.includes("email not confirmed")) return "E-mail pendente de confirmação. Verifique sua caixa de entrada.";
+    if (m.includes("user not found")) return "Usuário não encontrado.";
+    if (m.includes("already registered")) return "Este e-mail já está cadastrado no sistema.";
+    if (m.includes("password should be at least")) return "A senha deve ter no mínimo 6 caracteres.";
+    if (m.includes("weak password")) return "Senha muito fraca. Tente uma combinação mais complexa.";
+    if (m.includes("too many requests") || m.includes("rate limit")) return "Muitas tentativas consecutivas. Aguarde alguns instantes.";
+    if (m.includes("session expired")) return "Sessão expirada. Faça login novamente.";
+    if (m.includes("anonymous")) return "Acesso anônimo não permitido.";
+    if (m.includes("network")) return "Erro de conexão. Verifique sua internet.";
+    
+    // Fallback amigável mantendo o erro original para debug se necessário
+    return `Não foi possível completar a ação. (${message})`;
+};
+
 export const authService = {
   // Login with Supabase or Mock
   login: async (email: string, passwordInput: string): Promise<{ user: User | null; error?: string }> => {
@@ -30,9 +48,6 @@ export const authService = {
           if (authError) {
             console.warn("[Auth] Supabase SignIn failed (falling back to mock):", authError.message);
             supabaseErrorMsg = authError.message;
-            if (authError.message.includes("Email not confirmed")) {
-                return { user: null, error: "E-mail não confirmado. Verifique sua caixa de entrada ou contate o administrador." };
-            }
             // DO NOT RETURN HERE. Fall through to check Mocks.
           } else if (authData.user) {
               console.log("[Auth] User authenticated via Auth. Fetching profile...", authData.user.id);
@@ -47,7 +62,7 @@ export const authService = {
                   console.error("[Auth] Profile Fetch Error:", profileError);
                   return { 
                       user: null, 
-                      error: "Login realizado, mas perfil de usuário não encontrado na tabela 'profiles'. Execute o SQL de Setup." 
+                      error: "Login realizado, mas o perfil de usuário não foi encontrado." 
                   };
               }
 
@@ -79,9 +94,9 @@ export const authService = {
           return { user: mockUser };
       }
 
-      // 3. If no mock user found, return the original Supabase error if it exists
+      // 3. If no mock user found, return the translated Supabase error if it exists
       if (supabaseErrorMsg) {
-          return { user: null, error: `Erro Supabase: ${supabaseErrorMsg}` };
+          return { user: null, error: translateAuthError(supabaseErrorMsg) };
       }
 
       return { user: null, error: 'E-mail ou senha incorretos.' };
@@ -177,7 +192,7 @@ export const authService = {
 
                  if (authError) {
                      console.error("[Auth] Error creating Auth User:", authError.message);
-                     return { error: authError.message };
+                     return { error: translateAuthError(authError.message) };
                  } 
                  
                  let emailConfirmationRequired = false;
@@ -206,14 +221,14 @@ export const authService = {
 
                  if (error) {
                      console.error("Error creating/updating profile in DB:", error.code, error.message);
-                     return { error: `Erro no banco de dados: ${error.message}` };
+                     return { error: "Erro ao salvar perfil do usuário no banco de dados." };
                  }
 
                  return { 
                     id: tempId, 
                     email: userData.email, 
                     password: tempPassword,
-                    warning: emailConfirmationRequired ? "Este usuário requer confirmação de e-mail antes de logar. Para auto-confirmação, desative 'Enable Email Confirmations' no painel Supabase." : undefined
+                    warning: emailConfirmationRequired ? "Este usuário requer confirmação de e-mail antes de logar." : undefined
                  };
              }
          } catch (e: any) {
@@ -295,7 +310,7 @@ export const authService = {
   confirmPasswordReset: async (newPassword: string): Promise<{ success: boolean; error?: string }> => {
       if (isSupabaseConfigured()) {
           const { error } = await supabase.auth.updateUser({ password: newPassword });
-          if (error) return { success: false, error: error.message };
+          if (error) return { success: false, error: translateAuthError(error.message) };
           return { success: true };
       }
       return { success: true };
@@ -315,14 +330,14 @@ export const authService = {
       if (isSupabaseConfigured()) {
           // 1. Update Auth Password
           const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
-          if (authError) return { success: false, error: authError.message };
+          if (authError) return { success: false, error: translateAuthError(authError.message) };
 
           // 2. Update Profile Flag
           const { error: dbError } = await supabase.from('profiles')
             .update({ is_first_login: false })
             .eq('id', userId);
             
-          if (dbError) return { success: false, error: "Senha alterada, mas falha ao atualizar perfil." };
+          if (dbError) return { success: false, error: "Senha alterada, mas falha ao atualizar status no perfil." };
       }
 
       // Update Local Storage

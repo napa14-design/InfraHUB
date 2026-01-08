@@ -1,11 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, Lock, ChevronRight, Activity, AlertTriangle, Gauge, Thermometer, Waves } from 'lucide-react';
+import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, Lock, ChevronRight, Activity, AlertTriangle, Gauge, Thermometer, Waves, FileDown, Calendar, Download, X } from 'lucide-react';
 import { User, UserRole } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
+import { exportToCSV } from '../utils/csvExport';
 
 interface Props {
   user: User;
@@ -46,11 +47,23 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
 
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- REPORT MODAL STATE ---
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportType, setReportType] = useState<'CLORO' | 'CERTIFICADOS' | 'FILTROS' | 'RESERVATORIOS'>('CLORO');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [isExporting, setIsExporting] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
     fetchDashboardData();
+    
+    // Set default dates (Current Month)
+    const date = new Date();
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+    setDateRange({ start: firstDay, end: lastDay });
 
     return () => clearInterval(timer);
   }, [user]);
@@ -120,6 +133,103 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const handleCardClick = (id: string) => {
       const route = RouteMap[id];
       if (route) navigate(route);
+  };
+
+  const handleExport = async () => {
+      setIsExporting(true);
+      try {
+          if (reportType === 'CLORO') {
+              const data = await hydroService.getCloro(user);
+              // Filter by date
+              const filtered = data.filter(d => d.date >= dateRange.start && d.date <= dateRange.end);
+              
+              // Custom Headers Map
+              const headers = {
+                  sedeId: 'Unidade/Sede',
+                  date: 'Data Coleta',
+                  cl: 'Cloro (ppm)',
+                  ph: 'pH',
+                  medidaCorretiva: 'Ação Corretiva',
+                  responsavel: 'Responsável Técnico'
+              };
+              
+              // Remove ID before export or map specific fields
+              const finalData = filtered.map(item => ({
+                  sedeId: item.sedeId,
+                  date: item.date,
+                  cl: item.cl,
+                  ph: item.ph,
+                  medidaCorretiva: item.medidaCorretiva,
+                  responsavel: item.responsavel
+              }));
+
+              exportToCSV(finalData, 'Relatorio_Cloro_pH', headers);
+
+          } else if (reportType === 'CERTIFICADOS') {
+              const data = await hydroService.getCertificados(user);
+              const headers = {
+                  sedeId: 'Sede',
+                  parceiro: 'Laboratório',
+                  status: 'Status',
+                  validade: 'Vencimento',
+                  dataAnalise: 'Data Análise',
+                  linkFisico: 'Link Laudo Físico',
+                  linkMicro: 'Link Laudo Micro'
+              };
+              exportToCSV(data, 'Relatorio_Certificados', headers);
+
+          } else if (reportType === 'FILTROS') {
+              const data = await hydroService.getFiltros(user);
+              const headers = {
+                  sedeId: 'Sede',
+                  local: 'Local Instalação',
+                  patrimonio: 'Patrimônio',
+                  dataTroca: 'Última Troca',
+                  proximaTroca: 'Próxima Troca'
+              };
+              exportToCSV(data, 'Inventario_Filtros', headers);
+
+          } else if (reportType === 'RESERVATORIOS') {
+              const pocos = await hydroService.getPocos(user);
+              const cist = await hydroService.getCisternas(user);
+              const caixas = await hydroService.getCaixas(user);
+              
+              // Combine and Normalize
+              const combined = [
+                  ...pocos.map(p => ({ ...p, tipoDesc: 'Poço Artesiano' })),
+                  ...cist.map(c => ({ ...c, tipoDesc: 'Cisterna' })),
+                  ...caixas.map(c => ({ ...c, tipoDesc: 'Caixa D\'água' }))
+              ];
+
+              const headers = {
+                  sedeId: 'Sede',
+                  tipoDesc: 'Tipo',
+                  local: 'Localização',
+                  situacaoLimpeza: 'Status Limpeza',
+                  proximaLimpeza: 'Próxima Limpeza',
+                  responsavel: 'Responsável'
+              };
+              
+              // Select specific fields to keep clean CSV
+              const finalData = combined.map(i => ({
+                  sedeId: i.sedeId,
+                  tipoDesc: i.tipoDesc,
+                  local: i.local,
+                  situacaoLimpeza: i.situacaoLimpeza,
+                  proximaLimpeza: i.proximaLimpeza,
+                  responsavel: i.responsavel
+              }));
+
+              exportToCSV(finalData, 'Controle_Reservatorios', headers);
+          }
+          
+          setIsReportModalOpen(false);
+      } catch (e) {
+          alert("Erro ao gerar relatório");
+          console.error(e);
+      } finally {
+          setIsExporting(false);
+      }
   };
 
   // Dynamic Metrics based on fetched data
@@ -278,20 +388,17 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
 
               {/* Right side - Sede + Live data */}
               <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
-                {/* Live data indicators */}
-                <div className="hidden xl:flex items-center gap-4">
-                  {liveData.map((data, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 border border-slate-200 dark:border-white/5 bg-white/50 dark:bg-white/[0.02]">
-                      <data.icon size={14} className="text-cyan-600/70 dark:text-cyan-500/70" />
-                      <div>
-                        <div className="text-xs text-slate-500 dark:text-white/30 font-mono">{data.label}</div>
-                        <div className="text-sm text-slate-800 dark:text-white font-mono font-bold">
-                          {data.value}<span className="text-slate-400 dark:text-white/40 text-xs ml-1">{data.unit}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                
+                {/* REPORT BUTTON */}
+                {(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) && (
+                    <button 
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl shadow-lg shadow-cyan-500/20 hover:bg-cyan-700 transition-all text-xs font-bold font-mono uppercase"
+                    >
+                        <FileDown size={16} />
+                        Central de Relatórios
+                    </button>
+                )}
 
                 {/* Sede info */}
                 {userSede && (
@@ -479,6 +586,98 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
             )}
           </div>
         </div>
+
+        {/* ========== REPORT EXPORT MODAL ========== */}
+        {isReportModalOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 flex items-center justify-center">
+                                <FileDown size={20} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-900 dark:text-white">Exportar Dados</h3>
+                                <p className="text-xs text-slate-500">Business Intelligence CSV</p>
+                            </div>
+                        </div>
+                        <button onClick={() => setIsReportModalOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                            <X size={18} className="text-slate-500" />
+                        </button>
+                    </div>
+
+                    <div className="p-6 space-y-6">
+                        {/* Tipo de Relatório */}
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Selecione o Relatório</label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button 
+                                    onClick={() => setReportType('CLORO')}
+                                    className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'CLORO' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-1"><TestTube size={16}/> Cloro e pH</div>
+                                    <span className="text-[10px] font-normal opacity-70">Leituras diárias</span>
+                                </button>
+                                <button 
+                                    onClick={() => setReportType('RESERVATORIOS')}
+                                    className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'RESERVATORIOS' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-1"><Droplet size={16}/> Reservatórios</div>
+                                    <span className="text-[10px] font-normal opacity-70">Status de limpeza</span>
+                                </button>
+                                <button 
+                                    onClick={() => setReportType('CERTIFICADOS')}
+                                    className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'CERTIFICADOS' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-1"><Award size={16}/> Certificados</div>
+                                    <span className="text-[10px] font-normal opacity-70">Vencimentos</span>
+                                </button>
+                                <button 
+                                    onClick={() => setReportType('FILTROS')}
+                                    className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'FILTROS' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                >
+                                    <div className="flex items-center gap-2 mb-1"><Filter size={16}/> Filtros</div>
+                                    <span className="text-[10px] font-normal opacity-70">Trocas e validade</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Date Range (Only for Cloro) */}
+                        {reportType === 'CLORO' && (
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 animate-in fade-in">
+                                <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-500 uppercase">
+                                    <Calendar size={14} /> Período de Análise
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] text-slate-400 block mb-1">Início</label>
+                                        <input type="date" className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-slate-400 block mb-1">Fim</label>
+                                        <input type="date" className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="pt-2">
+                            <button 
+                                onClick={handleExport}
+                                disabled={isExporting}
+                                className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                            >
+                                {isExporting ? <Activity className="animate-spin" /> : <Download size={20} />}
+                                {isExporting ? 'Gerando Arquivo...' : 'Baixar Relatório CSV'}
+                            </button>
+                            <p className="text-center text-[10px] text-slate-400 mt-3">
+                                O arquivo será gerado em formato .csv compatível com Excel/Sheets.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* ========== FOOTER STATUS ========== */}
         <div 
