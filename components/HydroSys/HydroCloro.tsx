@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft } from 'lucide-react';
+import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, HydroCloroEntry, HydroSettings, Sede, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
@@ -132,8 +132,63 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             </div>
         </header>
 
+        {/* STANDARDS INFO (MOVED TO TOP) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+             {/* Cloro Card */}
+             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/10 rounded-bl-full -mr-10 -mt-10"></div>
+                 
+                 <div className="flex items-center gap-4 mb-4 relative z-10">
+                     <div className="w-12 h-12 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
+                        <Droplets size={24} />
+                     </div>
+                     <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Padrão Cloro (CL)</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{settings.cloroMin} a {settings.cloroMax} <span className="text-sm font-bold text-slate-400">ppm</span></p>
+                     </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3 text-xs font-mono relative z-10">
+                    <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20">
+                        <p className="font-bold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &lt; {settings.cloroMin} ppm</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adicionar Cloro</p>
+                    </div>
+                    <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                        <p className="font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &gt; {settings.cloroMax} ppm</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. Água s/ Cloro</p>
+                    </div>
+                 </div>
+             </div>
+
+             {/* pH Card */}
+             <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden">
+                 <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-bl-full -mr-10 -mt-10"></div>
+
+                 <div className="flex items-center gap-4 mb-4 relative z-10">
+                     <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
+                        <TestTube size={24} />
+                     </div>
+                     <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Padrão pH</p>
+                        <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{settings.phMin} a {settings.phMax}</p>
+                     </div>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-3 text-xs font-mono relative z-10">
+                    <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                        <p className="font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &lt; {settings.phMin}</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. Ácido Fosfórico</p>
+                    </div>
+                    <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-xl border border-purple-100 dark:border-purple-900/20">
+                        <p className="font-bold text-purple-600 dark:text-purple-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &gt; {settings.phMax}</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. Carbonato</p>
+                    </div>
+                 </div>
+             </div>
+        </div>
+
         {/* CALENDAR */}
-        <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-6 md:p-8 relative overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+        <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-6 md:p-8 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
             <div className="flex items-center justify-between mb-8 relative z-10">
                 <button onClick={handlePrevMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronLeft size={20} /></button>
                 <h2 className="text-xl md:text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight font-mono">{monthName}</h2>
@@ -203,27 +258,39 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                               </div>
                                           </div>
                                       ) : dateStr < todayStr ? (
-                                          <span className="text-[9px] font-bold text-red-400 uppercase tracking-wider flex justify-center">Pendente</span>
+                                          <div className="flex justify-center items-center h-full opacity-50">
+                                              <AlertTriangle size={16} className="text-red-400" />
+                                          </div>
                                       ) : null}
                                   </div>
                               </button>
                           );
                       })}
                   </div>
+                  
+                  {/* LEGEND */}
+                  <div className="mt-8 flex flex-wrap justify-center gap-6 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-6">
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-500">
+                                <CheckCircle2 size={10} />
+                            </div>
+                            <span>Realizado (OK)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500">
+                                <AlertTriangle size={10} />
+                            </div>
+                            <span>Pendente / Irregular</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <div className="w-4 h-4 rounded border-2 border-cyan-500 flex items-center justify-center">
+                                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
+                            </div>
+                            <span>Hoje</span>
+                        </div>
+                  </div>
               </>
             )}
-        </div>
-
-        {/* INFO FOOTER */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
-             <div className="bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                 <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600"><Droplets size={20} /></div>
-                 <div><p className="text-[10px] font-bold uppercase text-slate-400">Padrão Cloro</p><p className="text-xl font-black text-slate-800 dark:text-white">{settings.cloroMin} - {settings.cloroMax}</p></div>
-             </div>
-             <div className="bg-white/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 p-4 rounded-xl flex items-center gap-4">
-                 <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-600"><TestTube size={20} /></div>
-                 <div><p className="text-[10px] font-bold uppercase text-slate-400">Padrão pH</p><p className="text-xl font-black text-slate-800 dark:text-white">{settings.phMin} - {settings.phMax}</p></div>
-             </div>
         </div>
 
         {/* MODAL */}
