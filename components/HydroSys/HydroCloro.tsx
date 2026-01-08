@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCloroEntry, HydroSettings, Sede } from '../../types';
+import { User, HydroCloroEntry, HydroSettings, Sede, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 
@@ -42,7 +42,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
       const allSedes = orgService.getSedes();
       let userSedes: Sede[] = [];
       
-      if (user.sedeIds && user.sedeIds.length > 0) {
+      // ADMIN sees ALL, others see filtered list
+      if (user.role === UserRole.ADMIN) {
+          userSedes = allSedes;
+      } else if (user.sedeIds && user.sedeIds.length > 0) {
           userSedes = allSedes.filter(s => user.sedeIds.includes(s.id));
       } else {
           // Fallback if no sedes mapped

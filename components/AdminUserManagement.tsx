@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
@@ -318,11 +318,16 @@ export const AdminUserManagement: React.FC = () => {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono">
               {filteredUsers.map((user) => {
                   const userSedes = user.sedeIds || [];
-                  const locationDisplay = userSedes.length > 1 
-                    ? `${userSedes.length} UNIDADES` 
-                    : userSedes.length === 1 
-                        ? sedes.find(s => s.id === userSedes[0])?.name || userSedes[0]
-                        : 'SEM LOCAL';
+                  let locationDisplay = 'SEM LOCAL';
+
+                  // --- FIX FOR ADMIN DISPLAY ---
+                  if (user.role === UserRole.ADMIN) {
+                      locationDisplay = 'ACESSO GLOBAL';
+                  } else if (userSedes.length > 1) {
+                      locationDisplay = `${userSedes.length} UNIDADES`;
+                  } else if (userSedes.length === 1) {
+                      locationDisplay = sedes.find(s => s.id === userSedes[0])?.name || userSedes[0];
+                  }
                   
                   const displayName = user.name || 'Sem Nome';
 
@@ -348,8 +353,15 @@ export const AdminUserManagement: React.FC = () => {
                         {user.role}
                         </span>
                     </td>
-                    <td className="px-6 py-4 text-xs text-slate-600 dark:text-slate-400 uppercase">
-                        {locationDisplay}
+                    <td className="px-6 py-4 text-xs">
+                        {/* STYLE FOR GLOBAL ACCESS */}
+                        {locationDisplay === 'ACESSO GLOBAL' ? (
+                            <span className="flex items-center gap-2 text-purple-600 dark:text-purple-400 font-bold">
+                                <Globe size={14} /> ACESSO GLOBAL
+                            </span>
+                        ) : (
+                            <span className="text-slate-600 dark:text-slate-400 uppercase">{locationDisplay}</span>
+                        )}
                     </td>
                     <td className="px-6 py-4">
                         <button 
@@ -493,12 +505,12 @@ export const AdminUserManagement: React.FC = () => {
                               <div className="space-y-1">
                                   <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">INSTITUICAO_ID</label>
                                   <select 
-                                      className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
+                                      className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500 disabled:opacity-50"
                                       value={formData.organizationId}
                                       onChange={e => setFormData({...formData, organizationId: e.target.value, regionId: '', sedeIds: []})}
-                                      disabled={currentUser?.role === UserRole.GESTOR}
+                                      disabled={currentUser?.role === UserRole.GESTOR || formData.role === UserRole.ADMIN}
                                   >
-                                      <option value="">SELECIONE...</option>
+                                      <option value="">{formData.role === UserRole.ADMIN ? 'GLOBAL' : 'SELECIONE...'}</option>
                                       {orgs.map(org => (
                                           <option key={org.id} value={org.id}>{org.name.toUpperCase()}</option>
                                       ))}
@@ -506,51 +518,65 @@ export const AdminUserManagement: React.FC = () => {
                               </div>
                           </div>
 
-                          <div className="space-y-1">
-                                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">REGIAO_OPERACAO</label>
-                                <select 
-                                    className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500 disabled:opacity-50"
-                                    value={formData.regionId}
-                                    onChange={e => setFormData({...formData, regionId: e.target.value, sedeIds: []})}
-                                    disabled={!formData.organizationId}
-                                >
-                                    <option value="">SELECIONE REGIAO...</option>
-                                    {availableRegions.map(reg => (
-                                        <option key={reg.id} value={reg.id}>{reg.name.toUpperCase()}</option>
-                                    ))}
-                                </select>
-                          </div>
+                          {formData.role === UserRole.ADMIN ? (
+                              /* ADMIN GLOBAL BANNER */
+                              <div className="p-4 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800 rounded-lg flex items-center justify-center gap-3 text-purple-700 dark:text-purple-300">
+                                  <Globe size={24} />
+                                  <div className="text-center">
+                                      <p className="text-sm font-bold uppercase">Acesso Irrestrito Habilitado</p>
+                                      <p className="text-xs opacity-70">Administradores possuem visão de todas as sedes.</p>
+                                  </div>
+                              </div>
+                          ) : (
+                              /* REGULAR LOCATION SELECTORS */
+                              <>
+                                <div className="space-y-1">
+                                        <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">REGIAO_OPERACAO</label>
+                                        <select 
+                                            className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500 disabled:opacity-50"
+                                            value={formData.regionId}
+                                            onChange={e => setFormData({...formData, regionId: e.target.value, sedeIds: []})}
+                                            disabled={!formData.organizationId}
+                                        >
+                                            <option value="">SELECIONE REGIAO...</option>
+                                            {availableRegions.map(reg => (
+                                                <option key={reg.id} value={reg.id}>{reg.name.toUpperCase()}</option>
+                                            ))}
+                                        </select>
+                                </div>
 
-                          <div className="space-y-1">
-                                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest mb-2 block">
-                                    UNIDADES_VINCULADAS [MULTI-SELECT]
-                                </label>
-                                {formData.regionId ? (
-                                    <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">
-                                        {availableSedes.length > 0 ? (
-                                            <div className="space-y-1">
-                                                {availableSedes.map(sede => (
-                                                    <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer transition-colors">
-                                                        <input 
-                                                            type="checkbox"
-                                                            checked={formData.sedeIds?.includes(sede.id)}
-                                                            onChange={() => toggleSedeSelection(sede.id)}
-                                                            className="w-4 h-4 rounded-none border border-slate-500 bg-transparent text-brand-600 focus:ring-0 checked:bg-brand-500"
-                                                        />
-                                                        <div className="flex-1 text-xs font-mono text-slate-700 dark:text-slate-300 uppercase">{sede.name}</div>
-                                                    </label>
-                                                ))}
+                                <div className="space-y-1">
+                                        <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest mb-2 block">
+                                            UNIDADES_VINCULADAS [MULTI-SELECT]
+                                        </label>
+                                        {formData.regionId ? (
+                                            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">
+                                                {availableSedes.length > 0 ? (
+                                                    <div className="space-y-1">
+                                                        {availableSedes.map(sede => (
+                                                            <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer transition-colors">
+                                                                <input 
+                                                                    type="checkbox"
+                                                                    checked={formData.sedeIds?.includes(sede.id)}
+                                                                    onChange={() => toggleSedeSelection(sede.id)}
+                                                                    className="w-4 h-4 rounded-none border border-slate-500 bg-transparent text-brand-600 focus:ring-0 checked:bg-brand-500"
+                                                                />
+                                                                <div className="flex-1 text-xs font-mono text-slate-700 dark:text-slate-300 uppercase">{sede.name}</div>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-xs font-mono text-slate-500 text-center py-2">NO_DATA_FOUND</p>
+                                                )}
                                             </div>
                                         ) : (
-                                            <p className="text-xs font-mono text-slate-500 text-center py-2">NO_DATA_FOUND</p>
+                                            <div className="p-3 text-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 text-xs font-mono uppercase">
+                                                AGUARDANDO_REGIAO...
+                                            </div>
                                         )}
-                                    </div>
-                                ) : (
-                                    <div className="p-3 text-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 text-xs font-mono uppercase">
-                                        AGUARDANDO_REGIAO...
-                                    </div>
-                                )}
-                          </div>
+                                </div>
+                              </>
+                          )}
 
                           {/* Footer Actions */}
                           <div className="pt-4 flex gap-3 border-t border-slate-200 dark:border-slate-800 mt-2">
