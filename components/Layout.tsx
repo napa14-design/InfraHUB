@@ -33,7 +33,8 @@ import {
   MoreVertical,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Settings
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -203,7 +204,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       <NavItem to="/module/hydrosys/reservatorios" icon={Droplet} label="Reservatórios" />
       
       {user.role === UserRole.ADMIN && (
-         <NavItem to="/module/hydrosys/analytics" icon={PieChart} label="Analytics" />
+         <>
+            <NavItem to="/module/hydrosys/analytics" icon={PieChart} label="Analytics" />
+            <NavItem to="/module/hydrosys/config" icon={Settings} label="Configurações" />
+         </>
       )}
 
       <div className={`mt-4 border-t border-slate-100 dark:border-slate-800 pt-4`}>
