@@ -3,6 +3,7 @@ import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPo
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS } from '../constants';
 import { logService } from './logService';
+import { authService } from './authService';
 
 // --- MAPPERS (DB snake_case <-> App camelCase) ---
 
@@ -87,7 +88,6 @@ const mapReservatorioFromDB = (db: any): any => ({
     dataUltimaLimpeza: db.data_ultima_limpeza,
     proximaLimpeza: db.proxima_limpeza,
     situacaoLimpeza: db.situacao_limpeza,
-    // Poço fields
     bairro: db.bairro,
     referenciaBomba: db.referencia_bomba,
     fichaOperacional: db.ficha_operacional,
@@ -95,7 +95,6 @@ const mapReservatorioFromDB = (db: any): any => ({
     proximaTrocaFiltro: db.proxima_troca_filtro,
     situacaoFiltro: db.situacao_filtro,
     refil: db.refil,
-    // Caixa/Cisterna fields
     numCelulas: db.num_celulas,
     capacidade: db.capacidade,
     previsaoLimpeza1: db.previsao_limpeza_1,
@@ -113,7 +112,6 @@ const mapReservatorioToDB = (app: any) => ({
     data_ultima_limpeza: app.dataUltimaLimpeza,
     proxima_limpeza: app.proximaLimpeza,
     situacao_limpeza: app.situacaoLimpeza,
-    // Poço
     bairro: app.bairro,
     referencia_bomba: app.referenciaBomba,
     ficha_operacional: app.fichaOperacional,
@@ -121,7 +119,6 @@ const mapReservatorioToDB = (app: any) => ({
     proxima_troca_filtro: app.proximaTrocaFiltro,
     situacao_filtro: app.situacaoFiltro,
     refil: app.refil,
-    // Caixa/Cisterna
     num_celulas: app.numCelulas,
     capacidade: app.capacidade,
     previsao_limpeza_1: app.previsaoLimpeza1,
@@ -141,7 +138,7 @@ const mapSettingsFromDB = (db: any): HydroSettings => ({
 });
 
 const mapSettingsToDB = (app: HydroSettings) => ({
-    id: 'default', // Singleton ID
+    id: 'default',
     validade_certificado_meses: app.validadeCertificadoMeses,
     validade_filtro_meses: app.validadeFiltroMeses,
     validade_limpeza_meses: app.validadeLimpezaMeses,
@@ -151,7 +148,6 @@ const mapSettingsToDB = (app: HydroSettings) => ({
     ph_max: app.phMax
 });
 
-// Helper de filtragem por escopo de usuário
 const filterByScope = <T extends { sedeId: string }>(data: T[], user: User): T[] => {
   if (user.role === UserRole.ADMIN) return data;
   const userSedes = user.sedeIds || [];
@@ -162,16 +158,11 @@ const filterByScope = <T extends { sedeId: string }>(data: T[], user: User): T[]
   });
 };
 
-// Current User for Logging helper
-// NOTE: Ideally user should be passed to save methods, but for now we trust the caller has auth
-import { authService } from './authService';
-
 const getCurrentUserForLog = () => {
     return authService.getCurrentUser();
 }
 
 export const hydroService = {
-  // --- CERTIFICADOS ---
   getCertificados: async (user: User): Promise<HydroCertificado[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -185,9 +176,8 @@ export const hydroService = {
   },
   saveCertificado: async (item: HydroCertificado) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
-    // Log
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}, Validade: ${item.validade}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}`);
   },
   deleteCertificado: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').delete().eq('id', id);
@@ -195,7 +185,6 @@ export const hydroService = {
     if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Certificado ID ${id}`);
   },
 
-  // --- CLORO ---
   getCloro: async (user: User): Promise<HydroCloroEntry[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -209,12 +198,11 @@ export const hydroService = {
   },
   saveCloro: async (entry: HydroCloroEntry) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
-    // Log
+    // Log detalhado para auditoria: inclui a Data de Referência (dia do cloro registrado)
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, CL: ${entry.cl}, pH: ${entry.ph}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, Data Ref: ${entry.date}, CL: ${entry.cl}, pH: ${entry.ph}`);
   },
 
-  // --- FILTROS ---
   getFiltros: async (user: User): Promise<HydroFiltro[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -229,7 +217,7 @@ export const hydroService = {
   saveFiltro: async (item: HydroFiltro) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`, `Local: ${item.local}, Troca: ${item.dataTroca}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`);
   },
   deleteFiltro: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').delete().eq('id', id);
@@ -237,9 +225,6 @@ export const hydroService = {
     if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Filtro ID ${id}`);
   },
 
-  // --- RESERVATÓRIOS ---
-  
-  // Poços
   getPocos: async (user: User): Promise<HydroPoco[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -254,10 +239,9 @@ export const hydroService = {
   savePoco: async (item: HydroPoco) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`, `Limpeza: ${item.situacaoLimpeza}, Filtro: ${item.situacaoFiltro}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`);
   },
 
-  // Cisternas
   getCisternas: async (user: User): Promise<HydroCisterna[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -272,10 +256,9 @@ export const hydroService = {
   saveCisterna: async (item: HydroCisterna) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CISTERNA' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`, `Sede: ${item.sedeId}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`);
   },
 
-  // Caixas
   getCaixas: async (user: User): Promise<HydroCaixa[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -290,10 +273,9 @@ export const hydroService = {
   saveCaixa: async (item: HydroCaixa) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CAIXA' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa D'água ${item.local}`, `Sede: ${item.sedeId}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa ${item.local}`);
   },
 
-  // --- SETTINGS ---
   getSettings: async (): Promise<HydroSettings> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -316,6 +298,6 @@ export const hydroService = {
   saveSettings: async (settings: HydroSettings) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_settings').upsert(mapSettingsToDB(settings));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Configurações Gerais`, `Padrões de Qualidade Atualizados`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Configurações Gerais`, `Padrões Atualizados`);
   }
 };

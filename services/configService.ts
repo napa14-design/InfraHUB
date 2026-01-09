@@ -30,6 +30,15 @@ const DEFAULT_RULES: NotificationRule[] = [
     warningDays: 30,
     criticalDays: 7,
     enabled: true
+  },
+  {
+    id: 'rule_pest',
+    moduleId: 'pestcontrol',
+    name: 'Controle de Pragas',
+    description: 'Monitora agendamentos de dedetização e iscagem.',
+    warningDays: 5,
+    criticalDays: 0,
+    enabled: true
   }
 ];
 

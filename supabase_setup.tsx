@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom';
 import { CheckCircle2, ArrowLeft, Database, Copy, Terminal } from 'lucide-react';
 
 export const SCHEMA_SQL = `
--- TABELA DE LOGS DE AUDITORIA
+-- =============================================
+-- 1. LOGS DE AUDITORIA
+-- =============================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL,
@@ -17,52 +19,135 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   timestamp TIMESTAMPTZ DEFAULT now()
 );
 
--- HABILITAR RLS
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- POLÍTICAS DE ACESSO (PERMISSIVA PARA USO INTERNO)
+-- Políticas de Logs
 CREATE POLICY "Enable read access for all users" ON audit_logs FOR SELECT USING (true);
 CREATE POLICY "Enable insert access for all users" ON audit_logs FOR INSERT WITH CHECK (true);
+
+-- =============================================
+-- 2. CONTROLE DE PRAGAS (PEST CONTROL)
+-- =============================================
+
+-- Tabela de Configurações (Técnicos, Pragas, Frequências)
+CREATE TABLE IF NOT EXISTS pest_control_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  pest_types TEXT[] DEFAULT '{}',
+  technicians TEXT[] DEFAULT '{}',
+  global_frequencies JSONB DEFAULT '{}'::jsonb,
+  sede_frequencies JSONB DEFAULT '{}'::jsonb
+);
+
+-- Tabela de Execuções e Agendamentos
+CREATE TABLE IF NOT EXISTS pest_control_entries (
+  id TEXT PRIMARY KEY,
+  sede_id TEXT NOT NULL,
+  item TEXT NOT NULL,
+  target TEXT NOT NULL,
+  product TEXT,
+  frequency TEXT,
+  method TEXT,
+  technician TEXT,
+  scheduled_date DATE NOT NULL,
+  performed_date DATE,
+  observation TEXT,
+  status TEXT DEFAULT 'PENDENTE'
+);
+
+-- Habilitar RLS
+ALTER TABLE pest_control_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pest_control_entries ENABLE ROW LEVEL SECURITY;
+
+-- Políticas de Pragas (Permissivas para facilitar uso inicial)
+CREATE POLICY "Public Read Settings" ON pest_control_settings FOR SELECT USING (true);
+CREATE POLICY "Public Write Settings" ON pest_control_settings FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Settings" ON pest_control_settings FOR UPDATE USING (true);
+
+CREATE POLICY "Public Read Entries" ON pest_control_entries FOR SELECT USING (true);
+CREATE POLICY "Public Write Entries" ON pest_control_entries FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Entries" ON pest_control_entries FOR UPDATE USING (true);
+CREATE POLICY "Public Delete Entries" ON pest_control_entries FOR DELETE USING (true);
 `;
 
-export const SEED_SQL = "";
+export const SEED_SQL = `
+-- =============================================
+-- DADOS INICIAIS (SEED)
+-- =============================================
+
+-- Inserir configurações padrão de Dedetização se não existirem
+INSERT INTO pest_control_settings (id, pest_types, technicians, global_frequencies, sede_frequencies)
+VALUES (
+  'default',
+  ARRAY['Rato / Roedores', 'Barata / Escorpião', 'Muriçoca / Mosquitos', 'Cupim', 'Formiga', 'Carrapato'],
+  ARRAY['Fabio', 'Bernardo', 'Santana', 'Fernando', 'Chagas', 'Paulo', 'Equipe Externa'],
+  '{"Rato / Roedores": 15, "Barata / Escorpião": 15, "Muriçoca / Mosquitos": 7, "Cupim": 180, "Formiga": 30, "Carrapato": 30}'::jsonb,
+  '{}'::jsonb
+) ON CONFLICT (id) DO NOTHING;
+`;
 
 export const Instructions = () => {
-  const [copied, setCopied] = useState(false);
+  const [copiedSchema, setCopiedSchema] = useState(false);
+  const [copiedSeed, setCopiedSeed] = useState(false);
 
-  const handleCopy = () => {
+  const handleCopySchema = () => {
     navigator.clipboard.writeText(SCHEMA_SQL);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedSchema(true);
+    setTimeout(() => setCopiedSchema(false), 2000);
+  };
+
+  const handleCopySeed = () => {
+    navigator.clipboard.writeText(SEED_SQL);
+    setCopiedSeed(true);
+    setTimeout(() => setCopiedSeed(false), 2000);
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
+      <div className="max-w-4xl w-full bg-white dark:bg-slate-900 rounded-3xl shadow-xl p-8 border border-slate-200 dark:border-slate-800">
         <div className="flex flex-col items-center text-center mb-8">
             <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-4 shadow-inner">
               <Database size={28} />
             </div>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Setup de Banco de Dados</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">
-              Execute o script SQL abaixo no painel do Supabase para criar as tabelas necessárias (incluindo Logs de Auditoria).
+              Siga os passos abaixo no painel do Supabase para configurar as tabelas e dados iniciais.
             </p>
         </div>
 
-        {/* Code Block */}
-        <div className="relative mb-8 group">
-            <div className="absolute top-0 right-0 p-2">
+        {/* Step 1: Schema */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">1. Criação de Tabelas</h3>
                 <button 
-                    onClick={handleCopy}
-                    className="p-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-wider shadow-lg"
+                    onClick={handleCopySchema}
+                    className="text-xs font-bold text-brand-600 hover:text-brand-500 flex items-center gap-1"
                 >
-                    {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
-                    {copied ? 'Copiado!' : 'Copiar SQL'}
+                    {copiedSchema ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedSchema ? 'Copiado!' : 'Copiar Script'}
                 </button>
             </div>
-            <div className="bg-slate-900 rounded-xl p-4 pt-12 overflow-x-auto max-h-64 border border-slate-800 shadow-inner">
-                <pre className="text-xs font-mono text-emerald-400 whitespace-pre-wrap">
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-emerald-400 whitespace-pre-wrap leading-relaxed">
                     {SCHEMA_SQL}
+                </pre>
+            </div>
+        </div>
+
+        {/* Step 2: Seed */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">2. Dados Iniciais (Opcional)</h3>
+                <button 
+                    onClick={handleCopySeed}
+                    className="text-xs font-bold text-brand-600 hover:text-brand-500 flex items-center gap-1"
+                >
+                    {copiedSeed ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedSeed ? 'Copiado!' : 'Copiar Seed'}
+                </button>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-blue-400 whitespace-pre-wrap leading-relaxed">
+                    {SEED_SQL}
                 </pre>
             </div>
         </div>
@@ -75,7 +160,7 @@ export const Instructions = () => {
              className="flex-1 py-3 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-sm"
           >
              <Terminal size={16} />
-             Abrir Editor SQL
+             Ir para Editor SQL (Supabase)
           </a>
           <Link 
             to="/login"

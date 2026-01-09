@@ -4,19 +4,28 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logService } from './logService';
 import { authService } from './authService';
 
-// Mock Data
+const excelToISO = (serial: number) => {
+    const date = new Date((serial - 25569) * 86400 * 1000);
+    return date.toISOString().split('T')[0];
+};
+
 const MOCK_PEST_ENTRIES: PestControlEntry[] = [
-    { id: 'pc-1', sedeId: 'ALD', item: 'Dedetização', target: 'Rato', product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: '2025-09-06', performedDate: '2025-12-15', observation: '', status: 'REALIZADO' },
-    { id: 'pc-2', sedeId: 'ALD', item: 'Dedetização', target: 'Rato', product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: '2025-09-22', performedDate: '2025-09-22', observation: 'Ok', status: 'REALIZADO' },
-    { id: 'pc-3', sedeId: 'ALD', item: 'Dedetização', target: 'Muriçoca', product: 'k-otrine', frequency: 'Semanal', method: 'Maquina de fumaça', technician: 'Fabio', scheduledDate: '2025-09-06', performedDate: '2025-09-06', observation: 'Ok', status: 'REALIZADO' },
-    { id: 'pc-9', sedeId: 'ALD', item: 'Dedetização', target: 'Rato', product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: '2025-10-06', performedDate: undefined, observation: '', status: 'PENDENTE' },
+    { id: 'ald-1', sedeId: 'ALD', item: 'Dedetização', target: "Rato / Roedores", product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: excelToISO(45906), performedDate: excelToISO(46006), observation: '', status: 'REALIZADO' },
+    { id: 'ald-2', sedeId: 'ALD', item: 'Dedetização', target: "Rato / Roedores", product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: excelToISO(45922), performedDate: excelToISO(45922), observation: 'Ok', status: 'REALIZADO' },
+    { id: 'ald-3', sedeId: 'ALD', item: 'Dedetização', target: "Muriçoca / Mosquitos", product: 'k-otrine', frequency: 'Semanal', method: 'Maquina de fumaça', technician: 'Fabio', scheduledDate: excelToISO(45906), performedDate: excelToISO(45906), observation: 'Ok', status: 'REALIZADO' },
+    { id: 'dl-1', sedeId: 'DL', item: 'Dedetização', target: "Rato / Roedores", product: 'Racumin', frequency: 'Quinzenal', method: 'Isca com cuscuz', technician: 'BERNARDO', scheduledDate: excelToISO(45906), performedDate: excelToISO(45906), observation: 'Ok', status: 'REALIZADO' },
+    { id: 'eus-1', sedeId: 'EUS', item: 'Dedetização', target: "Barata / Escorpião", product: 'K-otrine pó', frequency: 'Quinzenal', method: 'Pó nas caixas de passagem', technician: 'PAULO', scheduledDate: excelToISO(45905), performedDate: excelToISO(45905), observation: 'Ok', status: 'REALIZADO' }
 ];
 
-let MOCK_SETTINGS: PestControlSettings = {
-    frequencyRato: 15,
-    frequencyMuricoca: 15,
-    frequencyBarata: 15,
-    defaultTechnician: 'Fabio'
+let LOCAL_SETTINGS: PestControlSettings = {
+    pestTypes: ["Rato / Roedores", "Barata / Escorpião", "Muriçoca / Mosquitos"],
+    technicians: ["Fabio", "Bernardo", "Santana", "Fernando", "Chagas", "Paulo"],
+    globalFrequencies: {
+        "Rato / Roedores": 15,
+        "Barata / Escorpião": 15,
+        "Muriçoca / Mosquitos": 7
+    },
+    sedeFrequencies: {}
 };
 
 const mapEntryFromDB = (db: any): PestControlEntry => ({
@@ -49,12 +58,6 @@ const mapEntryToDB = (app: PestControlEntry) => ({
     status: app.status
 });
 
-const filterByScope = (data: PestControlEntry[], user: User): PestControlEntry[] => {
-  if (user.role === UserRole.ADMIN) return data;
-  const userSedes = user.sedeIds || [];
-  return data.filter(item => userSedes.includes(item.sedeId));
-};
-
 export const pestService = {
     getAll: async (user: User): Promise<PestControlEntry[]> => {
         try {
@@ -62,9 +65,11 @@ export const pestService = {
             const { data, error } = await supabase.from('pest_control_entries').select('*');
             if (error) throw error;
             const mapped = (data || []).map(mapEntryFromDB);
-            return filterByScope(mapped, user);
+            if (user.role === UserRole.ADMIN) return mapped;
+            return mapped.filter(item => (user.sedeIds || []).includes(item.sedeId));
         } catch (e) {
-            return filterByScope(MOCK_PEST_ENTRIES, user);
+            if (user.role === UserRole.ADMIN) return MOCK_PEST_ENTRIES;
+            return MOCK_PEST_ENTRIES.filter(item => (user.sedeIds || []).includes(item.sedeId));
         }
     },
 
@@ -74,15 +79,15 @@ export const pestService = {
             const { data } = await supabase.from('pest_control_settings').select('*').single();
             if (data) {
                 return {
-                    frequencyRato: data.freq_rato,
-                    frequencyMuricoca: data.freq_muricoca,
-                    frequencyBarata: data.freq_barata,
-                    defaultTechnician: data.default_technician
+                    pestTypes: data.pest_types || [],
+                    technicians: data.technicians || [],
+                    globalFrequencies: data.global_frequencies || {},
+                    sedeFrequencies: data.sede_frequencies || {}
                 };
             }
             throw new Error("No settings");
         } catch (e) {
-            return MOCK_SETTINGS;
+            return LOCAL_SETTINGS;
         }
     },
 
@@ -90,33 +95,25 @@ export const pestService = {
         if (isSupabaseConfigured()) {
             await supabase.from('pest_control_settings').upsert({
                 id: 'default',
-                freq_rato: settings.frequencyRato,
-                freq_muricoca: settings.frequencyMuricoca,
-                freq_barata: settings.frequencyBarata,
-                default_technician: settings.defaultTechnician
+                pest_types: settings.pestTypes,
+                technicians: settings.technicians,
+                global_frequencies: settings.globalFrequencies,
+                sede_frequencies: settings.sedeFrequencies
             });
         } else {
-            MOCK_SETTINGS = settings;
+            LOCAL_SETTINGS = settings;
         }
         
         const u = authService.getCurrentUser();
-        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', 'Configurações', 'Intervalos atualizados');
+        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', 'Configurações', 'Matriz de frequências e listas atualizadas');
     },
 
-    // Main Logic: Save and potentially auto-schedule next task
     save: async (item: PestControlEntry) => {
         let isCompletion = false;
-        
-        // 1. Check if this save is completing a task
-        // We need to know previous state to be sure, or check if performedDate was just added.
-        // For simplicity, if status is REALIZADO and performedDate exists, we assume it might trigger next.
-        // To avoid duplicates, the UI/Service logic should ensure we don't double-create. 
-        // Ideally, we'd check DB, but here we'll rely on the fact that 'save' creates the next one immediately.
         
         if (item.status === 'REALIZADO' && item.performedDate) {
             isCompletion = true;
         } else {
-            // Recalculate status if not realized
             const sched = new Date(item.scheduledDate);
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -124,7 +121,6 @@ export const pestService = {
             else item.status = 'PENDENTE';
         }
 
-        // 2. Persist Current Item
         if (isSupabaseConfigured()) {
             await supabase.from('pest_control_entries').upsert(mapEntryToDB(item));
         } else {
@@ -134,25 +130,41 @@ export const pestService = {
         }
 
         const u = authService.getCurrentUser();
-        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Status: ${item.status}`);
+        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Unidade: ${item.sedeId}, Status: ${item.status}`);
 
-        // 3. Auto-Schedule Next if Completed
         if (isCompletion) {
             await pestService.generateNextTask(item);
         }
     },
 
     generateNextTask: async (completedItem: PestControlEntry) => {
-        // Prevent duplicate generation check (naive impl for mock/demo)
-        // In real DB, we might check if a pending task exists for same target/sede with date > performedDate
-        
         const settings = await pestService.getSettings();
-        let daysToAdd = 15; // Default
+        const target = completedItem.target;
+        const sedeId = completedItem.sedeId;
 
-        const target = completedItem.target.toLowerCase();
-        if (target.includes('rato')) daysToAdd = settings.frequencyRato;
-        else if (target.includes('muriçoca') || target.includes('muricoca')) daysToAdd = settings.frequencyMuricoca;
-        else if (target.includes('barata') || target.includes('escorpi')) daysToAdd = settings.frequencyBarata;
+        // Check duplicate: if there is already a PENDING task for this target/sede with date > scheduledDate
+        // This prevents creating duplicate future tasks if the user edits a Realized task multiple times.
+        const allEntries = await pestService.getAll({ role: UserRole.ADMIN } as User); 
+        const exists = allEntries.some(e => 
+            e.sedeId === completedItem.sedeId && 
+            e.target === completedItem.target && 
+            e.status === 'PENDENTE' &&
+            new Date(e.scheduledDate) > new Date(completedItem.scheduledDate)
+        );
+        
+        if (exists) return; // Already scheduled next task
+
+        // Lógica de Prioridade de Frequência:
+        // 1. Sede específica?
+        // 2. Global por praga?
+        // 3. Fallback (15 dias)
+        let daysToAdd = 15;
+        
+        if (settings.sedeFrequencies[sedeId] && settings.sedeFrequencies[sedeId][target]) {
+            daysToAdd = settings.sedeFrequencies[sedeId][target];
+        } else if (settings.globalFrequencies[target]) {
+            daysToAdd = settings.globalFrequencies[target];
+        }
 
         const performedDate = new Date(completedItem.performedDate!);
         const nextDate = new Date(performedDate);
@@ -163,10 +175,10 @@ export const pestService = {
             sedeId: completedItem.sedeId,
             item: completedItem.item,
             target: completedItem.target,
-            product: completedItem.product,
-            frequency: completedItem.frequency,
-            method: completedItem.method,
-            technician: completedItem.technician, // Keep same tech or use default
+            product: '', // IMPORTANTE: Limpar produto para o novo agendamento
+            frequency: daysToAdd === 7 ? 'Semanal' : daysToAdd === 15 ? 'Quinzenal' : daysToAdd === 30 ? 'Mensal' : `${daysToAdd} dias`,
+            method: '', // IMPORTANTE: Limpar método para o novo agendamento
+            technician: completedItem.technician, // Técnico mantém, mas pode ser alterado
             scheduledDate: nextDate.toISOString().split('T')[0],
             status: 'PENDENTE',
             observation: ''
@@ -179,7 +191,7 @@ export const pestService = {
         }
         
         const u = authService.getCurrentUser();
-        if(u) logService.logAction(u, 'PESTCONTROL', 'CREATE', `${nextItem.target} (Auto)`, `Agendado para: ${nextItem.scheduledDate}`);
+        if(u) logService.logAction(u, 'PESTCONTROL', 'CREATE', `${nextItem.target} (Auto)`, `Sede: ${nextItem.sedeId}, Agendado para: ${nextItem.scheduledDate} (Ciclo: ${daysToAdd}d)`);
     },
 
     delete: async (id: string) => {

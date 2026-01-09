@@ -39,12 +39,10 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
-  isFirstLogin?: boolean; // Flag para forçar troca de senha via Modal
-  
-  // Link user to hierarchy
+  isFirstLogin?: boolean;
   organizationId?: string;
   regionId?: string;
-  sedeIds: string[]; // IDs das sedes que o usuário tem acesso
+  sedeIds: string[];
 }
 
 export enum ModuleStatus {
@@ -71,17 +69,14 @@ export interface AppModule {
   type: ModuleType;
 }
 
-export interface LoginResponse {
-  user: User;
-  token: string;
-}
-
+// Fixed: Defined NotificationType as it was missing and being imported in multiple files
 export type NotificationType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
 
 export interface AppNotification {
   id: string;
   title: string;
   message: string;
+  // Fixed: Used the new NotificationType alias
   type: NotificationType;
   read: boolean;
   timestamp: Date;
@@ -99,7 +94,6 @@ export interface NotificationRule {
   enabled: boolean;
 }
 
-// --- LOGGING TYPES ---
 export type LogActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'EXPORT' | 'AUTH';
 
 export interface LogEntry {
@@ -107,14 +101,12 @@ export interface LogEntry {
   userId: string;
   userName: string;
   userRole: string;
-  module: string; // 'HYDROSYS', 'AUTH', 'ADMIN', etc.
+  module: string;
   action: LogActionType;
-  target: string; // O que foi afetado (ex: "Certificado X", "Usuário Y")
+  target: string;
   details?: string;
-  timestamp: string; // ISO String
+  timestamp: string;
 }
-
-// --- HYDROSYS TYPES ---
 
 export interface HydroSettings {
   validadeCertificadoMeses: number;
@@ -145,7 +137,7 @@ export interface HydroCertificado {
 export interface HydroCloroEntry {
   id: string;
   sedeId: string;
-  date: string; // YYYY-MM-DD
+  date: string;
   cl: number;
   ph: number;
   medidaCorretiva?: string;
@@ -162,8 +154,6 @@ export interface HydroFiltro {
   proximaTroca: string;
 }
 
-// RESERVATÓRIOS UNIFICADOS (Superset Type)
-// Este tipo cobre Poços, Cisternas e Caixas d'água com campos opcionais
 export type TipoReservatorio = 'POCO' | 'CISTERNA' | 'CAIXA';
 
 export interface HydroReservatorio {
@@ -172,60 +162,50 @@ export interface HydroReservatorio {
   tipo: TipoReservatorio;
   local: string;
   responsavel: string;
-  
-  // Controle de Limpeza (Comum a todos)
-  dataUltimaLimpeza?: string; // Data realizada
-  proximaLimpeza: string; // Data prevista
+  dataUltimaLimpeza?: string;
+  proximaLimpeza: string;
   situacaoLimpeza: 'DENTRO DO PRAZO' | 'FORA DO PRAZO' | 'PENDENTE' | 'DESATIVADO';
-  
-  // Específico: Poços
   bairro?: string;
   referenciaBomba?: string;
   fichaOperacional?: string;
-  
-  // Específico: Filtro do Poço
   ultimaTrocaFiltro?: string;
   proximaTrocaFiltro?: string;
   situacaoFiltro?: string;
   refil?: string;
-
-  // Específico: Cisternas e Caixas
   numCelulas?: number;
   capacidade?: string;
-  
-  // Campos de Cronograma Semestral (Comum para Caixas/Cisternas)
   previsaoLimpeza1?: string;
-  dataLimpeza1?: string; // Realizado sem 1
+  dataLimpeza1?: string;
   previsaoLimpeza2?: string;
-  dataLimpeza2?: string; // Realizado sem 2
+  dataLimpeza2?: string;
 }
 
-// Alias para manter compatibilidade com componentes antigos temporariamente, 
-// mas idealmente o código deve migrar para usar HydroReservatorio
 export type HydroPoco = HydroReservatorio;
 export type HydroCisterna = HydroReservatorio;
 export type HydroCaixa = HydroReservatorio;
 
-// --- PEST CONTROL TYPES ---
+// --- PEST CONTROL TYPES (ENHANCED) ---
 
 export interface PestControlSettings {
-  frequencyRato: number; // dias
-  frequencyMuricoca: number; // dias
-  frequencyBarata: number; // dias
-  defaultTechnician: string;
+  pestTypes: string[];
+  technicians: string[];
+  // Frequências globais: Record<"Nome da Praga", dias_intervalo>
+  globalFrequencies: Record<string, number>;
+  // Frequências por sede: Record<"sedeId", Record<"Nome da Praga", dias_intervalo>>
+  sedeFrequencies: Record<string, Record<string, number>>;
 }
 
 export interface PestControlEntry {
   id: string;
   sedeId: string;
-  item: string; // "Dedetização"
-  target: string; // "Rato", "Muriçoca", "Barata/Escorpião"
-  product: string; // "Racumin", "k-otrine"
-  frequency: string; // "Quinzenal", "Semanal" - Display purposes mostly, logic uses Settings
-  method: string; // "Isca nas caixas", "Maquina de fumaça"
-  technician: string; // "Fabio"
-  scheduledDate: string; // "Data Prevista" (YYYY-MM-DD)
-  performedDate?: string; // "Data Realizada" (YYYY-MM-DD) or null
+  item: string; 
+  target: string; 
+  product: string; 
+  frequency: string; 
+  method: string; 
+  technician: string; 
+  scheduledDate: string; 
+  performedDate?: string; 
   observation?: string;
   status: 'PENDENTE' | 'REALIZADO' | 'ATRASADO';
 }

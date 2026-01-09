@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, PieChart, BarChart3, Building2, CheckCircle2, AlertTriangle, Bug } from 'lucide-react';
@@ -6,7 +5,9 @@ import { EmptyState } from '../Shared/EmptyState';
 import { User, PestControlEntry, UserRole } from '../../types';
 import { pestService } from '../../services/pestService';
 
-const SimpleBar = ({ label, count, total, color }: { label: string, count: number, total: number, color: string }) => {
+// Add comment above each fix.
+// Fixed: Explicitly typed as React.FC to handle 'key' and other React-specific props correctly in map()
+const SimpleBar: React.FC<{ label: string, count: number, total: number, color: string }> = ({ label, count, total, color }) => {
     const percent = total > 0 ? (count / total) * 100 : 0;
     return (
         <div className="mb-3">
