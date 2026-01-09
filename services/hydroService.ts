@@ -2,6 +2,7 @@
 import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPoco, HydroCisterna, HydroCaixa, HydroSettings } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS } from '../constants';
+import { logService } from './logService';
 
 // --- MAPPERS (DB snake_case <-> App camelCase) ---
 
@@ -161,6 +162,14 @@ const filterByScope = <T extends { sedeId: string }>(data: T[], user: User): T[]
   });
 };
 
+// Current User for Logging helper
+// NOTE: Ideally user should be passed to save methods, but for now we trust the caller has auth
+import { authService } from './authService';
+
+const getCurrentUserForLog = () => {
+    return authService.getCurrentUser();
+}
+
 export const hydroService = {
   // --- CERTIFICADOS ---
   getCertificados: async (user: User): Promise<HydroCertificado[]> => {
@@ -176,9 +185,14 @@ export const hydroService = {
   },
   saveCertificado: async (item: HydroCertificado) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
+    // Log
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}, Validade: ${item.validade}`);
   },
   deleteCertificado: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').delete().eq('id', id);
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Certificado ID ${id}`);
   },
 
   // --- CLORO ---
@@ -195,6 +209,9 @@ export const hydroService = {
   },
   saveCloro: async (entry: HydroCloroEntry) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
+    // Log
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, CL: ${entry.cl}, pH: ${entry.ph}`);
   },
 
   // --- FILTROS ---
@@ -211,9 +228,13 @@ export const hydroService = {
   },
   saveFiltro: async (item: HydroFiltro) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`, `Local: ${item.local}, Troca: ${item.dataTroca}`);
   },
   deleteFiltro: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').delete().eq('id', id);
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Filtro ID ${id}`);
   },
 
   // --- RESERVATÓRIOS ---
@@ -232,6 +253,8 @@ export const hydroService = {
   },
   savePoco: async (item: HydroPoco) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`, `Limpeza: ${item.situacaoLimpeza}, Filtro: ${item.situacaoFiltro}`);
   },
 
   // Cisternas
@@ -248,6 +271,8 @@ export const hydroService = {
   },
   saveCisterna: async (item: HydroCisterna) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CISTERNA' }));
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`, `Sede: ${item.sedeId}`);
   },
 
   // Caixas
@@ -264,6 +289,8 @@ export const hydroService = {
   },
   saveCaixa: async (item: HydroCaixa) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CAIXA' }));
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa D'água ${item.local}`, `Sede: ${item.sedeId}`);
   },
 
   // --- SETTINGS ---
@@ -288,5 +315,7 @@ export const hydroService = {
 
   saveSettings: async (settings: HydroSettings) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_settings').upsert(mapSettingsToDB(settings));
+    const u = getCurrentUserForLog();
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Configurações Gerais`, `Padrões de Qualidade Atualizados`);
   }
 };

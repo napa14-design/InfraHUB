@@ -99,6 +99,21 @@ export interface NotificationRule {
   enabled: boolean;
 }
 
+// --- LOGGING TYPES ---
+export type LogActionType = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'EXPORT' | 'AUTH';
+
+export interface LogEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  module: string; // 'HYDROSYS', 'AUTH', 'ADMIN', etc.
+  action: LogActionType;
+  target: string; // O que foi afetado (ex: "Certificado X", "Usuário Y")
+  details?: string;
+  timestamp: string; // ISO String
+}
+
 // --- HYDROSYS TYPES ---
 
 export interface HydroSettings {

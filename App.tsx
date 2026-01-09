@@ -13,6 +13,7 @@ import { AdminUserManagement } from './components/AdminUserManagement';
 import { AdminModuleManagement } from './components/AdminModuleManagement';
 import { AdminOrgManagement } from './components/AdminOrgManagement';
 import { AdminNotificationConfig } from './components/AdminNotificationConfig';
+import { AuditLogs } from './components/AuditLogs'; // Import new component
 import { HydroSysDashboard } from './components/HydroSysDashboard';
 import { HydroCertificados } from './components/HydroSys/HydroCertificados';
 import { HydroCloro } from './components/HydroSys/HydroCloro';
@@ -170,6 +171,16 @@ const App: React.FC = () => {
                       element={
                         user.role === UserRole.ADMIN 
                           ? <AdminNotificationConfig /> 
+                          : <Navigate to="/" replace />
+                      } 
+                    />
+
+                    {/* LOGS: Visible for ADMIN and GESTOR */}
+                    <Route 
+                      path="/admin/logs" 
+                      element={
+                        (user.role === UserRole.ADMIN || user.role === UserRole.GESTOR)
+                          ? <AuditLogs /> 
                           : <Navigate to="/" replace />
                       } 
                     />
