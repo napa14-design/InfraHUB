@@ -6,6 +6,7 @@ import { notificationService } from '../services/notificationService';
 import { orgService } from '../services/orgService';
 import { NotificationCenter } from './NotificationCenter';
 import { CriticalAlertBanner } from './CriticalAlertBanner';
+import { CommandPalette } from './CommandPalette';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
 import { FirstLoginSetup } from './FirstLoginSetup';
@@ -34,7 +35,10 @@ import {
   Database,
   Wifi,
   WifiOff,
-  Settings
+  Settings,
+  Bug,
+  ShieldAlert,
+  HelpCircle
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -61,8 +65,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check if we are inside HydroSys module
+  // Check Contexts
   const isHydroSys = location.pathname.includes('/module/hydrosys');
+  const isPestControl = location.pathname.includes('/module/pestcontrol');
   
   // Safe User Name access
   const userName = user.name || 'Usuário';
@@ -193,6 +198,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       );
   };
 
+  // --- SUB MODULE SIDEBARS ---
+
+  const renderBackToHub = () => (
+      <div className={`mt-4 border-t border-slate-100 dark:border-slate-800 pt-4`}>
+          {isCollapsed ? (
+              <div className="flex justify-center group relative">
+                  <Link to="/" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:text-brand-600 transition-colors" title="Voltar ao Hub">
+                      <ArrowLeft size={20} />
+                  </Link>
+                  <div className="absolute left-14 top-1/2 -translate-y-1/2 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+                      Voltar ao Hub
+                  </div>
+              </div>
+          ) : (
+              <Link to="/" className="flex items-center space-x-3 px-3 py-3 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                <ArrowLeft size={20} />
+                <span className="font-medium">Voltar ao Hub</span>
+              </Link>
+          )}
+      </div>
+  );
+
   const renderHydroSysSidebar = () => (
     <>
       <SectionLabel label="Módulos HydroSys" />
@@ -209,25 +236,28 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             <NavItem to="/module/hydrosys/config" icon={Settings} label="Configurações" />
          </>
       )}
+      
+      {renderBackToHub()}
+    </>
+  );
 
-      <div className={`mt-4 border-t border-slate-100 dark:border-slate-800 pt-4`}>
-          {isCollapsed ? (
-              <div className="flex justify-center group relative">
-                  <Link to="/" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:text-brand-600 transition-colors" title="Voltar ao Hub">
-                      <ArrowLeft size={20} />
-                  </Link>
-                  {/* Tooltip for Back Button */}
-                  <div className="absolute left-14 top-1/2 -translate-y-1/2 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
-                      Voltar ao Hub
-                  </div>
-              </div>
-          ) : (
-              <Link to="/" className="flex items-center space-x-3 px-3 py-3 rounded-xl text-slate-500 hover:text-brand-600 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                <ArrowLeft size={20} />
-                <span className="font-medium">Voltar ao Hub</span>
-              </Link>
-          )}
-      </div>
+  const renderPestControlSidebar = () => (
+    <>
+      <SectionLabel label="Controle de Pragas" />
+      
+      <NavItem to="/module/pestcontrol" icon={LayoutGrid} label="Visão Geral" />
+      <NavItem to="/module/pestcontrol/execution" icon={ShieldAlert} label="Dedetização" />
+      
+      {user.role === UserRole.ADMIN && (
+         <>
+            <NavItem to="/module/pestcontrol/analytics" icon={PieChart} label="Analytics" />
+            <NavItem to="/module/pestcontrol/config" icon={Settings} label="Configurações" />
+         </>
+      )}
+
+      <NavItem to="/module/pestcontrol/help" icon={HelpCircle} label="Ajuda" />
+
+      {renderBackToHub()}
     </>
   );
 
@@ -248,7 +278,6 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão Usuários" />}
         {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo Apps" />}
         
-        {/* Changed: Opens Drawer instead of Route */}
         {isAdmin && (
             <NavItem 
                 to="#" 
@@ -261,8 +290,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
     );
   };
 
+  const getModuleConfig = () => {
+      if (isHydroSys) return { title: 'HydroSys', subtitle: 'Gestão de Água', icon: Droplets, color: 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' };
+      if (isPestControl) return { title: 'Pragas', subtitle: 'Controle Sanitário', icon: Bug, color: 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30' };
+      return { title: 'InfraHub', subtitle: 'Infraestrutura', icon: LayoutGrid, color: 'bg-gradient-to-br from-brand-500 to-indigo-600 shadow-brand-500/30' };
+  };
+
+  const modConfig = getModuleConfig();
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 flex">
+      {/* GLOBAL COMMAND PALETTE */}
+      <CommandPalette />
+
       {/* FIRST LOGIN MODAL OVERLAY */}
       {showFirstLogin && (
           <FirstLoginSetup user={user} onComplete={handleFirstLoginComplete} />
@@ -303,19 +343,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           <div className="h-20 flex items-center px-4 mb-2 flex-shrink-0 transition-all">
             <div className={`flex items-center ${isCollapsed ? 'justify-center w-full' : 'justify-between w-full space-x-3'}`}>
               <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transition-all duration-300 flex-shrink-0
-                    ${isHydroSys ? 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' : 'bg-gradient-to-br from-brand-500 to-indigo-600 shadow-brand-500/30'}
-                  `}>
-                    {isHydroSys ? <Droplets size={22} /> : <LayoutGrid size={22} />}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg transition-all duration-300 flex-shrink-0 ${modConfig.color}`}>
+                    <modConfig.icon size={22} />
                   </div>
                   
                   {!isCollapsed && (
                       <div className="animate-in fade-in duration-300 whitespace-nowrap overflow-hidden">
                         <span className="block text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
-                            {isHydroSys ? 'HydroSys' : 'InfraHub'}
+                            {modConfig.title}
                         </span>
                         <span className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mt-1">
-                          {isHydroSys ? 'Gestão de Água' : 'Infraestrutura'}
+                          {modConfig.subtitle}
                         </span>
                       </div>
                   )}
@@ -333,7 +371,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
           {/* 2. Navigation (Scrollable) */}
           <nav className="flex-1 overflow-y-auto px-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 overflow-x-hidden">
-            {isHydroSys ? renderHydroSysSidebar() : renderMainSidebar()}
+            {isHydroSys ? renderHydroSysSidebar() : isPestControl ? renderPestControlSidebar() : renderMainSidebar()}
           </nav>
 
           {/* 3. Footer (User Profile & Collapse) */}
@@ -343,7 +381,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
              {!isCollapsed && (
                 <div className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 mb-1 border ${isMockData ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
                     {isMockData ? <WifiOff size={12}/> : <Wifi size={12}/>}
-                    {isMockData ? 'Modo Demo (Local)' : 'Supabase Conectado'}
+                    {isMockData ? 'Modo Demo' : 'Supabase OK'}
                 </div>
              )}
 
@@ -386,7 +424,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     )}
                 </div>
 
-                {/* Theme Toggle Mini (Inside Profile Card for Collapsed or Below for Expanded) */}
+                {/* Theme Toggle Mini */}
                 <button 
                     onClick={toggleTheme}
                     className={`
@@ -398,7 +436,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                     {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
                 </button>
                 
-                {/* Logout Button when collapsed (Extra small icon below theme) */}
+                {/* Logout Button when collapsed */}
                 {isCollapsed && (
                     <button 
                         onClick={handleLogout} 
@@ -415,14 +453,14 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden relative bg-slate-50 dark:bg-slate-950">
-        {/* Mobile Header (Only visible on small screens) */}
+        {/* Mobile Header */}
         <header className="h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center px-4 justify-between lg:hidden flex-shrink-0 z-30">
           <div className="flex items-center space-x-3">
              <button onClick={() => setIsSidebarOpen(true)} className="text-slate-500 dark:text-slate-400">
               <Menu size={24} />
             </button>
             <span className="font-bold text-slate-900 dark:text-white">
-              {isHydroSys ? 'HydroSys' : 'InfraHub'}
+              {modConfig.title}
             </span>
           </div>
           <div className="flex items-center gap-3">

@@ -21,6 +21,11 @@ import { HydroFiltros } from './components/HydroSys/HydroFiltros';
 import { HydroReservatorios } from './components/HydroSys/HydroReservatorios';
 import { HydroConfig } from './components/HydroSys/HydroConfig';
 import { HydroSysAnalytics } from './components/HydroSys/HydroAnalytics';
+import { PestControlDashboard } from './components/PestControl/PestControlDashboard';
+import { PestControlExecution } from './components/PestControl/PestControlExecution';
+import { PestControlConfig } from './components/PestControl/PestControlConfig';
+import { PestControlAnalytics } from './components/PestControl/PestControlAnalytics';
+import { PestControlHelp } from './components/PestControl/PestControlHelp';
 import { ThemeProvider } from './components/ThemeContext';
 import { Instructions } from './supabase_setup';
 import { UpdatePassword } from './components/UpdatePassword';
@@ -93,12 +98,6 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
-  };
-
-  // Callback to update user state after password change without logging out
-  const refreshUser = () => {
-      const updated = authService.getCurrentUser();
-      setUser(updated);
   };
 
   if (loading) {
@@ -212,6 +211,36 @@ const App: React.FC = () => {
                         user.role === UserRole.ADMIN 
                           ? <HydroSysAnalytics user={user} />
                           : <Navigate to="/module/hydrosys" replace />
+                      } 
+                    />
+
+                    {/* PEST CONTROL ROUTES */}
+                    <Route 
+                        path="/module/pestcontrol" 
+                        element={<PestControlDashboard user={user} />} 
+                    />
+                    <Route 
+                        path="/module/pestcontrol/execution" 
+                        element={<PestControlExecution user={user} />} 
+                    />
+                    <Route 
+                        path="/module/pestcontrol/help" 
+                        element={<PestControlHelp user={user} />} 
+                    />
+                    <Route 
+                      path="/module/pestcontrol/config" 
+                      element={
+                        user.role === UserRole.ADMIN 
+                          ? <PestControlConfig user={user} />
+                          : <Navigate to="/module/pestcontrol" replace />
+                      } 
+                    />
+                    <Route 
+                      path="/module/pestcontrol/analytics" 
+                      element={
+                        user.role === UserRole.ADMIN 
+                          ? <PestControlAnalytics user={user} />
+                          : <Navigate to="/module/pestcontrol" replace />
                       } 
                     />
                     

@@ -185,6 +185,17 @@ export const INITIAL_MODULES: AppModule[] = [
     type: ModuleType.INTERNAL
   },
   {
+    id: 'pestcontrol',
+    title: 'Controle de Pragas',
+    description: 'Monitoramento de dedetização, iscagem e vetores.',
+    iconName: 'Bug',
+    minRole: UserRole.OPERATIONAL,
+    path: '/module/pestcontrol',
+    status: ModuleStatus.NORMAL,
+    category: 'OPERATIONAL',
+    type: ModuleType.INTERNAL
+  },
+  {
     id: 'user-management',
     title: 'Gestão de Usuários',
     description: 'Controle de acesso, criação e auditoria de contas.',
@@ -323,5 +334,37 @@ export const HYDROSYS_SUBMODULES = [
     description: 'Visão geral de qualidade e conformidade.',
     iconName: 'PieChart',
     roles: [UserRole.ADMIN]
+  }
+];
+
+// Pest Control Sub-modules
+export const PESTCONTROL_SUBMODULES = [
+  {
+    id: 'pc-execucao',
+    title: 'Dedetização',
+    description: 'Registros de serviços e armadilhas.',
+    iconName: 'ShieldAlert',
+    roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
+  },
+  {
+    id: 'pc-config',
+    title: 'Configuração',
+    description: 'Regras e períodos de serviço.',
+    iconName: 'Settings',
+    roles: [UserRole.ADMIN]
+  },
+  {
+    id: 'pc-analytics',
+    title: 'Analytics',
+    description: 'Indicadores de controle.',
+    iconName: 'PieChart',
+    roles: [UserRole.ADMIN]
+  },
+  {
+    id: 'pc-help',
+    title: 'Ajuda',
+    description: 'Manuais e Procedimentos.',
+    iconName: 'HelpCircle',
+    roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
   }
 ];

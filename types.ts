@@ -205,3 +205,27 @@ export interface HydroReservatorio {
 export type HydroPoco = HydroReservatorio;
 export type HydroCisterna = HydroReservatorio;
 export type HydroCaixa = HydroReservatorio;
+
+// --- PEST CONTROL TYPES ---
+
+export interface PestControlSettings {
+  frequencyRato: number; // dias
+  frequencyMuricoca: number; // dias
+  frequencyBarata: number; // dias
+  defaultTechnician: string;
+}
+
+export interface PestControlEntry {
+  id: string;
+  sedeId: string;
+  item: string; // "Dedetização"
+  target: string; // "Rato", "Muriçoca", "Barata/Escorpião"
+  product: string; // "Racumin", "k-otrine"
+  frequency: string; // "Quinzenal", "Semanal" - Display purposes mostly, logic uses Settings
+  method: string; // "Isca nas caixas", "Maquina de fumaça"
+  technician: string; // "Fabio"
+  scheduledDate: string; // "Data Prevista" (YYYY-MM-DD)
+  performedDate?: string; // "Data Realizada" (YYYY-MM-DD) or null
+  observation?: string;
+  status: 'PENDENTE' | 'REALIZADO' | 'ATRASADO';
+}
