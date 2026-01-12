@@ -234,10 +234,10 @@ export const AdminUserManagement: React.FC = () => {
         if (created && created.password) {
            setCreatedUserPass(created.password); // Show password screen
            if (created.warning) setCreationWarning(created.warning);
-           addToast("Usuário criado. Copie a senha gerada.", "success");
+           addToast("Usuário criado com sucesso! Salve as credenciais exibidas.", "success");
         } else {
            setIsModalOpen(false); // Should rarely happen if no password returned
-           addToast("Usuário criado com sucesso.", "success");
+           addToast(`Usuário "${formData.name}" criado com sucesso!`, "success");
         }
     }
   };
@@ -462,11 +462,11 @@ export const AdminUserManagement: React.FC = () => {
                   {createdUserPass ? (
                       <div className="p-8 text-center bg-white dark:bg-[#0C0C0E]">
                           <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto mb-6 border border-emerald-500/30">
-                              <Key size={32} />
+                              <Check size={32} />
                           </div>
-                          <h4 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">Credenciais Geradas</h4>
+                          <h4 className="text-xl font-mono font-bold text-emerald-600 dark:text-emerald-500 mb-2 uppercase tracking-widest">Usuário Criado com Sucesso!</h4>
                           <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm font-mono">
-                              Copie a chave de acesso abaixo. <br/> 
+                              O cadastro foi realizado. Copie a chave de acesso abaixo. <br/> 
                               <span className="text-red-500 dark:text-red-400">Esta informação não será exibida novamente.</span>
                           </p>
                           

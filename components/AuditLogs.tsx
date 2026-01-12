@@ -123,7 +123,17 @@ export const AuditLogs: React.FC = () => {
 
       // Dropdowns
       const matchesModule = moduleFilter === 'ALL' || log.module === moduleFilter;
-      const matchesAction = actionFilter === 'ALL' || log.action === actionFilter;
+      
+      // Action Filter Logic (Enhanced for Groups)
+      let matchesAction = true;
+      if (actionFilter !== 'ALL') {
+          if (actionFilter === 'LOGIN') {
+              // Group LOGIN and AUTH
+              matchesAction = log.action === 'LOGIN' || log.action === 'AUTH';
+          } else {
+              matchesAction = log.action === actionFilter;
+          }
+      }
 
       // Date Range
       let matchesDate = true;
@@ -158,8 +168,22 @@ export const AuditLogs: React.FC = () => {
     currentPage * itemsPerPage
   );
 
-  const handleExport = () => {
+  const handleExport = async () => {
+      // 1. Export Data
       exportToCSV(filteredLogs, 'Audit_Logs_Export');
+      
+      // 2. Log the Export Action
+      if (currentUser) {
+          await logService.logAction(
+              currentUser, 
+              'AUDIT', 
+              'EXPORT', 
+              'Relatório CSV', 
+              `Exportou ${filteredLogs.length} registros.`
+          );
+          // 3. Refresh list to show the new log entry
+          loadData(currentUser);
+      }
   };
 
   const clearFilters = () => {
@@ -172,6 +196,16 @@ export const AuditLogs: React.FC = () => {
 
   // Extract Unique Modules for Filter
   const uniqueModules = Array.from(new Set(logs.map(l => l.module))).sort();
+
+  // --- CONFIGURAÇÃO VISUAL DOS FILTROS DE AÇÃO ---
+  const actionFiltersConfig = [
+      { id: 'ALL', label: 'Todas', icon: Activity, activeClass: 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' },
+      { id: 'CREATE', label: 'Criação', icon: CheckCircle2, activeClass: 'bg-emerald-600 text-white shadow-emerald-500/30 shadow-md' },
+      { id: 'UPDATE', label: 'Edição', icon: RefreshCw, activeClass: 'bg-blue-600 text-white shadow-blue-500/30 shadow-md' },
+      { id: 'DELETE', label: 'Exclusão', icon: AlertTriangle, activeClass: 'bg-red-600 text-white shadow-red-500/30 shadow-md' },
+      { id: 'LOGIN', label: 'Acesso', icon: Shield, activeClass: 'bg-purple-600 text-white shadow-purple-500/30 shadow-md' },
+      { id: 'EXPORT', label: 'Exportação', icon: Download, activeClass: 'bg-amber-500 text-white shadow-amber-500/30 shadow-md' },
+  ];
 
   return (
     <div className="relative min-h-screen space-y-6 pb-20">
@@ -219,7 +253,7 @@ export const AuditLogs: React.FC = () => {
           <StatCard label="Módulos" value={stats.modules} icon={Terminal} color="bg-purple-500" />
       </div>
 
-      {/* FILTER BAR */}
+      {/* FILTER BAR - PRIMARY */}
       <div className="bg-white dark:bg-[#111114] p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row gap-2">
           
           {/* Search */}
@@ -260,27 +294,15 @@ export const AuditLogs: React.FC = () => {
 
           <div className="h-px xl:h-auto w-full xl:w-px bg-slate-100 dark:bg-slate-800 mx-1"></div>
 
-          {/* Dropdowns */}
+          {/* Module Filter (Dropdown works better for potentially long list of modules) */}
           <div className="flex gap-2 p-2 xl:p-0 items-center">
               <select 
-                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase py-2 px-3 outline-none text-slate-600 dark:text-slate-300 focus:border-brand-500"
+                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase py-2 px-3 outline-none text-slate-600 dark:text-slate-300 focus:border-brand-500 min-w-[140px]"
                 value={moduleFilter}
                 onChange={e => { setModuleFilter(e.target.value); setCurrentPage(1); }}
               >
-                  <option value="ALL">Todos Módulos</option>
+                  <option value="ALL">Módulos: Todos</option>
                   {uniqueModules.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-              <select 
-                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase py-2 px-3 outline-none text-slate-600 dark:text-slate-300 focus:border-brand-500"
-                value={actionFilter}
-                onChange={e => { setActionFilter(e.target.value); setCurrentPage(1); }}
-              >
-                  <option value="ALL">Todas Ações</option>
-                  <option value="CREATE">CREATE</option>
-                  <option value="UPDATE">UPDATE</option>
-                  <option value="DELETE">DELETE</option>
-                  <option value="LOGIN">LOGIN</option>
-                  <option value="EXPORT">EXPORT</option>
               </select>
               
               {(searchTerm || moduleFilter !== 'ALL' || actionFilter !== 'ALL' || dateRange.start || dateRange.end) && (
@@ -289,6 +311,29 @@ export const AuditLogs: React.FC = () => {
                   </button>
               )}
           </div>
+      </div>
+
+      {/* FILTER BAR - ACTION TYPES (CHIPS) */}
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800">
+          {actionFiltersConfig.map(f => {
+              const isActive = actionFilter === f.id;
+              const Icon = f.icon;
+              return (
+                  <button
+                    key={f.id}
+                    onClick={() => { setActionFilter(f.id); setCurrentPage(1); }}
+                    className={`
+                        flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide transition-all border
+                        ${isActive 
+                            ? `${f.activeClass} border-transparent` 
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 hover:border-slate-300 dark:hover:border-slate-700 hover:text-slate-700 dark:hover:text-slate-300'}
+                    `}
+                  >
+                      <Icon size={14} />
+                      {f.label}
+                  </button>
+              );
+          })}
       </div>
 
       {/* TABLE */}

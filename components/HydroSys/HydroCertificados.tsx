@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Award, FileText, Calendar, Plus, Edit, X, History, Clock, 
   CheckCircle2, AlertTriangle, Activity, Filter, FlaskConical, 
-  Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Eye
+  Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Eye, ExternalLink, Maximize2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, HydroCertificado, UserRole, Sede } from '../../types';
@@ -80,6 +80,9 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const [historyItems, setHistoryItems] = useState<HydroCertificado[]>([]);
   const [historyTitle, setHistoryTitle] = useState('');
 
+  // --- PREVIEW MODAL STATE ---
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
   const canCreate = user.role !== UserRole.OPERATIONAL;
   const isAdmin = user.role === UserRole.ADMIN;
 
@@ -114,6 +117,19 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  // --- DOC PREVIEW LOGIC ---
+  const handlePreview = (url: string) => {
+      if (!url) return;
+      
+      let finalUrl = url;
+      // Transform Google Drive /view links to /preview for embedded clean view
+      if (url.includes('drive.google.com') && url.includes('/view')) {
+          finalUrl = url.replace(/\/view.*/, '/preview');
+      }
+      
+      setPreviewUrl(finalUrl);
+  };
 
   const handleNew = () => {
     setSheetMode('NEW');
@@ -322,8 +338,16 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                     
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
                                         <div className="flex gap-2">
-                                            {item.linkMicro && <a href={item.linkMicro} target="_blank" rel="noreferrer" className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro"><Microscope size={16}/></a>}
-                                            {item.linkFisico && <a href={item.linkFisico} target="_blank" rel="noreferrer" className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico"><FlaskConical size={16}/></a>}
+                                            {item.linkMicro && (
+                                                <button onClick={() => handlePreview(item.linkMicro)} className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro">
+                                                    <Microscope size={16}/>
+                                                </button>
+                                            )}
+                                            {item.linkFisico && (
+                                                <button onClick={() => handlePreview(item.linkFisico)} className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico">
+                                                    <FlaskConical size={16}/>
+                                                </button>
+                                            )}
                                         </div>
                                         <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
                                             <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
@@ -339,6 +363,44 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
             </div>
         )}
       </div>
+
+      {/* --- DOCUMENT PREVIEW MODAL (GOOGLE DRIVE VIEWER) --- */}
+      {previewUrl && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-2 md:p-6 animate-in fade-in duration-300">
+              <div className="w-full h-full max-w-6xl flex flex-col bg-white dark:bg-[#111114] rounded-2xl overflow-hidden relative shadow-2xl">
+                  {/* Header Overlay */}
+                  <div className="flex justify-between items-center p-4 bg-slate-900 text-white border-b border-white/10">
+                      <div className="flex items-center gap-3">
+                          <Eye size={20} className="text-cyan-400" />
+                          <h3 className="font-mono font-bold uppercase tracking-wider text-sm">Visualizador de Documento</h3>
+                      </div>
+                      <div className="flex items-center gap-3">
+                          <a 
+                            href={previewUrl.replace('/preview', '/view')} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-bold uppercase transition-colors"
+                          >
+                              <ExternalLink size={14} /> Abrir no Navegador
+                          </a>
+                          <button onClick={() => setPreviewUrl(null)} className="p-1.5 bg-white/10 hover:bg-red-500/80 rounded-lg transition-colors text-white">
+                              <X size={20} />
+                          </button>
+                      </div>
+                  </div>
+                  
+                  {/* Iframe Container */}
+                  <div className="flex-1 bg-slate-200 dark:bg-slate-900 relative">
+                      <iframe 
+                        src={previewUrl} 
+                        className="w-full h-full absolute inset-0 border-0" 
+                        allow="autoplay"
+                        title="Document Preview"
+                      />
+                  </div>
+              </div>
+          </div>
+      )}
 
       {/* MODAL HISTÓRICO */}
       {isHistoryOpen && (
@@ -376,12 +438,12 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                         <div className="flex flex-col gap-2">
                                             <p className="text-[10px] text-slate-400 font-mono italic">Validade: {new Date(h.validade).toLocaleDateString()}</p>
                                             
-                                            {/* VISIBLE LINKS AS BUTTONS */}
+                                            {/* VISIBLE LINKS AS PREVIEW BUTTONS */}
                                             <div className="flex gap-2 mt-2">
                                                 {h.linkMicro ? (
-                                                    <a href={h.linkMicro} target="_blank" rel="noreferrer" className="flex-1 py-1.5 px-3 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
+                                                    <button onClick={() => handlePreview(h.linkMicro)} className="flex-1 py-1.5 px-3 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
                                                         <Microscope size={12}/> Ver Micro
-                                                    </a>
+                                                    </button>
                                                 ) : (
                                                     <span className="flex-1 py-1.5 px-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-2 cursor-not-allowed">
                                                         <Microscope size={12}/> Sem Micro
@@ -389,9 +451,9 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                                 )}
                                                 
                                                 {h.linkFisico ? (
-                                                    <a href={h.linkFisico} target="_blank" rel="noreferrer" className="flex-1 py-1.5 px-3 rounded bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-cyan-100 transition-colors">
+                                                    <button onClick={() => handlePreview(h.linkFisico)} className="flex-1 py-1.5 px-3 rounded bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-cyan-100 transition-colors">
                                                         <FlaskConical size={12}/> Ver Físico
-                                                    </a>
+                                                    </button>
                                                 ) : (
                                                     <span className="flex-1 py-1.5 px-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-2 cursor-not-allowed">
                                                         <FlaskConical size={12}/> Sem Físico
