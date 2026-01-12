@@ -31,7 +31,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const userSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
 
-  // Real Data State
+  // Real Data State (Mantido para uso futuro ou report)
   const [stats, setStats] = useState({
       reservatorios: 0,
       certificados: 0,
@@ -92,10 +92,9 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               return map;
           }, new Map<string, HydroCertificado>()).values());
 
-          // 2. Unique Filtros (Latest per Patrimonio/Local - Assuming Patrimonio implies unique asset)
-          // Note: If filters are replaced, we usually update the date, but if new rows are created:
+          // 2. Unique Filtros (Latest per Patrimonio/Local)
           const uniqueFiltros = Array.from(filts.reduce((map, item) => {
-              const key = `${item.sedeId}-${item.patrimonio}`; // Or just patrimoine if unique global
+              const key = `${item.sedeId}-${item.patrimonio}`; 
               const existing = map.get(key);
               if (!existing || new Date(item.dataTroca) > new Date(existing.dataTroca)) {
                   map.set(key, item);
@@ -103,7 +102,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               return map;
           }, new Map<string, HydroFiltro>()).values());
 
-          // 3. Reservoirs (Usually static count, but good to be safe)
+          // 3. Reservoirs
           const totalReservatorios = pocos.length + cist.length + caixas.length;
           
           // 4. Calc Alerts on ACTIVE items only
@@ -194,22 +193,16 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       }
   };
 
-  const metrics = [
-    { id: 'reserv', label: 'Reservatórios', value: stats.reservatorios.toString().padStart(2, '0'), unit: 'ativos', status: 'normal', icon: Droplet },
-    { id: 'cert', label: 'Certificados', value: stats.certificados.toString().padStart(2, '0'), unit: 'vigentes', status: 'normal', icon: Award },
-    { id: 'filtros', label: 'Filtros', value: stats.filtros.toString().padStart(2, '0'), unit: 'un', status: 'normal', icon: Filter },
-    { id: 'alertas', label: 'Alertas', value: stats.alertas.toString().padStart(2, '0'), unit: 'pendentes', status: stats.alertas > 0 ? 'critical' : 'normal', icon: AlertTriangle },
-  ];
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
-      {/* Background and Header Code same as before... Keeping content concise for update */}
+      {/* Background Pattern */}
       <div className="fixed inset-0 -z-10 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-[#0A0A0C] dark:via-[#0D0D10] dark:to-[#0A0A0C]" />
         <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] text-slate-400 dark:text-cyan-500" style={{ backgroundImage: `linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)`, backgroundSize: '80px 80px' }} />
         <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.015] text-slate-400 dark:text-cyan-500" style={{ backgroundImage: `linear-gradient(currentColor 0.5px, transparent 0.5px), linear-gradient(90deg, currentColor 0.5px, transparent 0.5px)`, backgroundSize: '16px 16px' }} />
       </div>
 
+      {/* Top Status Bar */}
       <div className="relative z-10 border-b border-slate-200 dark:border-white/5 bg-white/50 dark:bg-black/20 backdrop-blur-sm">
         <div className="px-4 md:px-8 py-3 flex items-center justify-between">
           <div className="flex items-center gap-6">
@@ -268,31 +261,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           </div>
         </header>
 
-        {/* METRICS GRID */}
-        <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 transition-all duration-700 delay-100 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-          {metrics.map((metric) => {
-            const Icon = metric.icon;
-            const config = metric.status === 'critical' 
-                ? { border: 'border-red-500/20', bg: 'bg-red-500/5', text: 'text-red-600 dark:text-red-500', dot: 'bg-red-500 animate-pulse' }
-                : { border: 'border-emerald-500/20', bg: 'bg-emerald-500/5', text: 'text-emerald-600 dark:text-emerald-500', dot: 'bg-emerald-500' };
-            
-            return (
-              <div key={metric.id} className={`relative p-5 border bg-white dark:bg-transparent ${config.border} ${config.bg}`}>
-                <div className={`absolute top-0 right-0 w-2 h-2 ${config.dot}`} />
-                <div className="flex items-start justify-between mb-3">
-                  <Icon size={20} className={config.text} />
-                  <div className={`w-2 h-2 rounded-full ${config.dot}`} />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-3xl font-black text-slate-900 dark:text-white font-mono tabular-nums">{metric.value}</div>
-                  <div className="text-[10px] text-slate-500 dark:text-white/40 font-mono uppercase tracking-wider">
-                    {metric.label} <span className="text-slate-300 dark:text-white/20">/ {metric.unit}</span>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {/* METRICS GRID REMOVIDO CONFORME SOLICITADO */}
 
         {/* MODULES SECTION */}
         <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
