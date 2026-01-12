@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -189,11 +190,11 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
         </div>
 
         {/* CALENDAR */}
-        <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-6 md:p-8 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
-            <div className="flex items-center justify-between mb-8 relative z-10">
-                <button onClick={handlePrevMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronLeft size={20} /></button>
-                <h2 className="text-xl md:text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight font-mono">{monthName}</h2>
-                <button onClick={handleNextMonth} className="h-10 w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronRight size={20} /></button>
+        <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-4 md:p-8 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
+            <div className="flex items-center justify-between mb-6 md:mb-8 relative z-10">
+                <button onClick={handlePrevMonth} className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronLeft size={18} /></button>
+                <h2 className="text-lg md:text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight font-mono">{monthName}</h2>
+                <button onClick={handleNextMonth} className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronRight size={18} /></button>
             </div>
 
             {!selectedSedeId ? (
@@ -203,10 +204,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             ) : (
               <>
-                  <div className="grid grid-cols-7 gap-3 mb-4 text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-3 mb-2 md:mb-4 text-center text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                       <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
                   </div>
-                  <div className="grid grid-cols-7 gap-3 lg:gap-4 relative z-10">
+                  <div className="grid grid-cols-7 gap-1 sm:gap-3 lg:gap-4 relative z-10">
                       {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}
                       {Array.from({ length: daysInMonth }).map((_, i) => {
                           const day = i + 1;
@@ -243,24 +244,24 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                           }
 
                           return (
-                              <button key={day} onClick={() => handleDayClick(day)} className={`group h-24 md:h-28 rounded-xl flex flex-col justify-between p-3 border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${cardStyle}`}>
+                              <button key={day} onClick={() => handleDayClick(day)} className={`group h-auto min-h-[80px] md:h-28 rounded-lg md:rounded-xl flex flex-col justify-between p-1.5 md:p-3 border transition-all duration-200 active:scale-95 md:hover:-translate-y-1 md:hover:shadow-lg ${cardStyle}`}>
                                   <div className="flex justify-between items-start w-full">
-                                      <span className={`text-lg font-bold font-mono ${dateStr === todayStr ? 'text-slate-900 dark:text-white' : 'opacity-70'}`}>{day}</span>
-                                      <Icon size={16} className={iconColor} />
+                                      <span className={`text-xs md:text-lg font-bold font-mono ${dateStr === todayStr ? 'text-slate-900 dark:text-white' : 'opacity-70'}`}>{day}</span>
+                                      <div className={`${iconColor} scale-75 md:scale-100 origin-top-right`}><Icon size={16} /></div>
                                   </div>
-                                  <div className="w-full">
+                                  <div className="w-full mt-1">
                                       {entry ? (
                                           <div className="flex flex-col gap-1">
-                                              <div className={`flex justify-between text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${isSafe(entry.cl, settings.cloroMin, settings.cloroMax) ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
+                                              <div className={`flex justify-between items-center text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded font-bold uppercase ${isSafe(entry.cl, settings.cloroMin, settings.cloroMax) ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
                                                   <span>CL</span> <span>{entry.cl}</span>
                                               </div>
-                                              <div className={`flex justify-between text-[10px] px-1.5 py-0.5 rounded font-bold uppercase ${isSafe(entry.ph, settings.phMin, settings.phMax) ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
+                                              <div className={`flex justify-between items-center text-[8px] md:text-[10px] px-1 md:px-1.5 py-0.5 rounded font-bold uppercase ${isSafe(entry.ph, settings.phMin, settings.phMax) ? 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300' : 'bg-red-100 text-red-600'}`}>
                                                   <span>pH</span> <span>{entry.ph}</span>
                                               </div>
                                           </div>
                                       ) : dateStr < todayStr ? (
-                                          <div className="flex justify-center items-center h-full opacity-50">
-                                              <AlertTriangle size={16} className="text-red-400" />
+                                          <div className="flex justify-center items-center h-full opacity-50 pb-2 md:pb-0">
+                                              <AlertTriangle size={12} className="text-red-400 md:w-4 md:h-4" />
                                           </div>
                                       ) : null}
                                   </div>
@@ -270,22 +271,22 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                   </div>
                   
                   {/* LEGEND */}
-                  <div className="mt-8 flex flex-wrap justify-center gap-6 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-6">
+                  <div className="mt-6 md:mt-8 flex flex-wrap justify-center gap-4 md:gap-6 text-[9px] md:text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4 md:pt-6">
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-500">
+                            <div className="w-3 h-3 md:w-4 md:h-4 rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-500">
                                 <CheckCircle2 size={10} />
                             </div>
                             <span>Realizado (OK)</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500">
+                            <div className="w-3 h-3 md:w-4 md:h-4 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500">
                                 <AlertTriangle size={10} />
                             </div>
                             <span>Pendente / Irregular</span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="w-4 h-4 rounded border-2 border-cyan-500 flex items-center justify-center">
-                                <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
+                            <div className="w-3 h-3 md:w-4 md:h-4 rounded border-2 border-cyan-500 flex items-center justify-center">
+                                <div className="w-1 md:w-1.5 h-1 md:h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
                             </div>
                             <span>Hoje</span>
                         </div>

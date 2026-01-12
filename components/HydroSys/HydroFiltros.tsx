@@ -13,6 +13,9 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const [data, setData] = useState<HydroFiltro[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   
+  // Filters
+  const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
+
   // Modals
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -42,6 +45,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
+  const isAdmin = user.role === UserRole.ADMIN;
   
   const getDaysRemaining = (dateStr: string) => {
     if (!dateStr) return 999;
@@ -111,6 +115,11 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
   const confirmDelete = async () => { if (itemToDelete) { await hydroService.deleteFiltro(itemToDelete.id); await loadData(); setIsDeleteModalOpen(false); } };
 
+  const filteredData = data.filter(item => {
+      if (isAdmin && selectedSedeFilter && item.sedeId !== selectedSedeFilter) return false;
+      return true;
+  });
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
       <div className="fixed inset-0 -z-10 pointer-events-none">
@@ -135,19 +144,44 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                     </div>
                 </div>
-                {canManage && (
-                    <button onClick={handleAddNew} className="w-full md:w-auto h-12 px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
-                        <Plus size={18} /> NOVO FILTRO
-                    </button>
-                )}
+                
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                    {/* FILTRO DE SEDE (ADMIN ONLY) */}
+                    {isAdmin && (
+                        <div className="relative group w-full sm:w-auto">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                <Building2 size={14} />
+                            </div>
+                            <select
+                                className="w-full sm:w-48 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none uppercase transition-all hover:border-cyan-500/30"
+                                value={selectedSedeFilter}
+                                onChange={(e) => setSelectedSedeFilter(e.target.value)}
+                            >
+                                <option value="">Todas as Sedes</option>
+                                {availableSedes.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
+                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                                <Filter size={12} />
+                            </div>
+                        </div>
+                    )}
+
+                    {canManage && (
+                        <button onClick={handleAddNew} className="w-full sm:w-auto h-12 px-6 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
+                            <Plus size={18} /> NOVO FILTRO
+                        </button>
+                    )}
+                </div>
             </div>
         </header>
 
-        {data.length === 0 ? (
-            <EmptyState icon={Filter} title="Nenhum Filtro" description="Não há filtros cadastrados nesta unidade." actionLabel={canManage ? "Cadastrar Agora" : undefined} onAction={canManage ? handleAddNew : undefined} />
+        {filteredData.length === 0 ? (
+            <EmptyState icon={Filter} title="Nenhum Filtro Encontrado" description={selectedSedeFilter ? "Não há filtros cadastrados nesta unidade." : "Nenhum registro disponível."} actionLabel={canManage ? "Cadastrar Agora" : undefined} onAction={canManage ? handleAddNew : undefined} />
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                {data.map(item => {
+                {filteredData.map(item => {
                     const days = getDaysRemaining(item.proximaTroca);
                     const status = getStatus(days);
                     const StatusIcon = status.icon;

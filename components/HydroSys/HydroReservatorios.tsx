@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { 
   Droplet, Edit, X, Search, ArrowLeft,
   Waves, Box, History, User as UserIcon, ChevronRight,
-  Download, Activity, Filter, Settings, FileText, Calendar, Lock, RotateCw
+  Download, Activity, Filter, Settings, FileText, Calendar, Lock, RotateCw, Building2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings } from '../../types';
+import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings, Sede } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { orgService } from '../../services/orgService';
 import { EmptyState } from '../Shared/EmptyState';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
@@ -18,7 +19,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [pocos, setPocos] = useState<HydroPoco[]>([]);
   const [cisternas, setCisternas] = useState<HydroCisterna[]>([]);
   const [caixas, setCaixas] = useState<HydroCaixa[]>([]);
+  
+  // Filters
   const [filterText, setFilterText] = useState('');
+  const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
+  const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   
   // Use a more robust default settings object
   const [settings, setSettings] = useState<HydroSettings>({
@@ -39,7 +44,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [editItem, setEditItem] = useState<any>(null);
   const [historyItem, setHistoryItem] = useState<any>(null);
 
-  useEffect(() => { refreshData(); }, [user]);
+  const isAdmin = user.role === UserRole.ADMIN;
+
+  useEffect(() => { refreshData(); loadSedes(); }, [user]);
+
+  const loadSedes = () => {
+      const allSedes = orgService.getSedes();
+      setAvailableSedes(user.role === UserRole.ADMIN ? allSedes : allSedes.filter(s => (user.sedeIds || []).includes(s.id)));
+  };
 
   const refreshData = async () => {
     setPocos(await hydroService.getPocos(user));
@@ -121,8 +133,19 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   );
 
   const filterList = (list: any[]) => {
-      if (!filterText) return list;
-      return list.filter(i => i.local.toLowerCase().includes(filterText.toLowerCase()) || i.sedeId.toLowerCase().includes(filterText.toLowerCase()));
+      let result = list;
+      
+      // Filter by Sede (Admin)
+      if (isAdmin && selectedSedeFilter) {
+          result = result.filter(i => i.sedeId === selectedSedeFilter);
+      }
+
+      // Filter by Text
+      if (filterText) {
+          result = result.filter(i => i.local.toLowerCase().includes(filterText.toLowerCase()) || i.sedeId.toLowerCase().includes(filterText.toLowerCase()));
+      }
+      
+      return result;
   };
 
   const renderTimelineDate = (label: string, date: string, status?: 'done' | 'pending' | 'future') => (
@@ -148,8 +171,8 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
             {/* HEADER */}
             <header className="relative overflow-hidden border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#111114]/90 backdrop-blur-sm rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-                <div className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div className="space-y-4 w-full md:w-auto">
+                <div className="p-6 md:p-8 flex flex-col lg:flex-row justify-between items-center gap-6">
+                    <div className="space-y-4 w-full lg:w-auto">
                         <button onClick={() => navigate('/module/hydrosys')} className="group flex items-center gap-2 text-slate-500 dark:text-white/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all text-xs font-mono uppercase tracking-widest">
                             <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Voltar ao Painel
                         </button>
@@ -167,29 +190,54 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                         </div>
                     </div>
-                    <div className="w-full md:w-64 relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar Local..." 
-                            className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-mono"
-                            value={filterText}
-                            onChange={e => setFilterText(e.target.value)}
-                        />
+                    
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                        {/* FILTRO DE SEDE (ADMIN ONLY) */}
+                        {isAdmin && (
+                            <div className="relative group w-full sm:w-auto">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                    <Building2 size={14} />
+                                </div>
+                                <select
+                                    className="w-full sm:w-48 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none uppercase transition-all hover:border-cyan-500/30"
+                                    value={selectedSedeFilter}
+                                    onChange={(e) => setSelectedSedeFilter(e.target.value)}
+                                >
+                                    <option value="">Todas as Sedes</option>
+                                    {availableSedes.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                                    <Filter size={12} />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="w-full sm:w-64 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                            <input 
+                                type="text" 
+                                placeholder="Buscar Local..." 
+                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-mono uppercase"
+                                value={filterText}
+                                onChange={e => setFilterText(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
             </header>
 
             {/* TABS */}
             <div className="flex flex-col md:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                <TabButton id="pocos" label="Poços Artesianos" count={pocos.length} icon={Activity} />
-                <TabButton id="cisternas" label="Cisternas" count={cisternas.length} icon={Waves} />
-                <TabButton id="caixas" label="Caixas D'água" count={caixas.length} icon={Box} />
+                <TabButton id="pocos" label="Poços Artesianos" count={filterList(pocos).length} icon={Activity} />
+                <TabButton id="cisternas" label="Cisternas" count={filterList(cisternas).length} icon={Waves} />
+                <TabButton id="caixas" label="Caixas D'água" count={filterList(caixas).length} icon={Box} />
             </div>
 
             {/* LIST */}
             {data.length === 0 ? (
-                <EmptyState icon={Droplet} title="Nenhum registro" description={`Não encontramos ${activeTab} na busca.`} />
+                <EmptyState icon={Droplet} title="Nenhum registro" description={selectedSedeFilter ? `Não encontramos ${activeTab} nesta unidade.` : `Não encontramos ${activeTab} na busca.`} />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
                     {data.map((item: any) => {

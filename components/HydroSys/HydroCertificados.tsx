@@ -204,7 +204,9 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     })
     .sort((a, b) => new Date(b.validade).getTime() - new Date(a.validade).getTime());
 
-  const countByStatus = (status: string) => activeItems.filter(i => getDynamicStatus(getDaysRemaining(i.validade)) === status).length;
+  // Count filtered for stats if filter is applied, or all if no filter
+  const itemsToCount = isAdmin && selectedSedeFilter ? activeItems.filter(i => i.sedeId === selectedSedeFilter) : activeItems;
+  const countByStatus = (status: string) => itemsToCount.filter(i => getDynamicStatus(getDaysRemaining(i.validade)) === status).length;
 
   return (
     <div className="relative min-h-screen bg-slate-50 dark:bg-[#0A0A0C]">
@@ -224,18 +226,43 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                 </div>
             </div>
-            {canCreate && (
-                <button onClick={handleNew} className="px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
-                    <Plus size={18} /> NOVO LAUDO
-                </button>
-            )}
+            
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+                {/* FILTRO DE SEDE (ADMIN ONLY) */}
+                {isAdmin && (
+                    <div className="relative group w-full sm:w-auto">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <Building2 size={14} />
+                        </div>
+                        <select
+                            className="w-full sm:w-48 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none uppercase transition-all hover:border-cyan-500/30"
+                            value={selectedSedeFilter}
+                            onChange={(e) => setSelectedSedeFilter(e.target.value)}
+                        >
+                            <option value="">Todas as Sedes</option>
+                            {availableSedes.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                            ))}
+                        </select>
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
+                            <Filter size={12} />
+                        </div>
+                    </div>
+                )}
+
+                {canCreate && (
+                    <button onClick={handleNew} className="w-full sm:w-auto px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
+                        <Plus size={18} /> <span className="hidden sm:inline">NOVO LAUDO</span><span className="sm:hidden">NOVO</span>
+                    </button>
+                )}
+            </div>
         </header>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard title="Vigentes" value={countByStatus('VIGENTE')} icon={<CheckCircle2 size={20}/>} gradient="from-emerald-500 to-teal-500" isActive={filterStatus === 'VIGENTE'} onClick={() => setFilterStatus(filterStatus === 'VIGENTE' ? null : 'VIGENTE')} />
             <KPICard title="Vencendo" value={countByStatus('PROXIMO')} icon={<Clock size={20}/>} gradient="from-amber-500 to-orange-500" isActive={filterStatus === 'PROXIMO'} onClick={() => setFilterStatus(filterStatus === 'PROXIMO' ? null : 'PROXIMO')} />
             <KPICard title="Vencidos" value={countByStatus('VENCIDO')} icon={<AlertTriangle size={20}/>} gradient="from-red-500 to-rose-500" isActive={filterStatus === 'VENCIDO'} onClick={() => setFilterStatus(filterStatus === 'VENCIDO' ? null : 'VENCIDO')} />
-            <KPICard title="Total" value={activeItems.length} icon={<Activity size={20}/>} gradient="from-slate-500 to-slate-600" isActive={filterStatus === null} onClick={() => setFilterStatus(null)} />
+            <KPICard title="Total" value={itemsToCount.length} icon={<Activity size={20}/>} gradient="from-slate-500 to-slate-600" isActive={filterStatus === null} onClick={() => setFilterStatus(null)} />
         </div>
 
         {isLoading ? (
@@ -244,61 +271,71 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
             </div>
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                {filteredData.map((item: HydroCertificado) => {
-                    const daysLeft = getDaysRemaining(item.validade);
-                    const displayStatus = getDynamicStatus(daysLeft);
-                    const cfg = getStatusConfig(displayStatus);
-                    const isUrgent = displayStatus !== 'VIGENTE';
+                {filteredData.length === 0 ? (
+                    <div className="col-span-full py-12">
+                        <EmptyState 
+                            icon={Filter} 
+                            title="Nenhum certificado encontrado" 
+                            description={selectedSedeFilter ? "Não há laudos cadastrados para esta unidade com os filtros atuais." : "Ajuste os filtros ou cadastre um novo laudo."}
+                        />
+                    </div>
+                ) : (
+                    filteredData.map((item: HydroCertificado) => {
+                        const daysLeft = getDaysRemaining(item.validade);
+                        const displayStatus = getDynamicStatus(daysLeft);
+                        const cfg = getStatusConfig(displayStatus);
+                        const isUrgent = displayStatus !== 'VIGENTE';
 
-                    return (
-                        <div key={item.id} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full shadow-sm hover:border-cyan-500/30 transition-all">
-                            <div className="flex justify-between items-start mb-5">
-                                <div className="flex items-center gap-3">
-                                    <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">{item.sedeId}</div>
-                                    <div><h3 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{item.parceiro}</h3><p className="text-[10px] text-slate-500 font-mono">{item.semestre}</p></div>
+                        return (
+                            <div key={item.id} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full shadow-sm hover:border-cyan-500/30 transition-all">
+                                <div className="flex justify-between items-start mb-5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">{item.sedeId}</div>
+                                        <div><h3 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{item.parceiro}</h3><p className="text-[10px] text-slate-500 font-mono">{item.semestre}</p></div>
+                                    </div>
+                                    <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${cfg.bg} ${cfg.text}`}>{cfg.label}</div>
                                 </div>
-                                <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${cfg.bg} ${cfg.text}`}>{cfg.label}</div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl p-3 border border-slate-100 dark:border-slate-800/50 text-center">
-                                <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
-                                <div>
-                                    <p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Vencimento</p>
-                                    <p className={`text-xs font-mono font-bold ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                        {daysLeft < 0 ? `VENCIDO (${Math.abs(daysLeft)}d)` : daysLeft === 0 ? 'HOJE' : `${daysLeft} dias`}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="mt-auto space-y-4">
-                                {canCreate && (
-                                    <button 
-                                        onClick={() => handleRenovar(item)} 
-                                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2
-                                        ${isUrgent 
-                                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/30 animate-pulse' 
-                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
-                                    >
-                                        <RotateCw size={18} className={isUrgent ? "animate-spin-slow" : ""} /> 
-                                        {isUrgent ? 'Renovar Agora' : 'Antecipar Renovação'}
-                                    </button>
-                                )}
                                 
-                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
-                                    <div className="flex gap-2">
-                                        {item.linkMicro && <a href={item.linkMicro} target="_blank" rel="noreferrer" className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro"><Microscope size={16}/></a>}
-                                        {item.linkFisico && <a href={item.linkFisico} target="_blank" rel="noreferrer" className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico"><FlaskConical size={16}/></a>}
+                                <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl p-3 border border-slate-100 dark:border-slate-800/50 text-center">
+                                    <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
+                                    <div>
+                                        <p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Vencimento</p>
+                                        <p className={`text-xs font-mono font-bold ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                            {daysLeft < 0 ? `VENCIDO (${Math.abs(daysLeft)}d)` : daysLeft === 0 ? 'HOJE' : `${daysLeft} dias`}
+                                        </p>
                                     </div>
-                                    <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
-                                        <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
-                                        {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
+                                </div>
+
+                                <div className="mt-auto space-y-4">
+                                    {canCreate && (
+                                        <button 
+                                            onClick={() => handleRenovar(item)} 
+                                            className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2
+                                            ${isUrgent 
+                                                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/30 animate-pulse' 
+                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                                        >
+                                            <RotateCw size={18} className={isUrgent ? "animate-spin-slow" : ""} /> 
+                                            {isUrgent ? 'Renovar Agora' : 'Antecipar Renovação'}
+                                        </button>
+                                    )}
+                                    
+                                    <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
+                                        <div className="flex gap-2">
+                                            {item.linkMicro && <a href={item.linkMicro} target="_blank" rel="noreferrer" className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro"><Microscope size={16}/></a>}
+                                            {item.linkFisico && <a href={item.linkFisico} target="_blank" rel="noreferrer" className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico"><FlaskConical size={16}/></a>}
+                                        </div>
+                                        <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
+                                            <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
+                                            <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
+                                            {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                )}
             </div>
         )}
       </div>
