@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +17,9 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const [settings, setSettings] = useState<HydroSettings>({
     validadeCertificadoMeses: 6,
     validadeFiltroMeses: 6,
-    validadeLimpezaMeses: 6,
+    validadeLimpezaCaixa: 6,
+    validadeLimpezaCisterna: 6,
+    validadeLimpezaPoco: 6,
     cloroMin: 1.0,
     cloroMax: 3.0,
     phMin: 7.4,

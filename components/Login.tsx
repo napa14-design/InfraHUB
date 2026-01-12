@@ -30,10 +30,27 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setMounted(true);
   }, []);
 
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+
+    if (!validateEmail(email)) {
+        setError('Por favor, insira um endereço de e-mail válido.');
+        setIsLoading(false);
+        return;
+    }
+
+    if (password.length < 6) {
+        setError('A senha deve ter no mínimo 6 caracteres.');
+        setIsLoading(false);
+        return;
+    }
 
     try {
       const result = await authService.login(email, password);
@@ -57,6 +74,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      
+      if (!validateEmail(email)) {
+          setError('Por favor, insira um e-mail válido para recuperação.');
+          return;
+      }
+
       setIsLoading(true);
       await authService.resetPasswordRequest(email);
       setIsLoading(false);
@@ -67,6 +90,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       setShowForgot(false);
       setIsResetSent(false); // Reset state for next time
       setEmail('');
+      setError('');
   };
 
   return (
@@ -399,7 +423,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
                 {/* Error Message */}
                 {error && (
-                  <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400">
+                  <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 animate-in fade-in slide-in-from-top-2">
                     <AlertCircle size={18} className="flex-shrink-0" />
                     <span className="text-sm font-mono">{error}</span>
                   </div>
@@ -511,6 +535,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             placeholder="usuario@empresa.com"
                             />
                         </div>
+                        {error && <p className="text-xs text-red-500 font-mono">{error}</p>}
                         <button
                           type="submit"
                           disabled={isLoading}

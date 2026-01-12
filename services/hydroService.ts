@@ -130,7 +130,10 @@ const mapReservatorioToDB = (app: any) => ({
 const mapSettingsFromDB = (db: any): HydroSettings => ({
     validadeCertificadoMeses: db.validade_certificado_meses,
     validadeFiltroMeses: db.validade_filtro_meses,
-    validadeLimpezaMeses: db.validade_limpeza_meses,
+    // Novos campos (com fallback para compatibilidade retroativa)
+    validadeLimpezaCaixa: db.validade_limpeza_caixa || db.validade_limpeza_meses || 6,
+    validadeLimpezaCisterna: db.validade_limpeza_cisterna || db.validade_limpeza_meses || 6,
+    validadeLimpezaPoco: db.validade_limpeza_poco || db.validade_limpeza_meses || 6,
     cloroMin: db.cloro_min,
     cloroMax: db.cloro_max,
     phMin: db.ph_min,
@@ -141,7 +144,12 @@ const mapSettingsToDB = (app: HydroSettings) => ({
     id: 'default',
     validade_certificado_meses: app.validadeCertificadoMeses,
     validade_filtro_meses: app.validadeFiltroMeses,
-    validade_limpeza_meses: app.validadeLimpezaMeses,
+    // Campos específicos
+    validade_limpeza_caixa: app.validadeLimpezaCaixa,
+    validade_limpeza_cisterna: app.validadeLimpezaCisterna,
+    validade_limpeza_poco: app.validadeLimpezaPoco,
+    // Mantém o antigo por compatibilidade por enquanto
+    validade_limpeza_meses: app.validadeLimpezaCaixa, 
     cloro_min: app.cloroMin,
     cloro_max: app.cloroMax,
     ph_min: app.phMin,
@@ -316,7 +324,9 @@ export const hydroService = {
         return {
             validadeCertificadoMeses: 6,
             validadeFiltroMeses: 6,
-            validadeLimpezaMeses: 6,
+            validadeLimpezaCaixa: 6,
+            validadeLimpezaCisterna: 6,
+            validadeLimpezaPoco: 6,
             cloroMin: 1.0,
             cloroMax: 3.0,
             phMin: 7.4,

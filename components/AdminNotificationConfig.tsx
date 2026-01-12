@@ -4,11 +4,13 @@ import { ArrowLeft, Bell, Save, AlertTriangle, AlertCircle, RefreshCw, CheckCirc
 import { useNavigate } from 'react-router-dom';
 import { NotificationRule } from '../types';
 import { configService } from '../services/configService';
+import { useToast } from './Shared/ToastContext';
 
 type ModuleTab = 'hydrosys' | 'pestcontrol' | 'system';
 
 export const AdminNotificationConfig: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<ModuleTab>('hydrosys');
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
@@ -31,6 +33,18 @@ export const AdminNotificationConfig: React.FC = () => {
   };
 
   const handleSave = async () => {
+    // Validation Logic
+    for (const r of rules) {
+        if (r.enabled && r.warningDays <= r.criticalDays) {
+            addToast(`Regra "${r.name}": Dias de Aviso deve ser MAIOR que Dias Críticos.`, "warning");
+            return;
+        }
+        if (r.warningDays < 0 || r.criticalDays < 0) {
+            addToast(`Regra "${r.name}": Os dias não podem ser negativos.`, "warning");
+            return;
+        }
+    }
+
     setIsSaving(true);
     setSaveStatus('IDLE');
     setErrorMessage('');
@@ -49,9 +63,11 @@ export const AdminNotificationConfig: React.FC = () => {
         setSaveStatus('ERROR');
         const msg = typeof errorFound === 'string' ? errorFound : JSON.stringify(errorFound);
         setErrorMessage(msg);
+        addToast("Erro ao salvar regras.", "error");
     } else {
         setSaveStatus('SUCCESS');
         setHasChanges(false);
+        addToast("Regras atualizadas com sucesso!", "success");
         setTimeout(() => setSaveStatus('IDLE'), 3000);
     }
   };
@@ -60,6 +76,7 @@ export const AdminNotificationConfig: React.FC = () => {
       if(confirm('Isso irá redefinir todas as regras para o padrão do sistema. Continuar?')) {
           setRules(await configService.resetDefaults());
           setHasChanges(false);
+          addToast("Regras redefinidas para o padrão.", "info");
       }
   }
 

@@ -6,9 +6,11 @@ import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types
 import { authService } from '../services/authService';
 import { orgService } from '../services/orgService';
 import { notificationService } from '../services/notificationService';
+import { useToast } from './Shared/ToastContext';
 
 export const AdminUserManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const currentUser = authService.getCurrentUser(); // Get logged in user
   
   const [users, setUsers] = useState<User[]>([]);
@@ -89,7 +91,7 @@ export const AdminUserManagement: React.FC = () => {
   const handleStartEdit = async (user: User) => {
       // Permission Check: Gestor cannot edit Admin
       if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
-          alert("Você não tem permissão para editar Administradores.");
+          addToast("Você não tem permissão para editar Administradores.", "error");
           return;
       }
 
@@ -114,11 +116,11 @@ export const AdminUserManagement: React.FC = () => {
 
   const requestDelete = (targetUser: User) => {
     if (targetUser.id === currentUser?.id) {
-        alert("Você não pode excluir a si mesmo.");
+        addToast("Você não pode excluir a si mesmo.", "warning");
         return;
     }
     if (currentUser?.role !== UserRole.ADMIN && targetUser.role === UserRole.ADMIN) {
-        alert("Você não tem permissão para excluir Administradores.");
+        addToast("Você não tem permissão para excluir Administradores.", "error");
         return;
     }
     setUserToDelete(targetUser);
@@ -143,12 +145,53 @@ export const AdminUserManagement: React.FC = () => {
       loadData();
       setDeleteModalOpen(false);
       setUserToDelete(null);
+      addToast("Usuário removido com sucesso.", "success");
     }
+  };
+
+  const validateForm = () => {
+      if (!formData.name || formData.name.trim().length < 3) {
+          addToast("Nome deve ter no mínimo 3 caracteres.", "warning");
+          return false;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!formData.email || !emailRegex.test(formData.email)) {
+          addToast("E-mail inválido.", "warning");
+          return false;
+      }
+      
+      // Role validation
+      if (!formData.role) {
+          addToast("Selecione um nível de acesso.", "warning");
+          return false;
+      }
+
+      // Hierarchy validation
+      if (formData.role !== UserRole.ADMIN) {
+          if (!formData.organizationId) {
+              addToast("Usuários Operacionais e Gestores devem pertencer a uma Instituição.", "warning");
+              return false;
+          }
+          if (formData.role === UserRole.OPERATIONAL && (!formData.sedeIds || formData.sedeIds.length === 0)) {
+              addToast("Usuários Operacionais devem estar vinculados a pelo menos uma Unidade/Sede.", "warning");
+              return false;
+          }
+      }
+
+      // Manual Password validation on creation
+      if (!isEditing && manualPassword && manualPassword.length < 6) {
+          addToast("A senha manual deve ter no mínimo 6 caracteres.", "warning");
+          return false;
+      }
+
+      return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!validateForm()) return;
+
     if (isEditing && editingId) {
         // UPDATE
         await authService.updateUser(editingId, formData);
@@ -165,6 +208,7 @@ export const AdminUserManagement: React.FC = () => {
 
         loadData();
         setIsModalOpen(false); // Close immediately on edit
+        addToast("Usuário atualizado com sucesso.", "success");
     } else {
         // CREATE
         // Pass manualPassword if set, otherwise undefined (auto-generate)
@@ -172,7 +216,7 @@ export const AdminUserManagement: React.FC = () => {
         
         // Handle Errors from Service
         if (created.error) {
-            alert(`Falha ao criar usuário: ${created.error}`);
+            addToast(`Falha ao criar usuário: ${created.error}`, "error");
             return; // STOP execution, keep modal open
         }
         
@@ -190,8 +234,10 @@ export const AdminUserManagement: React.FC = () => {
         if (created && created.password) {
            setCreatedUserPass(created.password); // Show password screen
            if (created.warning) setCreationWarning(created.warning);
+           addToast("Usuário criado. Copie a senha gerada.", "success");
         } else {
            setIsModalOpen(false); // Should rarely happen if no password returned
+           addToast("Usuário criado com sucesso.", "success");
         }
     }
   };
@@ -209,6 +255,7 @@ export const AdminUserManagement: React.FC = () => {
   const toggleStatus = async (user: User) => {
     // Permission check
     if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
+        addToast("Ação não permitida em Administradores.", "error");
         return; 
     }
     const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -228,6 +275,7 @@ export const AdminUserManagement: React.FC = () => {
     }
 
     loadData();
+    addToast(`Status de ${user.name} alterado para ${newStatus}.`, "info");
   };
 
   // --- MULTI-SELECT HELPER ---
@@ -424,7 +472,7 @@ export const AdminUserManagement: React.FC = () => {
                                   {createdUserPass}
                               </code>
                               <button 
-                                onClick={() => { navigator.clipboard.writeText(createdUserPass); alert("COPIADO"); }} 
+                                onClick={() => { navigator.clipboard.writeText(createdUserPass); addToast("Copiado para área de transferência", "success"); }} 
                                 className="text-emerald-600 hover:text-emerald-700 dark:hover:text-emerald-400 transition-colors"
                               >
                                   <Copy size={20} />

@@ -82,6 +82,31 @@ ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Read Rules" ON notification_rules FOR SELECT USING (true);
 CREATE POLICY "Public Write Rules" ON notification_rules FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Update Rules" ON notification_rules FOR UPDATE USING (true);
+
+-- =============================================
+-- 4. HYDRO SETTINGS (ATUALIZADO)
+-- =============================================
+CREATE TABLE IF NOT EXISTS hydro_settings (
+  id TEXT PRIMARY KEY DEFAULT 'default',
+  validade_certificado_meses INTEGER DEFAULT 6,
+  validade_filtro_meses INTEGER DEFAULT 6,
+  -- Campos novos para reservatórios específicos
+  validade_limpeza_caixa INTEGER DEFAULT 6,
+  validade_limpeza_cisterna INTEGER DEFAULT 6,
+  validade_limpeza_poco INTEGER DEFAULT 6,
+  -- Mantendo legado por segurança
+  validade_limpeza_meses INTEGER DEFAULT 6,
+  
+  cloro_min FLOAT DEFAULT 1.0,
+  cloro_max FLOAT DEFAULT 3.0,
+  ph_min FLOAT DEFAULT 7.4,
+  ph_max FLOAT DEFAULT 7.6
+);
+
+ALTER TABLE hydro_settings ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Hydro Settings" ON hydro_settings FOR SELECT USING (true);
+CREATE POLICY "Public Update Hydro Settings" ON hydro_settings FOR UPDATE USING (true);
+CREATE POLICY "Public Insert Hydro Settings" ON hydro_settings FOR INSERT WITH CHECK (true);
 `;
 
 export const SEED_SQL = `
@@ -97,6 +122,10 @@ VALUES (
   '{"Rato / Roedores": 15, "Barata / Escorpião": 15, "Muriçoca / Mosquitos": 7, "Cupim": 180, "Formiga": 30, "Carrapato": 30}'::jsonb,
   '{}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO hydro_settings (id, validade_limpeza_caixa, validade_limpeza_cisterna, validade_limpeza_poco)
+VALUES ('default', 6, 6, 6)
+ON CONFLICT (id) DO NOTHING;
 
 -- Inserir regras padrão de notificação
 INSERT INTO notification_rules (id, module_id, name, description, warning_days, critical_days, enabled) VALUES

@@ -19,10 +19,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [cisternas, setCisternas] = useState<HydroCisterna[]>([]);
   const [caixas, setCaixas] = useState<HydroCaixa[]>([]);
   const [filterText, setFilterText] = useState('');
+  
+  // Use a more robust default settings object
   const [settings, setSettings] = useState<HydroSettings>({
     validadeCertificadoMeses: 6,
     validadeFiltroMeses: 6,
-    validadeLimpezaMeses: 6,
+    validadeLimpezaCaixa: 6,
+    validadeLimpezaCisterna: 6,
+    validadeLimpezaPoco: 6,
     cloroMin: 1.0,
     cloroMax: 3.0,
     phMin: 7.4,
@@ -70,9 +74,15 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleDateChange = (field: 'LIMPEZA' | 'FILTRO', dateValue: string) => {
-      const duration = field === 'LIMPEZA' 
-        ? (settings?.validadeLimpezaMeses || 6) 
-        : (settings?.validadeFiltroMeses || 6);
+      // Determine duration based on type specific settings
+      let duration = 6;
+      if (field === 'LIMPEZA') {
+          if (editItem.tipo === 'POCO') duration = settings.validadeLimpezaPoco || 6;
+          else if (editItem.tipo === 'CISTERNA') duration = settings.validadeLimpezaCisterna || 6;
+          else duration = settings.validadeLimpezaCaixa || 6; // Default to Caixa
+      } else {
+          duration = settings?.validadeFiltroMeses || 6;
+      }
 
       const nextDate = calculateNextDate(dateValue, duration);
       const status = determineStatus(nextDate);

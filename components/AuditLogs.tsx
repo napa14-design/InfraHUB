@@ -1,66 +1,156 @@
 
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, Search, Filter, Shield, Clock, User, Download } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  ArrowLeft, Search, Filter, Shield, Clock, User, Download, 
+  Calendar, RefreshCw, ChevronLeft, ChevronRight, Terminal, 
+  Activity, AlertTriangle, CheckCircle2, Database, X 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LogEntry } from '../types';
 import { logService } from '../services/logService';
 import { exportToCSV } from '../utils/csvExport';
+import { TableRowSkeleton } from './Shared/Skeleton';
+
+// --- COMPONENTS ---
+
+const StatCard = ({ label, value, icon: Icon, color, trend }: any) => (
+  <div className="bg-white dark:bg-[#111114] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+    <div>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
+      <h3 className="text-2xl font-black text-slate-900 dark:text-white font-mono">{value}</h3>
+    </div>
+    <div className={`p-3 rounded-lg ${color} bg-opacity-10 text-opacity-100`}>
+      <Icon size={20} className={color.replace('bg-', 'text-').replace('/10', '')} />
+    </div>
+  </div>
+);
+
+const ActionBadge = ({ action }: { action: string }) => {
+  let style = 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
+  let icon = <Activity size={10} />;
+
+  switch (action) {
+    case 'CREATE':
+      style = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20';
+      icon = <CheckCircle2 size={10} />;
+      break;
+    case 'UPDATE':
+      style = 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border-blue-200 dark:border-blue-500/20';
+      icon = <RefreshCw size={10} />;
+      break;
+    case 'DELETE':
+      style = 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400 border-red-200 dark:border-red-500/20';
+      icon = <AlertTriangle size={10} />;
+      break;
+    case 'LOGIN':
+    case 'AUTH':
+      style = 'bg-purple-50 text-purple-700 dark:bg-purple-500/10 dark:text-purple-400 border-purple-200 dark:border-purple-500/20';
+      icon = <Shield size={10} />;
+      break;
+    case 'EXPORT':
+        style = 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border-amber-200 dark:border-amber-500/20';
+        icon = <Download size={10} />;
+        break;
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded text-[9px] font-bold uppercase border ${style}`}>
+      {icon} {action}
+    </span>
+  );
+};
 
 export const AuditLogs: React.FC = () => {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [filteredLogs, setFilteredLogs] = useState<LogEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Filters
+  // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [moduleFilter, setModuleFilter] = useState('');
-  const [actionFilter, setActionFilter] = useState('');
+  const [moduleFilter, setModuleFilter] = useState('ALL');
+  const [actionFilter, setActionFilter] = useState('ALL');
+  const [dateRange, setDateRange] = useState({ start: '', end: '' });
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   useEffect(() => {
-    const load = async () => {
-        const data = await logService.getAll();
-        setLogs(data);
-        setFilteredLogs(data);
-    };
-    load();
+    loadData();
   }, []);
 
-  useEffect(() => {
-    let result = logs;
+  const loadData = async () => {
+    setIsLoading(true);
+    // Simulate slight network delay for skeleton demo
+    setTimeout(async () => {
+        const data = await logService.getAll();
+        setLogs(data);
+        setIsLoading(false);
+    }, 600);
+  };
 
-    if (searchTerm) {
-        const lower = searchTerm.toLowerCase();
-        result = result.filter(l => 
-            l.userName.toLowerCase().includes(lower) || 
-            l.target.toLowerCase().includes(lower) ||
-            l.details?.toLowerCase().includes(lower)
-        );
-    }
+  // --- FILTER LOGIC ---
+  const filteredLogs = useMemo(() => {
+    return logs.filter(log => {
+      // Text Search
+      const searchLower = searchTerm.toLowerCase();
+      const matchesSearch = 
+        log.userName.toLowerCase().includes(searchLower) || 
+        log.target.toLowerCase().includes(searchLower) ||
+        (log.details || '').toLowerCase().includes(searchLower) ||
+        log.id.toLowerCase().includes(searchLower);
 
-    if (moduleFilter) {
-        result = result.filter(l => l.module === moduleFilter);
-    }
+      // Dropdowns
+      const matchesModule = moduleFilter === 'ALL' || log.module === moduleFilter;
+      const matchesAction = actionFilter === 'ALL' || log.action === actionFilter;
 
-    if (actionFilter) {
-        result = result.filter(l => l.action === actionFilter);
-    }
+      // Date Range
+      let matchesDate = true;
+      if (dateRange.start) {
+        matchesDate = matchesDate && new Date(log.timestamp) >= new Date(dateRange.start);
+      }
+      if (dateRange.end) {
+        // Adjust end date to include the full day
+        const endDate = new Date(dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        matchesDate = matchesDate && new Date(log.timestamp) <= endDate;
+      }
 
-    setFilteredLogs(result);
-  }, [searchTerm, moduleFilter, actionFilter, logs]);
+      return matchesSearch && matchesModule && matchesAction && matchesDate;
+    });
+  }, [logs, searchTerm, moduleFilter, actionFilter, dateRange]);
+
+  // --- STATS CALCULATION ---
+  const stats = useMemo(() => {
+    return {
+      total: filteredLogs.length,
+      critical: filteredLogs.filter(l => l.action === 'DELETE').length,
+      users: new Set(filteredLogs.map(l => l.userId)).size,
+      modules: new Set(filteredLogs.map(l => l.module)).size
+    };
+  }, [filteredLogs]);
+
+  // --- PAGINATION LOGIC ---
+  const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+  const paginatedLogs = filteredLogs.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleExport = () => {
       exportToCSV(filteredLogs, 'Audit_Logs_Export');
   };
 
-  const getActionColor = (action: string) => {
-      switch(action) {
-          case 'CREATE': return 'text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20';
-          case 'UPDATE': return 'text-blue-500 bg-blue-50 dark:bg-blue-900/20';
-          case 'DELETE': return 'text-red-500 bg-red-50 dark:bg-red-900/20';
-          case 'LOGIN': return 'text-purple-500 bg-purple-50 dark:bg-purple-900/20';
-          default: return 'text-slate-500 bg-slate-50 dark:bg-slate-800';
-      }
+  const clearFilters = () => {
+      setSearchTerm('');
+      setModuleFilter('ALL');
+      setActionFilter('ALL');
+      setDateRange({ start: '', end: '' });
+      setCurrentPage(1);
   };
+
+  // Extract Unique Modules for Filter
+  const uniqueModules = Array.from(new Set(logs.map(l => l.module))).sort();
 
   return (
     <div className="relative min-h-screen space-y-6 pb-20">
@@ -82,96 +172,170 @@ export const AuditLogs: React.FC = () => {
           </button>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
             <Shield className="text-brand-600 dark:text-brand-400" size={28} />
-            LOGS DE AUDITORIA
+            CONSOLE DE AUDITORIA
           </h1>
-          <p className="text-sm text-slate-500 font-mono">Rastreamento completo de atividades do sistema.</p>
+          <p className="text-sm text-slate-500 font-mono">Registro imutável de operações do sistema.</p>
         </div>
-        <button onClick={handleExport} className="px-4 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            <Download size={16} /> Exportar CSV
-        </button>
+        <div className="flex gap-2">
+            <button onClick={loadData} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
+                <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> Atualizar
+            </button>
+            <button onClick={handleExport} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20">
+                <Download size={16} /> CSV
+            </button>
+        </div>
       </div>
 
-      {/* FILTERS */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-center">
-          <div className="flex-1 w-full relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+      {/* STATS ROW */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatCard label="Eventos Listados" value={stats.total} icon={Database} color="bg-brand-500" />
+          <StatCard label="Ações Críticas" value={stats.critical} icon={AlertTriangle} color="bg-red-500" />
+          <StatCard label="Usuários Ativos" value={stats.users} icon={User} color="bg-emerald-500" />
+          <StatCard label="Módulos" value={stats.modules} icon={Terminal} color="bg-purple-500" />
+      </div>
+
+      {/* FILTER BAR */}
+      <div className="bg-white dark:bg-[#111114] p-1 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col xl:flex-row gap-2">
+          
+          {/* Search */}
+          <div className="flex-1 relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm outline-none focus:border-brand-500 font-mono"
-                placeholder="Buscar por usuário, alvo ou detalhes..."
+                className="w-full pl-11 pr-4 py-3 bg-transparent text-sm outline-none font-mono text-slate-700 dark:text-slate-200 placeholder-slate-400"
+                placeholder="Buscar ID, Usuário ou Detalhes..."
                 value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
+                onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               />
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
+
+          <div className="h-px xl:h-auto w-full xl:w-px bg-slate-100 dark:bg-slate-800 mx-1"></div>
+
+          {/* Date Range */}
+          <div className="flex items-center gap-2 px-2">
+              <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input 
+                    type="date" 
+                    className="pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-brand-500"
+                    value={dateRange.start}
+                    onChange={e => { setDateRange(prev => ({ ...prev, start: e.target.value })); setCurrentPage(1); }}
+                  />
+              </div>
+              <span className="text-slate-400">-</span>
+              <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input 
+                    type="date" 
+                    className="pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-mono font-bold text-slate-600 dark:text-slate-300 outline-none focus:border-brand-500"
+                    value={dateRange.end}
+                    onChange={e => { setDateRange(prev => ({ ...prev, end: e.target.value })); setCurrentPage(1); }}
+                  />
+              </div>
+          </div>
+
+          <div className="h-px xl:h-auto w-full xl:w-px bg-slate-100 dark:bg-slate-800 mx-1"></div>
+
+          {/* Dropdowns */}
+          <div className="flex gap-2 p-2 xl:p-0 items-center">
               <select 
-                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase p-2 outline-none"
+                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase py-2 px-3 outline-none text-slate-600 dark:text-slate-300 focus:border-brand-500"
                 value={moduleFilter}
-                onChange={e => setModuleFilter(e.target.value)}
+                onChange={e => { setModuleFilter(e.target.value); setCurrentPage(1); }}
               >
-                  <option value="">Todos Módulos</option>
-                  <option value="AUTH">Auth</option>
-                  <option value="HYDROSYS">HydroSys</option>
-                  <option value="ADMIN">Admin</option>
+                  <option value="ALL">Todos Módulos</option>
+                  {uniqueModules.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               <select 
-                className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase p-2 outline-none"
+                className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-xs font-bold uppercase py-2 px-3 outline-none text-slate-600 dark:text-slate-300 focus:border-brand-500"
                 value={actionFilter}
-                onChange={e => setActionFilter(e.target.value)}
+                onChange={e => { setActionFilter(e.target.value); setCurrentPage(1); }}
               >
-                  <option value="">Todas Ações</option>
-                  <option value="CREATE">Create</option>
-                  <option value="UPDATE">Update</option>
-                  <option value="DELETE">Delete</option>
-                  <option value="LOGIN">Login</option>
+                  <option value="ALL">Todas Ações</option>
+                  <option value="CREATE">CREATE</option>
+                  <option value="UPDATE">UPDATE</option>
+                  <option value="DELETE">DELETE</option>
+                  <option value="LOGIN">LOGIN</option>
+                  <option value="EXPORT">EXPORT</option>
               </select>
+              
+              {(searchTerm || moduleFilter !== 'ALL' || actionFilter !== 'ALL' || dateRange.start || dateRange.end) && (
+                  <button onClick={clearFilters} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Limpar Filtros">
+                      <X size={16} />
+                  </button>
+              )}
           </div>
       </div>
 
       {/* TABLE */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
-          <div className="overflow-x-auto">
+      <div className="bg-white dark:bg-[#111114] border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm flex flex-col min-h-[500px]">
+          <div className="overflow-x-auto flex-1">
               <table className="w-full text-left text-sm font-mono">
-                  <thead className="bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
+                  <thead className="bg-slate-50 dark:bg-black/40 border-b border-slate-200 dark:border-slate-800">
                       <tr>
-                          <th className="px-6 py-4 text-slate-500 text-xs font-bold uppercase tracking-wider">Data/Hora</th>
-                          <th className="px-6 py-4 text-slate-500 text-xs font-bold uppercase tracking-wider">Usuário</th>
-                          <th className="px-6 py-4 text-slate-500 text-xs font-bold uppercase tracking-wider">Módulo</th>
-                          <th className="px-6 py-4 text-slate-500 text-xs font-bold uppercase tracking-wider">Ação</th>
-                          <th className="px-6 py-4 text-slate-500 text-xs font-bold uppercase tracking-wider">Detalhes</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-48">Timestamp</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-32">Módulo</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-48">Usuário</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-32">Ação</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Detalhes do Evento</th>
                       </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {filteredLogs.length === 0 ? (
-                          <tr><td colSpan={5} className="p-8 text-center text-slate-400">Nenhum registro encontrado.</td></tr>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                      {isLoading ? (
+                          // Skeleton Loading
+                          [...Array(5)].map((_, i) => (
+                              <tr key={i}><td colSpan={5} className="p-0"><TableRowSkeleton /></td></tr>
+                          ))
+                      ) : filteredLogs.length === 0 ? (
+                          <tr>
+                              <td colSpan={5} className="p-12 text-center">
+                                  <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-4 border border-dashed border-slate-300 dark:border-slate-700">
+                                      <Filter size={24} className="text-slate-400 opacity-50" />
+                                  </div>
+                                  <p className="text-slate-500 text-xs font-mono uppercase tracking-wider">Nenhum registro encontrado</p>
+                              </td>
+                          </tr>
                       ) : (
-                          filteredLogs.map(log => (
-                              <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                  <td className="px-6 py-4 text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                      <div className="flex items-center gap-2">
-                                          <Clock size={14} />
-                                          {new Date(log.timestamp).toLocaleString()}
-                                      </div>
-                                  </td>
-                                  <td className="px-6 py-4">
+                          paginatedLogs.map(log => (
+                              <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/40 transition-colors group">
+                                  <td className="px-6 py-4 whitespace-nowrap">
                                       <div className="flex flex-col">
-                                          <span className="font-bold text-slate-900 dark:text-white">{log.userName}</span>
-                                          <span className="text-[10px] text-slate-500 uppercase">{log.userRole}</span>
+                                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                                              {new Date(log.timestamp).toLocaleDateString()}
+                                          </span>
+                                          <span className="text-[10px] text-slate-400">
+                                              {new Date(log.timestamp).toLocaleTimeString()}
+                                          </span>
                                       </div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-[10px] font-bold uppercase text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700">
                                           {log.module}
                                       </span>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${getActionColor(log.action)}`}>
-                                          {log.action}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                          <div className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-500 uppercase">
+                                              {log.userName.charAt(0)}
+                                          </div>
+                                          <div className="flex flex-col">
+                                              <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate max-w-[120px]" title={log.userName}>{log.userName}</span>
+                                              <span className="text-[9px] text-slate-400 uppercase">{log.userRole}</span>
+                                          </div>
+                                      </div>
                                   </td>
                                   <td className="px-6 py-4">
-                                      <div className="max-w-xs truncate">
-                                          <span className="font-bold text-slate-700 dark:text-slate-300">{log.target}</span>
-                                          <p className="text-xs text-slate-500 truncate" title={log.details}>{log.details}</p>
+                                      <ActionBadge action={log.action} />
+                                  </td>
+                                  <td className="px-6 py-4">
+                                      <div className="flex flex-col gap-1">
+                                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 font-mono">
+                                              {log.target}
+                                          </span>
+                                          {log.details && (
+                                              <span className="text-[10px] text-slate-500 dark:text-slate-500 font-mono truncate max-w-md group-hover:whitespace-normal group-hover:overflow-visible transition-all">
+                                                  {log.details}
+                                              </span>
+                                          )}
                                       </div>
                                   </td>
                               </tr>
@@ -179,6 +343,33 @@ export const AuditLogs: React.FC = () => {
                       )}
                   </tbody>
               </table>
+          </div>
+
+          {/* PAGINATION FOOTER */}
+          <div className="border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#111114] p-4 flex items-center justify-between">
+              <p className="text-[10px] font-mono text-slate-500 uppercase">
+                  Mostrando <span className="font-bold text-slate-900 dark:text-white">{paginatedLogs.length}</span> de <span className="font-bold text-slate-900 dark:text-white">{filteredLogs.length}</span> eventos
+              </p>
+              
+              <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-slate-600 dark:text-slate-400"
+                  >
+                      <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300 px-2">
+                      PÁGINA {currentPage} / {totalPages || 1}
+                  </span>
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-slate-600 dark:text-slate-400"
+                  >
+                      <ChevronRight size={16} />
+                  </button>
+              </div>
           </div>
       </div>
     </div>

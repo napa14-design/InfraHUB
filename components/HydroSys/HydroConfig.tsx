@@ -1,16 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Save, Calendar, TestTube, Droplets, ArrowLeft, RefreshCw, Info, CheckCircle2 } from 'lucide-react';
+import { Settings, Save, Calendar, TestTube, Droplets, ArrowLeft, RefreshCw, Info, CheckCircle2, Box, Waves, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { useToast } from '../Shared/ToastContext';
 
 export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [settings, setSettings] = useState<HydroSettings>({
     validadeCertificadoMeses: 6,
     validadeFiltroMeses: 6,
-    validadeLimpezaMeses: 6,
+    validadeLimpezaCaixa: 6,
+    validadeLimpezaCisterna: 6,
+    validadeLimpezaPoco: 6,
     cloroMin: 1.0,
     cloroMax: 3.0,
     phMin: 7.4,
@@ -23,17 +27,77 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
     load();
   }, []);
 
+  const validateSettings = () => {
+      // Logic Checks
+      if (settings.cloroMin < 0 || settings.cloroMax < 0 || settings.phMin < 0 || settings.phMax < 0) {
+          addToast("Os valores químicos devem ser positivos.", "warning");
+          return false;
+      }
+      
+      if (settings.cloroMin >= settings.cloroMax) {
+          addToast("Cloro Mínimo deve ser menor que o Máximo.", "warning");
+          return false;
+      }
+
+      if (settings.phMin >= settings.phMax) {
+          addToast("pH Mínimo deve ser menor que o Máximo.", "warning");
+          return false;
+      }
+
+      if (settings.phMin > 14 || settings.phMax > 14) {
+          addToast("Valores de pH devem estar entre 0 e 14.", "warning");
+          return false;
+      }
+
+      if (settings.validadeCertificadoMeses <= 0 || settings.validadeFiltroMeses <= 0 || 
+          settings.validadeLimpezaCaixa <= 0 || settings.validadeLimpezaCisterna <= 0 || settings.validadeLimpezaPoco <= 0) {
+          addToast("Ciclos de validade devem ser maiores que zero.", "warning");
+          return false;
+      }
+
+      return true;
+  };
+
   const handleSave = async () => {
+    if (!validateSettings()) return;
+
     await hydroService.saveSettings(settings);
     setSaved(true);
+    addToast("Configurações atualizadas com sucesso.", "success");
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handleReset = () => {
       if(confirm('Restaurar configurações padrão?')) {
-          setSettings({ validadeCertificadoMeses: 6, validadeFiltroMeses: 6, validadeLimpezaMeses: 6, cloroMin: 1.0, cloroMax: 3.0, phMin: 7.4, phMax: 7.6 });
+          setSettings({ 
+              validadeCertificadoMeses: 6, 
+              validadeFiltroMeses: 6, 
+              validadeLimpezaCaixa: 6,
+              validadeLimpezaCisterna: 6,
+              validadeLimpezaPoco: 6,
+              cloroMin: 1.0, 
+              cloroMax: 3.0, 
+              phMin: 7.4, 
+              phMax: 7.6 
+          });
+          addToast("Valores restaurados. Clique em Salvar para confirmar.", "info");
       }
   };
+
+  const CycleItem = ({ label, icon: Icon, value, onChange }: any) => (
+      <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800">
+          <div className="flex items-center gap-3">
+              {Icon && <div className="p-2 bg-white dark:bg-slate-900 rounded-lg text-slate-400"><Icon size={16}/></div>}
+              <p className="font-bold text-slate-700 dark:text-slate-300 text-sm uppercase tracking-wide">{label}</p>
+          </div>
+          <div className="flex items-center gap-3">
+              <button onClick={() => onChange(Math.max(1, value - 1))} className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">-</button>
+              <span className="w-8 text-center font-bold text-lg font-mono">{value}</span>
+              <button onClick={() => onChange(value + 1)} className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">+</button>
+              <span className="text-xs font-bold text-slate-400 uppercase">Meses</span>
+          </div>
+      </div>
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
@@ -86,27 +150,43 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                             <Calendar className="text-purple-500" size={20} /> CICLOS DE VALIDADE
                         </h3>
                     </div>
-                    <div className="p-6 space-y-6">
-                        {[
-                            { label: 'Certificados Potabilidade', key: 'validadeCertificadoMeses' },
-                            { label: 'Troca de Filtros', key: 'validadeFiltroMeses' },
-                            { label: 'Limpeza Reservatórios', key: 'validadeLimpezaMeses' }
-                        ].map((item, i) => (
-                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800">
-                                <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">{item.label}</p>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => setSettings({...settings, [item.key]: Math.max(1, (settings as any)[item.key] - 1)})} className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-100">-</button>
-                                    <span className="w-8 text-center font-bold text-lg font-mono">{(settings as any)[item.key]}</span>
-                                    <button onClick={() => setSettings({...settings, [item.key]: (settings as any)[item.key] + 1})} className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-100">+</button>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Meses</span>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="p-6 space-y-4">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Geral</div>
+                        <CycleItem 
+                            label="Certificados Potabilidade" 
+                            value={settings.validadeCertificadoMeses} 
+                            onChange={(v: number) => setSettings({...settings, validadeCertificadoMeses: v})} 
+                        />
+                        <CycleItem 
+                            label="Troca de Filtros" 
+                            value={settings.validadeFiltroMeses} 
+                            onChange={(v: number) => setSettings({...settings, validadeFiltroMeses: v})} 
+                        />
+                        
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2">Reservatórios (Limpeza)</div>
+                        <CycleItem 
+                            label="Caixa D'água" 
+                            icon={Box}
+                            value={settings.validadeLimpezaCaixa} 
+                            onChange={(v: number) => setSettings({...settings, validadeLimpezaCaixa: v})} 
+                        />
+                        <CycleItem 
+                            label="Cisterna" 
+                            icon={Waves}
+                            value={settings.validadeLimpezaCisterna} 
+                            onChange={(v: number) => setSettings({...settings, validadeLimpezaCisterna: v})} 
+                        />
+                        <CycleItem 
+                            label="Poço Artesiano" 
+                            icon={Activity}
+                            value={settings.validadeLimpezaPoco} 
+                            onChange={(v: number) => setSettings({...settings, validadeLimpezaPoco: v})} 
+                        />
                     </div>
                 </div>
 
                 {/* QUALITY STANDARDS */}
-                <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-fit">
                     <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                         <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono">
                             <TestTube className="text-cyan-500" size={20} /> PADRÕES DE QUALIDADE

@@ -8,6 +8,7 @@ import { orgService } from '../../services/orgService';
 import { hydroService } from '../../services/hydroService';
 import { exportToCSV } from '../utils/csvExport';
 import { Breadcrumbs } from './Shared/Breadcrumbs';
+import { DashboardGridSkeleton, Skeleton } from './Shared/Skeleton';
 
 interface Props {
   user: User;
@@ -58,9 +59,11 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
     setMounted(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     
-    fetchDashboardData();
+    // Simulate slight delay to show off skeleton
+    setTimeout(() => {
+        fetchDashboardData();
+    }, 800);
     
-    // Set default dates (Current Month)
     const date = new Date();
     const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
     const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -80,20 +83,15 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               hydroService.getCloro(user)
           ]);
 
-          // --- LOGIC: DEDUPLICATE TO GET ONLY ACTIVE ITEMS ---
-          
-          // 1. Unique Certs (Latest per Sede+Parceiro)
           const uniqueCerts = Array.from(certs.reduce((map, item) => {
               const key = `${item.sedeId}-${item.parceiro}`;
               const existing = map.get(key);
-              // Keep the one with the latest validity date
               if (!existing || new Date(item.validade) > new Date(existing.validade)) {
                   map.set(key, item);
               }
               return map;
           }, new Map<string, HydroCertificado>()).values());
 
-          // 2. Unique Filtros (Latest per Patrimonio/Local)
           const uniqueFiltros = Array.from(filts.reduce((map, item) => {
               const key = `${item.sedeId}-${item.patrimonio}`; 
               const existing = map.get(key);
@@ -103,10 +101,8 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               return map;
           }, new Map<string, HydroFiltro>()).values());
 
-          // 3. Reservoirs
           const totalReservatorios = pocos.length + cist.length + caixas.length;
           
-          // 4. Calc Alerts on ACTIVE items only
           const today = new Date();
           let alertCount = 0;
 
@@ -117,11 +113,8 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               return diff <= daysThreshold;
           };
 
-          // Check Active Certs
           uniqueCerts.forEach(c => { if (c.status !== 'VIGENTE' || checkDate(c.validade)) alertCount++; });
-          // Check Active Filtros
           uniqueFiltros.forEach(f => { if (checkDate(f.proximaTroca, 15)) alertCount++; });
-          // Check Reservatorios
           pocos.forEach(p => { if (checkDate(p.proximaLimpeza)) alertCount++; });
           cist.forEach(c => { if (checkDate(c.proximaLimpeza)) alertCount++; });
           caixas.forEach(c => { if (checkDate(c.proximaLimpeza)) alertCount++; });
@@ -133,7 +126,6 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               alertas: alertCount
           });
 
-          // 5. Latest Reading
           if (cloroEntries.length > 0) {
               const sorted = [...cloroEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
               const last = sorted[0];
@@ -261,9 +253,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           </div>
         </header>
 
-        {/* METRICS GRID REMOVIDO CONFORME SOLICITADO */}
-
-        {/* MODULES SECTION */}
+        {/* MODULES SECTION WITH SKELETON */}
         <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-1 h-6 bg-cyan-500" />
@@ -271,34 +261,38 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
             <div className="flex-1 h-px bg-slate-200 dark:bg-white/5" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {allowedSubModules.map((mod, index) => {
-              const Icon = HydroIconMap[mod.iconName] || Droplets;
-              const isAdminOnly = mod.roles.length === 1 && mod.roles.includes(UserRole.ADMIN);
+          {isLoading ? (
+              <DashboardGridSkeleton />
+          ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {allowedSubModules.map((mod, index) => {
+                  const Icon = HydroIconMap[mod.iconName] || Droplets;
+                  const isAdminOnly = mod.roles.length === 1 && mod.roles.includes(UserRole.ADMIN);
 
-              return (
-                <button key={mod.id} onClick={() => handleCardClick(mod.id)} className="group relative text-left h-full" style={{ animationDelay: `${index * 50}ms`, animation: mounted ? 'fade-up 0.4s ease-out forwards' : 'none', opacity: 0 }}>
-                  <div className={`relative h-full border bg-white dark:bg-[#111114]/80 backdrop-blur-sm p-6 transition-all duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10' : 'border-slate-200 dark:border-white/5 hover:border-cyan-500/30 hover:bg-cyan-50/[0.02] dark:hover:bg-cyan-500/[0.02]'}`}>
-                    <div className={`absolute top-0 right-0 w-3 h-3 border-t border-r transition-colors duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/10' : 'border-slate-200 dark:border-white/10 group-hover:border-cyan-500/50'}`} />
-                    <div className="flex justify-between items-start mb-5">
-                      <div className={`w-12 h-12 border flex items-center justify-center transition-all duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-slate-400' : 'border-cyan-500/20 bg-cyan-50 dark:bg-cyan-500/5 text-cyan-600 dark:text-cyan-500 group-hover:border-cyan-500/40 group-hover:bg-cyan-100 dark:group-hover:bg-cyan-500/10'}`}>
-                        <Icon size={24} />
+                  return (
+                    <button key={mod.id} onClick={() => handleCardClick(mod.id)} className="group relative text-left h-full" style={{ animationDelay: `${index * 50}ms`, animation: mounted ? 'fade-up 0.4s ease-out forwards' : 'none', opacity: 0 }}>
+                      <div className={`relative h-full border bg-white dark:bg-[#111114]/80 backdrop-blur-sm p-6 transition-all duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10' : 'border-slate-200 dark:border-white/5 hover:border-cyan-500/30 hover:bg-cyan-50/[0.02] dark:hover:bg-cyan-500/[0.02]'}`}>
+                        <div className={`absolute top-0 right-0 w-3 h-3 border-t border-r transition-colors duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/10' : 'border-slate-200 dark:border-white/10 group-hover:border-cyan-500/50'}`} />
+                        <div className="flex justify-between items-start mb-5">
+                          <div className={`w-12 h-12 border flex items-center justify-center transition-all duration-300 ${isAdminOnly ? 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-slate-400' : 'border-cyan-500/20 bg-cyan-50 dark:bg-cyan-500/5 text-cyan-600 dark:text-cyan-500 group-hover:border-cyan-500/40 group-hover:bg-cyan-100 dark:group-hover:bg-cyan-500/10'}`}>
+                            <Icon size={24} />
+                          </div>
+                          {isAdminOnly && <span className="px-2 py-1 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-[9px] font-mono text-slate-500 dark:text-white/40 uppercase tracking-wider">Admin</span>}
+                        </div>
+                        <div className="space-y-2 mb-6">
+                          <h3 className={`text-lg font-bold transition-colors duration-300 ${isAdminOnly ? 'text-slate-500 dark:text-white/60' : 'text-slate-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400'}`}>{mod.title}</h3>
+                          <p className="text-sm text-slate-500 dark:text-white/30 leading-relaxed line-clamp-2 font-mono">{mod.description}</p>
+                        </div>
+                        <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
+                          <span className={`text-[10px] font-mono uppercase tracking-widest transition-colors duration-300 ${isAdminOnly ? 'text-slate-400 dark:text-white/20' : 'text-slate-500 dark:text-white/30 group-hover:text-cyan-600 dark:group-hover:text-cyan-500/70'}`}>Acessar</span>
+                          <ChevronRight size={16} className={isAdminOnly ? 'text-slate-300' : 'text-slate-400 group-hover:text-cyan-600 group-hover:translate-x-1'} />
+                        </div>
                       </div>
-                      {isAdminOnly && <span className="px-2 py-1 border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.02] text-[9px] font-mono text-slate-500 dark:text-white/40 uppercase tracking-wider">Admin</span>}
-                    </div>
-                    <div className="space-y-2 mb-6">
-                      <h3 className={`text-lg font-bold transition-colors duration-300 ${isAdminOnly ? 'text-slate-500 dark:text-white/60' : 'text-slate-900 dark:text-white group-hover:text-cyan-600 dark:group-hover:text-cyan-400'}`}>{mod.title}</h3>
-                      <p className="text-sm text-slate-500 dark:text-white/30 leading-relaxed line-clamp-2 font-mono">{mod.description}</p>
-                    </div>
-                    <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex items-center justify-between">
-                      <span className={`text-[10px] font-mono uppercase tracking-widest transition-colors duration-300 ${isAdminOnly ? 'text-slate-400 dark:text-white/20' : 'text-slate-500 dark:text-white/30 group-hover:text-cyan-600 dark:group-hover:text-cyan-500/70'}`}>Acessar</span>
-                      <ChevronRight size={16} className={isAdminOnly ? 'text-slate-300' : 'text-slate-400 group-hover:text-cyan-600 group-hover:translate-x-1'} />
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+                    </button>
+                  );
+                })}
+              </div>
+          )}
         </div>
 
         {/* Modal code remains same */}

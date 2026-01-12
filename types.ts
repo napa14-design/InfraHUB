@@ -111,7 +111,10 @@ export interface LogEntry {
 export interface HydroSettings {
   validadeCertificadoMeses: number;
   validadeFiltroMeses: number;
-  validadeLimpezaMeses: number;
+  // Novos campos específicos
+  validadeLimpezaCaixa: number;
+  validadeLimpezaCisterna: number;
+  validadeLimpezaPoco: number;
   cloroMin: number;
   cloroMax: number;
   phMin: number;

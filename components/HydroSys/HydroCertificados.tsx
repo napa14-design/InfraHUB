@@ -11,6 +11,8 @@ import { hydroService } from '../../services/hydroService';
 import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
 import { EmptyState } from '../Shared/EmptyState';
+import { useToast } from '../Shared/ToastContext';
+import { CardSkeleton } from '../Shared/Skeleton';
 
 const getDaysRemaining = (validade: string) => {
   if (!validade) return 0;
@@ -63,7 +65,11 @@ const KPICard = ({ title, value, icon, gradient, onClick, isActive }: any) => (
 
 export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
+  
   const [data, setData] = useState<HydroCertificado[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
@@ -95,9 +101,14 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const [formData, setFormData] = useState<HydroCertificado>(initialForm);
 
   const loadData = async () => {
-     const res = await hydroService.getCertificados(user);
-     setData(res);
-     if (isAdmin) setAvailableSedes(orgService.getSedes());
+     setIsLoading(true);
+     // Simulate slight delay for Skeleton demo
+     setTimeout(async () => {
+         const res = await hydroService.getCertificados(user);
+         setData(res);
+         if (isAdmin) setAvailableSedes(orgService.getSedes());
+         setIsLoading(false);
+     }, 600);
   };
 
   useEffect(() => {
@@ -151,19 +162,21 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleSave = async () => {
     if (!formData.parceiro || !formData.dataAnalise || !formData.validade) {
-        alert("Preencha os campos obrigatórios.");
+        addToast("Preencha todos os campos obrigatórios.", "warning");
         return;
     }
     await hydroService.saveCertificado(formData);
     await notificationService.markByLink('/module/hydrosys/certificados');
     await loadData();
     setIsSheetOpen(false);
+    addToast(sheetMode === 'RENEW' ? "Certificado renovado com sucesso!" : "Registro salvo com sucesso!", "success");
   };
 
   const handleDelete = async (id: string) => {
     if(confirm("Deseja remover este certificado permanentemente?")) {
         await hydroService.deleteCertificado(id);
         await loadData();
+        addToast("Certificado removido.", "info");
     }
   };
 
@@ -174,10 +187,9 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
       return map;
   }, new Map<string, HydroCertificado>()).values());
 
-  // Calcula o status dinâmico para exibição, corrigindo o problema de "Vigente" quando faltam 0 dias
   const getDynamicStatus = (daysLeft: number) => {
       if (daysLeft < 0) return 'VENCIDO';
-      if (daysLeft <= 30) return 'PROXIMO'; // Regra de 30 dias para alerta
+      if (daysLeft <= 30) return 'PROXIMO'; 
       return 'VIGENTE';
   };
 
@@ -192,7 +204,6 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     })
     .sort((a, b) => new Date(b.validade).getTime() - new Date(a.validade).getTime());
 
-  // Contadores baseados no status dinâmico
   const countByStatus = (status: string) => activeItems.filter(i => getDynamicStatus(getDaysRemaining(i.validade)) === status).length;
 
   return (
@@ -227,63 +238,69 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
             <KPICard title="Total" value={activeItems.length} icon={<Activity size={20}/>} gradient="from-slate-500 to-slate-600" isActive={filterStatus === null} onClick={() => setFilterStatus(null)} />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredData.map((item: HydroCertificado) => {
-                const daysLeft = getDaysRemaining(item.validade);
-                const displayStatus = getDynamicStatus(daysLeft);
-                const cfg = getStatusConfig(displayStatus);
-                const isUrgent = displayStatus !== 'VIGENTE';
+        {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {[1,2,3,4,5,6].map(i => <CardSkeleton key={i} />)}
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                {filteredData.map((item: HydroCertificado) => {
+                    const daysLeft = getDaysRemaining(item.validade);
+                    const displayStatus = getDynamicStatus(daysLeft);
+                    const cfg = getStatusConfig(displayStatus);
+                    const isUrgent = displayStatus !== 'VIGENTE';
 
-                return (
-                    <div key={item.id} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full shadow-sm hover:border-cyan-500/30 transition-all">
-                        <div className="flex justify-between items-start mb-5">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">{item.sedeId}</div>
-                                <div><h3 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{item.parceiro}</h3><p className="text-[10px] text-slate-500 font-mono">{item.semestre}</p></div>
+                    return (
+                        <div key={item.id} className="bg-white dark:bg-slate-900 rounded-3xl border-2 border-slate-200 dark:border-slate-800 p-6 flex flex-col h-full shadow-sm hover:border-cyan-500/30 transition-all">
+                            <div className="flex justify-between items-start mb-5">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-bold text-xs">{item.sedeId}</div>
+                                    <div><h3 className="font-bold text-slate-900 dark:text-white uppercase text-sm">{item.parceiro}</h3><p className="text-[10px] text-slate-500 font-mono">{item.semestre}</p></div>
+                                </div>
+                                <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${cfg.bg} ${cfg.text}`}>{cfg.label}</div>
                             </div>
-                            <div className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${cfg.bg} ${cfg.text}`}>{cfg.label}</div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl p-3 border border-slate-100 dark:border-slate-800/50 text-center">
-                            <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
-                            <div>
-                                <p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Vencimento</p>
-                                <p className={`text-xs font-mono font-bold ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                                    {daysLeft < 0 ? `VENCIDO (${Math.abs(daysLeft)}d)` : daysLeft === 0 ? 'HOJE' : `${daysLeft} dias`}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="mt-auto space-y-4">
-                            {canCreate && (
-                                <button 
-                                    onClick={() => handleRenovar(item)} 
-                                    className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2
-                                    ${isUrgent 
-                                        ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/30 animate-pulse' 
-                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
-                                >
-                                    <RotateCw size={18} className={isUrgent ? "animate-spin-slow" : ""} /> 
-                                    {isUrgent ? 'Renovar Agora' : 'Antecipar Renovação'}
-                                </button>
-                            )}
                             
-                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
-                                <div className="flex gap-2">
-                                    {item.linkMicro && <a href={item.linkMicro} target="_blank" rel="noreferrer" className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro"><Microscope size={16}/></a>}
-                                    {item.linkFisico && <a href={item.linkFisico} target="_blank" rel="noreferrer" className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico"><FlaskConical size={16}/></a>}
+                            <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl p-3 border border-slate-100 dark:border-slate-800/50 text-center">
+                                <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
+                                <div>
+                                    <p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Vencimento</p>
+                                    <p className={`text-xs font-mono font-bold ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                        {daysLeft < 0 ? `VENCIDO (${Math.abs(daysLeft)}d)` : daysLeft === 0 ? 'HOJE' : `${daysLeft} dias`}
+                                    </p>
                                 </div>
-                                <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
-                                    <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
-                                    <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
-                                    {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
+                            </div>
+
+                            <div className="mt-auto space-y-4">
+                                {canCreate && (
+                                    <button 
+                                        onClick={() => handleRenovar(item)} 
+                                        className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-2
+                                        ${isUrgent 
+                                            ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-emerald-500/30 animate-pulse' 
+                                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20'}`}
+                                    >
+                                        <RotateCw size={18} className={isUrgent ? "animate-spin-slow" : ""} /> 
+                                        {isUrgent ? 'Renovar Agora' : 'Antecipar Renovação'}
+                                    </button>
+                                )}
+                                
+                                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
+                                    <div className="flex gap-2">
+                                        {item.linkMicro && <a href={item.linkMicro} target="_blank" rel="noreferrer" className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro"><Microscope size={16}/></a>}
+                                        {item.linkFisico && <a href={item.linkFisico} target="_blank" rel="noreferrer" className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico"><FlaskConical size={16}/></a>}
+                                    </div>
+                                    <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
+                                        <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
+                                        <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
+                                        {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                );
-            })}
-        </div>
+                    );
+                })}
+            </div>
+        )}
       </div>
 
       {/* MODAL HISTÓRICO */}
@@ -305,7 +322,6 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                           {historyItems.map((h, idx) => {
                               // Calcular status histórico também
                               const days = getDaysRemaining(h.validade);
-                              const dynamicSt = getDynamicStatus(days);
                               
                               return (
                                 <div key={h.id} className="relative pl-8 border-l-2 border-slate-100 dark:border-slate-800 pb-4 last:pb-0">

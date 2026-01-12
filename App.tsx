@@ -1,36 +1,100 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
-import { supabase, isSupabaseConfigured } from './lib/supabase'; // Import supabase client
-import { Login } from './components/Login';
-import { Dashboard } from './components/Dashboard';
-import { Layout } from './components/Layout';
-import { ModuleView } from './components/ModuleView';
-import { AdminUserManagement } from './components/AdminUserManagement';
-import { AdminModuleManagement } from './components/AdminModuleManagement';
-import { AdminOrgManagement } from './components/AdminOrgManagement';
-import { AdminNotificationConfig } from './components/AdminNotificationConfig';
-import { AuditLogs } from './components/AuditLogs'; // Import new component
-import { HydroSysDashboard } from './components/HydroSysDashboard';
-import { HydroCertificados } from './components/HydroSys/HydroCertificados';
-import { HydroCloro } from './components/HydroSys/HydroCloro';
-import { HydroFiltros } from './components/HydroSys/HydroFiltros';
-import { HydroReservatorios } from './components/HydroSys/HydroReservatorios';
-import { HydroConfig } from './components/HydroSys/HydroConfig';
-import { HydroSysAnalytics } from './components/HydroSys/HydroAnalytics';
-import { PestControlDashboard } from './components/PestControl/PestControlDashboard';
-import { PestControlExecution } from './components/PestControl/PestControlExecution';
-import { PestControlConfig } from './components/PestControl/PestControlConfig';
-import { PestControlAnalytics } from './components/PestControl/PestControlAnalytics';
-import { PestControlHelp } from './components/PestControl/PestControlHelp';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
+import { ToastProvider } from './components/Shared/ToastContext'; // Import ToastProvider
 import { Instructions } from './supabase_setup';
-import { UpdatePassword } from './components/UpdatePassword';
 
-// Component to handle Supabase Auth Events (Like Password Recovery Redirects)
+// --- ERROR BOUNDARY FOR LAZY LOADING ---
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("Lazy Load Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 text-center">
+          <div className="max-w-md p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-mono uppercase">Erro de Carregamento</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha ao baixar o módulo. Verifique sua conexão.</p>
+            <button 
+              onClick={() => { this.setState({ hasError: false }); window.location.reload(); }} 
+              className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-colors"
+            >
+              Tentar Novamente
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// --- LAZY COMPONENTS (CODE SPLITTING) ---
+const lazyImport = <T extends React.ComponentType<any>>(
+  factory: () => Promise<{ [key: string]: T }>,
+  name: string
+): React.LazyExoticComponent<T> => {
+  return lazy(() => factory().then((module) => ({ default: module[name as keyof typeof module] })));
+};
+
+// Core Components
+const Login = lazyImport(() => import('./components/Login'), 'Login');
+const UpdatePassword = lazyImport(() => import('./components/UpdatePassword'), 'UpdatePassword');
+const Layout = lazyImport(() => import('./components/Layout'), 'Layout');
+const Dashboard = lazyImport(() => import('./components/Dashboard'), 'Dashboard');
+const ModuleView = lazyImport(() => import('./components/ModuleView'), 'ModuleView');
+
+// Admin Components
+const AdminUserManagement = lazyImport(() => import('./components/AdminUserManagement'), 'AdminUserManagement');
+const AdminModuleManagement = lazyImport(() => import('./components/AdminModuleManagement'), 'AdminModuleManagement');
+const AdminOrgManagement = lazyImport(() => import('./components/AdminOrgManagement'), 'AdminOrgManagement');
+const AdminNotificationConfig = lazyImport(() => import('./components/AdminNotificationConfig'), 'AdminNotificationConfig');
+const AuditLogs = lazyImport(() => import('./components/AuditLogs'), 'AuditLogs');
+
+// HydroSys Components
+const HydroSysDashboard = lazyImport(() => import('./components/HydroSysDashboard'), 'HydroSysDashboard');
+const HydroCertificados = lazyImport(() => import('./components/HydroSys/HydroCertificados'), 'HydroCertificados');
+const HydroCloro = lazyImport(() => import('./components/HydroSys/HydroCloro'), 'HydroCloro');
+const HydroFiltros = lazyImport(() => import('./components/HydroSys/HydroFiltros'), 'HydroFiltros');
+const HydroReservatorios = lazyImport(() => import('./components/HydroSys/HydroReservatorios'), 'HydroReservatorios');
+const HydroConfig = lazyImport(() => import('./components/HydroSys/HydroConfig'), 'HydroConfig');
+const HydroSysAnalytics = lazyImport(() => import('./components/HydroSys/HydroAnalytics'), 'HydroSysAnalytics');
+
+// PestControl Components
+const PestControlDashboard = lazyImport(() => import('./components/PestControl/PestControlDashboard'), 'PestControlDashboard');
+const PestControlExecution = lazyImport(() => import('./components/PestControl/PestControlExecution'), 'PestControlExecution');
+const PestControlConfig = lazyImport(() => import('./components/PestControl/PestControlConfig'), 'PestControlConfig');
+const PestControlAnalytics = lazyImport(() => import('./components/PestControl/PestControlAnalytics'), 'PestControlAnalytics');
+const PestControlHelp = lazyImport(() => import('./components/PestControl/PestControlHelp'), 'PestControlHelp');
+
+// --- LOADING FALLBACK ---
+const PageLoader = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+    <div className="flex flex-col items-center gap-4">
+       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 dark:border-brand-400"></div>
+       <p className="text-slate-400 font-mono text-xs animate-pulse uppercase tracking-widest">Carregando Módulo...</p>
+    </div>
+  </div>
+);
+
+// Component to handle Supabase Auth Events
 const AuthObserver = () => {
   const navigate = useNavigate();
 
@@ -38,7 +102,6 @@ const AuthObserver = () => {
     if (!isSupabaseConfigured()) return;
 
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      // FORCE redirect to update-password when recovery link is clicked
       if (event === 'PASSWORD_RECOVERY') {
         console.log("Password Recovery Event Detected - Redirecting...");
         navigate('/update-password');
@@ -60,8 +123,6 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
         try {
-            // 0. Ensure Session is restored before fetching data
-            // This is critical for RLS policies to recognize the user
             if (isSupabaseConfigured()) {
                 await supabase.auth.getSession();
             }
@@ -69,10 +130,8 @@ const App: React.FC = () => {
             console.warn("Session check failed", e);
         }
 
-        // 1. Load Org Cache (Critical for UI labels)
         await orgService.initialize();
 
-        // 2. Check Session
         const currentUser = authService.getCurrentUser();
         if (currentUser) {
             setUser(currentUser);
@@ -89,7 +148,6 @@ const App: React.FC = () => {
     
     if (foundUser) {
       setUser(foundUser);
-      // Re-fetch org data on login to ensure we have fresh data with new permissions
       await orgService.initialize();
       return true;
     }
@@ -101,163 +159,77 @@ const App: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <div className="flex flex-col items-center gap-4">
-             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand-600"></div>
-             <p className="text-slate-500 font-medium animate-pulse">Carregando Hub...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (
     <ThemeProvider>
-      <Router>
-        <AuthObserver /> {/* Listens for Password Recovery events inside Router */}
-        <Routes>
-          <Route path="/setup" element={<Instructions />} />
-          
-          <Route 
-            path="/login" 
-            element={
-              user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
-            } 
-          />
+      <ToastProvider>
+        <Router>
+          <AuthObserver />
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
+                <Route path="/setup" element={<Instructions />} />
+                
+                <Route 
+                  path="/login" 
+                  element={
+                    user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+                  } 
+                />
 
-          {/* Password Reset Route (No Auth Required) */}
-          <Route path="/update-password" element={<UpdatePassword />} />
+                <Route path="/update-password" element={<UpdatePassword />} />
 
-          {/* Protected Routes Wrapper */}
-          <Route
-            path="*"
-            element={
-              user ? (
-                <Layout user={user} onLogout={handleLogout}>
-                  <Routes>
-                    <Route path="/" element={<Dashboard user={user} />} />
-                    
-                    {/* Admin Routes */}
-                    <Route 
-                      path="/admin/users" 
-                      element={
-                        (user.role === UserRole.ADMIN || user.role === UserRole.GESTOR)
-                          ? <AdminUserManagement /> 
-                          : <Navigate to="/" replace />
-                      } 
-                    />
+                <Route
+                  path="*"
+                  element={
+                    user ? (
+                      <Layout user={user} onLogout={handleLogout}>
+                        <ErrorBoundary>
+                          <Suspense fallback={<PageLoader />}>
+                            <Routes>
+                              <Route path="/" element={<Dashboard user={user} />} />
+                              
+                              {/* Admin Routes */}
+                              <Route path="/admin/users" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AdminUserManagement /> : <Navigate to="/" replace />} />
+                              <Route path="/admin/modules" element={user.role === UserRole.ADMIN ? <AdminModuleManagement /> : <Navigate to="/" replace />} />
+                              <Route path="/admin/org" element={user.role === UserRole.ADMIN ? <AdminOrgManagement /> : <Navigate to="/" replace />} />
+                              <Route path="/admin/notifications" element={user.role === UserRole.ADMIN ? <AdminNotificationConfig /> : <Navigate to="/" replace />} />
+                              <Route path="/admin/logs" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AuditLogs /> : <Navigate to="/" replace />} />
 
-                    <Route 
-                      path="/admin/modules" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <AdminModuleManagement /> 
-                          : <Navigate to="/" replace />
-                      } 
-                    />
+                              {/* HydroSys Routes */}
+                              <Route path="/module/hydrosys" element={<HydroSysDashboard user={user} />} />
+                              <Route path="/module/hydrosys/certificados" element={<HydroCertificados user={user} />} />
+                              <Route path="/module/hydrosys/cloro" element={<HydroCloro user={user} />} />
+                              <Route path="/module/hydrosys/filtros" element={<HydroFiltros user={user} />} />
+                              <Route path="/module/hydrosys/reservatorios" element={<HydroReservatorios user={user} />} />
+                              <Route path="/module/hydrosys/config" element={user.role === UserRole.ADMIN ? <HydroConfig user={user} /> : <Navigate to="/module/hydrosys" replace />} />
+                              <Route path="/module/hydrosys/analytics" element={user.role === UserRole.ADMIN ? <HydroSysAnalytics user={user} /> : <Navigate to="/module/hydrosys" replace />} />
 
-                    <Route 
-                      path="/admin/org" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <AdminOrgManagement /> 
-                          : <Navigate to="/" replace />
-                      } 
-                    />
-
-                    <Route 
-                      path="/admin/notifications" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <AdminNotificationConfig /> 
-                          : <Navigate to="/" replace />
-                      } 
-                    />
-
-                    {/* LOGS: Visible for ADMIN and GESTOR */}
-                    <Route 
-                      path="/admin/logs" 
-                      element={
-                        (user.role === UserRole.ADMIN || user.role === UserRole.GESTOR)
-                          ? <AuditLogs /> 
-                          : <Navigate to="/" replace />
-                      } 
-                    />
-
-                    {/* HydroSys Main Route */}
-                    <Route 
-                        path="/module/hydrosys" 
-                        element={<HydroSysDashboard user={user} />} 
-                    />
-
-                    {/* HydroSys Internal Routes */}
-                    <Route path="/module/hydrosys/certificados" element={<HydroCertificados user={user} />} />
-                    <Route path="/module/hydrosys/cloro" element={<HydroCloro user={user} />} />
-                    <Route path="/module/hydrosys/filtros" element={<HydroFiltros user={user} />} />
-                    <Route path="/module/hydrosys/reservatorios" element={<HydroReservatorios user={user} />} />
-                    
-                    <Route 
-                      path="/module/hydrosys/config" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <HydroConfig user={user} />
-                          : <Navigate to="/module/hydrosys" replace />
-                      } 
-                    />
-
-                    <Route 
-                      path="/module/hydrosys/analytics" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <HydroSysAnalytics user={user} />
-                          : <Navigate to="/module/hydrosys" replace />
-                      } 
-                    />
-
-                    {/* PEST CONTROL ROUTES */}
-                    <Route 
-                        path="/module/pestcontrol" 
-                        element={<PestControlDashboard user={user} />} 
-                    />
-                    <Route 
-                        path="/module/pestcontrol/execution" 
-                        element={<PestControlExecution user={user} />} 
-                    />
-                    <Route 
-                        path="/module/pestcontrol/help" 
-                        element={<PestControlHelp user={user} />} 
-                    />
-                    <Route 
-                      path="/module/pestcontrol/config" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <PestControlConfig user={user} />
-                          : <Navigate to="/module/pestcontrol" replace />
-                      } 
-                    />
-                    <Route 
-                      path="/module/pestcontrol/analytics" 
-                      element={
-                        user.role === UserRole.ADMIN 
-                          ? <PestControlAnalytics user={user} />
-                          : <Navigate to="/module/pestcontrol" replace />
-                      } 
-                    />
-                    
-                    {/* Generic Module Routes */}
-                    <Route path="/module/:id" element={<ModuleView />} />
-                    
-                    {/* Fallback */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </Layout>
-              ) : (
-                <Navigate to="/login" replace />
-              )
-            }
-          />
-        </Routes>
-      </Router>
+                              {/* Pest Control Routes */}
+                              <Route path="/module/pestcontrol" element={<PestControlDashboard user={user} />} />
+                              <Route path="/module/pestcontrol/execution" element={<PestControlExecution user={user} />} />
+                              <Route path="/module/pestcontrol/help" element={<PestControlHelp user={user} />} />
+                              <Route path="/module/pestcontrol/config" element={user.role === UserRole.ADMIN ? <PestControlConfig user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
+                              <Route path="/module/pestcontrol/analytics" element={user.role === UserRole.ADMIN ? <PestControlAnalytics user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
+                              
+                              <Route path="/module/:id" element={<ModuleView />} />
+                              <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                          </Suspense>
+                        </ErrorBoundary>
+                      </Layout>
+                    ) : (
+                      <Navigate to="/login" replace />
+                    )
+                  }
+                />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </Router>
+      </ToastProvider>
     </ThemeProvider>
   );
 };
