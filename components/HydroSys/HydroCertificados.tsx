@@ -320,11 +320,30 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                                 {h.status}
                                             </span>
                                         </div>
-                                        <div className="flex justify-between items-center">
+                                        <div className="flex flex-col gap-2">
                                             <p className="text-[10px] text-slate-400 font-mono italic">Validade: {new Date(h.validade).toLocaleDateString()}</p>
-                                            <div className="flex gap-2">
-                                                {h.linkMicro && <a href={h.linkMicro} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-purple-500"><Microscope size={14}/></a>}
-                                                {h.linkFisico && <a href={h.linkFisico} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-cyan-500"><FlaskConical size={14}/></a>}
+                                            
+                                            {/* VISIBLE LINKS AS BUTTONS */}
+                                            <div className="flex gap-2 mt-2">
+                                                {h.linkMicro ? (
+                                                    <a href={h.linkMicro} target="_blank" rel="noreferrer" className="flex-1 py-1.5 px-3 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
+                                                        <Microscope size={12}/> Ver Micro
+                                                    </a>
+                                                ) : (
+                                                    <span className="flex-1 py-1.5 px-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-2 cursor-not-allowed">
+                                                        <Microscope size={12}/> Sem Micro
+                                                    </span>
+                                                )}
+                                                
+                                                {h.linkFisico ? (
+                                                    <a href={h.linkFisico} target="_blank" rel="noreferrer" className="flex-1 py-1.5 px-3 rounded bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-cyan-100 transition-colors">
+                                                        <FlaskConical size={12}/> Ver Físico
+                                                    </a>
+                                                ) : (
+                                                    <span className="flex-1 py-1.5 px-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-300 text-[10px] font-bold uppercase flex items-center justify-center gap-2 cursor-not-allowed">
+                                                        <FlaskConical size={12}/> Sem Físico
+                                                    </span>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

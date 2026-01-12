@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Logs
 CREATE POLICY "Enable read access for all users" ON audit_logs FOR SELECT USING (true);
 CREATE POLICY "Enable insert access for all users" ON audit_logs FOR INSERT WITH CHECK (true);
 
@@ -29,7 +28,6 @@ CREATE POLICY "Enable insert access for all users" ON audit_logs FOR INSERT WITH
 -- 2. CONTROLE DE PRAGAS (PEST CONTROL)
 -- =============================================
 
--- Tabela de Configurações (Técnicos, Pragas, Frequências)
 CREATE TABLE IF NOT EXISTS pest_control_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
   pest_types TEXT[] DEFAULT '{}',
@@ -38,7 +36,6 @@ CREATE TABLE IF NOT EXISTS pest_control_settings (
   sede_frequencies JSONB DEFAULT '{}'::jsonb
 );
 
--- Tabela de Execuções e Agendamentos
 CREATE TABLE IF NOT EXISTS pest_control_entries (
   id TEXT PRIMARY KEY,
   sede_id TEXT NOT NULL,
@@ -54,11 +51,9 @@ CREATE TABLE IF NOT EXISTS pest_control_entries (
   status TEXT DEFAULT 'PENDENTE'
 );
 
--- Habilitar RLS
 ALTER TABLE pest_control_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pest_control_entries ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Pragas (Permissivas para facilitar uso inicial)
 CREATE POLICY "Public Read Settings" ON pest_control_settings FOR SELECT USING (true);
 CREATE POLICY "Public Write Settings" ON pest_control_settings FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Update Settings" ON pest_control_settings FOR UPDATE USING (true);
@@ -67,6 +62,26 @@ CREATE POLICY "Public Read Entries" ON pest_control_entries FOR SELECT USING (tr
 CREATE POLICY "Public Write Entries" ON pest_control_entries FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Update Entries" ON pest_control_entries FOR UPDATE USING (true);
 CREATE POLICY "Public Delete Entries" ON pest_control_entries FOR DELETE USING (true);
+
+-- =============================================
+-- 3. REGRAS DE NOTIFICAÇÃO
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS notification_rules (
+  id TEXT PRIMARY KEY,
+  module_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  warning_days INTEGER DEFAULT 30,
+  critical_days INTEGER DEFAULT 0,
+  enabled BOOLEAN DEFAULT true
+);
+
+ALTER TABLE notification_rules ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public Read Rules" ON notification_rules FOR SELECT USING (true);
+CREATE POLICY "Public Write Rules" ON notification_rules FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Rules" ON notification_rules FOR UPDATE USING (true);
 `;
 
 export const SEED_SQL = `
@@ -74,7 +89,6 @@ export const SEED_SQL = `
 -- DADOS INICIAIS (SEED)
 -- =============================================
 
--- Inserir configurações padrão de Dedetização se não existirem
 INSERT INTO pest_control_settings (id, pest_types, technicians, global_frequencies, sede_frequencies)
 VALUES (
   'default',
@@ -83,6 +97,14 @@ VALUES (
   '{"Rato / Roedores": 15, "Barata / Escorpião": 15, "Muriçoca / Mosquitos": 7, "Cupim": 180, "Formiga": 30, "Carrapato": 30}'::jsonb,
   '{}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
+
+-- Inserir regras padrão de notificação
+INSERT INTO notification_rules (id, module_id, name, description, warning_days, critical_days, enabled) VALUES
+('rule_cert', 'hydrosys', 'Certificados de Potabilidade', 'Monitora a data de validade dos laudos.', 30, 0, true),
+('rule_filtros', 'hydrosys', 'Troca de Filtros', 'Monitora a data da próxima troca de elementos filtrantes.', 15, 0, true),
+('rule_res', 'hydrosys', 'Limpeza de Reservatórios', 'Monitora datas de limpeza de Caixas e Cisternas.', 30, 7, true),
+('rule_pest', 'pestcontrol', 'Controle de Pragas', 'Monitora agendamentos de dedetização e iscagem.', 5, 0, true)
+ON CONFLICT (id) DO NOTHING;
 `;
 
 export const Instructions = () => {

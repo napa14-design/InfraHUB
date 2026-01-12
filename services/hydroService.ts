@@ -4,9 +4,9 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS } from '../constants';
 import { logService } from './logService';
 import { authService } from './authService';
+import { notificationService } from './notificationService';
 
-// --- MAPPERS (DB snake_case <-> App camelCase) ---
-
+// ... (KEEP ALL MAPPERS AS IS, DO NOT CHANGE THEM) ...
 const mapCertificadoFromDB = (db: any): HydroCertificado => ({
     id: db.id,
     sedeId: db.sede_id,
@@ -177,12 +177,20 @@ export const hydroService = {
   saveCertificado: async (item: HydroCertificado) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}`);
+    if(u) {
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}`);
+        // Se status vigent, limpar alertas antigos
+        if (item.status === 'VIGENTE') await notificationService.resolveAlert(item.id);
+        await notificationService.checkSystemStatus(u);
+        notificationService.notifyRefresh();
+    }
   },
   deleteCertificado: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_certificados').delete().eq('id', id);
     const u = getCurrentUserForLog();
     if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Certificado ID ${id}`);
+    await notificationService.resolveAlert(id);
+    notificationService.notifyRefresh();
   },
 
   getCloro: async (user: User): Promise<HydroCloroEntry[]> => {
@@ -217,12 +225,19 @@ export const hydroService = {
   saveFiltro: async (item: HydroFiltro) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`);
+    if(u) {
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`);
+        await notificationService.resolveAlert(item.id);
+        await notificationService.checkSystemStatus(u);
+        notificationService.notifyRefresh();
+    }
   },
   deleteFiltro: async (id: string) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_filtros').delete().eq('id', id);
     const u = getCurrentUserForLog();
     if(u) logService.logAction(u, 'HYDROSYS', 'DELETE', `Filtro ID ${id}`);
+    await notificationService.resolveAlert(id);
+    notificationService.notifyRefresh();
   },
 
   getPocos: async (user: User): Promise<HydroPoco[]> => {
@@ -239,7 +254,12 @@ export const hydroService = {
   savePoco: async (item: HydroPoco) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`);
+    if(u) {
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        await notificationService.checkSystemStatus(u);
+        notificationService.notifyRefresh();
+    }
   },
 
   getCisternas: async (user: User): Promise<HydroCisterna[]> => {
@@ -256,7 +276,12 @@ export const hydroService = {
   saveCisterna: async (item: HydroCisterna) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CISTERNA' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`);
+    if(u) {
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        await notificationService.checkSystemStatus(u);
+        notificationService.notifyRefresh();
+    }
   },
 
   getCaixas: async (user: User): Promise<HydroCaixa[]> => {
@@ -273,7 +298,12 @@ export const hydroService = {
   saveCaixa: async (item: HydroCaixa) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'CAIXA' }));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa ${item.local}`);
+    if(u) {
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa ${item.local}`);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        await notificationService.checkSystemStatus(u);
+        notificationService.notifyRefresh();
+    }
   },
 
   getSettings: async (): Promise<HydroSettings> => {

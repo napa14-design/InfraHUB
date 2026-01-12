@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_RULES } from '../constants';
 
 const DEFAULT_RULES: NotificationRule[] = [
+  // --- HYDROSYS ---
   {
     id: 'rule_cert',
     moduleId: 'hydrosys',
@@ -31,11 +32,41 @@ const DEFAULT_RULES: NotificationRule[] = [
     criticalDays: 7,
     enabled: true
   },
+  
+  // --- PEST CONTROL (GRANULAR) ---
   {
-    id: 'rule_pest',
+    id: 'rule_pest_rodents',
     moduleId: 'pestcontrol',
-    name: 'Controle de Pragas',
-    description: 'Monitora agendamentos de dedetização e iscagem.',
+    name: 'Roedores (Ratos)',
+    description: 'Alertas para desratização e iscagem.',
+    warningDays: 5,
+    criticalDays: 0,
+    enabled: true
+  },
+  {
+    id: 'rule_pest_insects',
+    moduleId: 'pestcontrol',
+    name: 'Insetos Rasteiros',
+    description: 'Baratas, Formigas, Escorpiões, etc.',
+    warningDays: 7,
+    criticalDays: 0,
+    enabled: true
+  },
+  {
+    id: 'rule_pest_vector',
+    moduleId: 'pestcontrol',
+    name: 'Vetores Voadores',
+    description: 'Mosquitos, Muriçocas e Fumacê.',
+    warningDays: 3,
+    criticalDays: 0,
+    enabled: true
+  },
+  // Regra genérica de fallback (caso o tipo não bata com os acima)
+  {
+    id: 'rule_pest_general',
+    moduleId: 'pestcontrol',
+    name: 'Outras Pragas (Geral)',
+    description: 'Regra padrão para tipos não especificados.',
     warningDays: 5,
     criticalDays: 0,
     enabled: true
@@ -49,13 +80,19 @@ export const configService = {
         const { data, error } = await supabase.from('notification_rules').select('*');
         
         if (error) {
-            console.error("Error fetching rules:", error);
+            // Se a tabela não existir, retorna defaults para evitar crash
+            if (error.code === '42P01') {
+                console.warn("Table notification_rules not found. Using defaults.");
+                return DEFAULT_RULES;
+            }
             throw error;
         }
 
+        let mappedRules: NotificationRule[] = [];
+
         if (data && data.length > 0) {
             // Map DB snake_case to App camelCase
-            return data.map((r: any) => ({
+            mappedRules = data.map((r: any) => ({
                 id: r.id,
                 moduleId: r.module_id, // snake_case from DB
                 name: r.name,
@@ -66,8 +103,19 @@ export const configService = {
             }));
         }
         
-        // If connected but empty, return defaults (and maybe save them later or let user save)
-        return DEFAULT_RULES;
+        // MERGE: Ensure all DEFAULT_RULES are present. 
+        // If a rule exists in DB, use DB version. If not, use Default.
+        const mergedRules = [...mappedRules];
+        
+        DEFAULT_RULES.forEach(defRule => {
+            const exists = mergedRules.find(r => r.id === defRule.id);
+            if (!exists) {
+                mergedRules.push(defRule);
+            }
+        });
+
+        return mergedRules;
+
     } catch (e) {
         console.warn("Using Mock Rules due to error or offline mode.");
         return MOCK_RULES || DEFAULT_RULES;

@@ -46,7 +46,26 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
     useEffect(() => {
         const load = async () => {
             const [c, f, p] = await Promise.all([hydroService.getCertificados(user), hydroService.getFiltros(user), hydroService.getPocos(user)]);
-            setCertificados(c); setFiltros(f); setPocos(p); setLoading(false);
+            
+            // DEDUPLICATION (Same logic as Dashboard) to ensure sync
+            const uniqueCerts = Array.from(c.reduce((map, item) => {
+                const key = `${item.sedeId}-${item.parceiro}`;
+                const existing = map.get(key);
+                if (!existing || new Date(item.validade) > new Date(existing.validade)) map.set(key, item);
+                return map;
+            }, new Map<string, HydroCertificado>()).values());
+
+            const uniqueFiltros = Array.from(f.reduce((map, item) => {
+                const key = `${item.sedeId}-${item.patrimonio}`;
+                const existing = map.get(key);
+                if (!existing || new Date(item.dataTroca) > new Date(existing.dataTroca)) map.set(key, item);
+                return map;
+            }, new Map<string, HydroFiltro>()).values());
+
+            setCertificados(uniqueCerts); 
+            setFiltros(uniqueFiltros); 
+            setPocos(p); 
+            setLoading(false);
         };
         load();
     }, [user]);
@@ -101,7 +120,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                             <StatCard title="Índice de Saúde" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
                             <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="Ação imediata" />
                             <StatCard title="Alertas Próximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
-                            <StatCard title="Total Monitorado" value={totalAssets} icon={Droplets} type="info" subtitle="Ativos cadastrados" />
+                            <StatCard title="Total Monitorado" value={totalAssets} icon={Droplets} type="info" subtitle="Ativos ativos" />
                         </div>
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">

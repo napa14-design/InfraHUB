@@ -5,7 +5,7 @@ import {
     ArrowLeft, ShieldAlert, Plus, Calendar, Filter, 
     Search, CheckCircle2, AlertTriangle, Clock, 
     Edit2, Trash2, Save, X, Check, User as UserIcon, 
-    Bug, Beaker, ClipboardList, History, CalendarCheck
+    Bug, Beaker, ClipboardList, History, CalendarCheck, AlertCircle
 } from 'lucide-react';
 import { User, PestControlEntry, UserRole, Sede, PestControlSettings } from '../../types';
 import { pestService } from '../../services/pestService';
@@ -13,10 +13,12 @@ import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
 
 // Helper de Data Robusto (Ignora Fuso Horário para comparação de dias puros)
+// Se target (data agendada) for MENOR que hoje (00:00), retorna negativo (Atrasado).
 const getDaysDiff = (dateStr: string) => {
     if (!dateStr) return 0;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    // Resetar hoje para meia-noite absoluta local
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
     // Parse manual da string YYYY-MM-DD para garantir data local correta
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -40,6 +42,10 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  
+  // Delete Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<PestControlEntry | null>(null);
   
   const [editingItem, setEditingItem] = useState<Partial<PestControlEntry>>({});
   const [historyItems, setHistoryItems] = useState<PestControlEntry[]>([]);
@@ -141,20 +147,27 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string, e?: React.MouseEvent) => {
-      if (e) e.stopPropagation();
-      
-      if(confirm("ATENÇÃO: Deseja realmente excluir este agendamento?")) {
+  const requestDelete = (item: PestControlEntry, e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation(); // CRUCIAL: Stop event bubbling
+      setItemToDelete(item);
+      setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+      if(itemToDelete) {
           try {
-            // Atualização Otimista
-            setEntries(prev => prev.filter(item => item.id !== id));
-            
-            await pestService.delete(id);
+            // Optimistic Update
+            setEntries(prev => prev.filter(i => i.id !== itemToDelete.id));
+            await pestService.delete(itemToDelete.id);
             await refreshData();
           } catch (e) {
             console.error("Delete failed", e);
             alert("Erro ao excluir. Verifique sua conexão ou permissões.");
-            await refreshData(); // Revert on error
+            await refreshData(); // Revert
+          } finally {
+            setIsDeleteModalOpen(false);
+            setItemToDelete(null);
           }
       }
   };
@@ -223,14 +236,14 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
           )}
 
           {dynamicStatus !== 'REALIZADO' && canEdit && (
-              <button onClick={() => handleComplete(entry)} className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors shadow-sm" title="Concluir / Renovar">
+              <button onClick={() => handleComplete(entry)} className="p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors shadow-sm" title="Concluir / Renovar">
                   <CheckCircle2 size={20} />
               </button>
           )}
           
           {canEdit && (
               <button 
-                onClick={(e) => handleDelete(entry.id, e)} 
+                onClick={(e) => requestDelete(entry, e)} 
                 className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
                 title="Excluir"
               >
@@ -365,7 +378,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                const hasDetails = entry.method && entry.product;
 
                                return (
-                                   <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors">
+                                   <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors group">
                                        <td className="px-6 py-4">
                                            <div className="flex items-center gap-2 font-mono font-black text-slate-900 dark:text-white">
                                                <Calendar size={14} className="text-slate-400"/>
@@ -570,6 +583,39 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                ))}
                            </div>
                        )}
+                   </div>
+               </div>
+           </div>
+       )}
+
+       {/* DELETE CONFIRMATION MODAL */}
+       {isDeleteModalOpen && itemToDelete && (
+           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+               <div className="bg-white dark:bg-[#111114] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative overflow-hidden rounded-2xl animate-in zoom-in-95 shadow-2xl">
+                   <div className="absolute top-0 left-0 w-full h-1 bg-red-600"></div>
+                   <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-6 rounded-full border border-red-200 dark:border-red-800">
+                       <AlertCircle size={32} />
+                   </div>
+                   
+                   <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">CONFIRMAR EXCLUSÃO</h3>
+                   <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                       Ação irreversível.<br/>
+                       Deseja realmente remover o agendamento de <strong className="text-slate-900 dark:text-white">{itemToDelete.target}</strong>?
+                   </p>
+
+                   <div className="grid grid-cols-2 gap-3">
+                       <button 
+                         onClick={() => setIsDeleteModalOpen(false)}
+                         className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors rounded-xl"
+                       >
+                           CANCELAR
+                       </button>
+                       <button 
+                         onClick={confirmDelete}
+                         className="py-3 bg-red-600 hover:bg-red-700 text-white font-mono text-xs font-bold uppercase transition-colors rounded-xl shadow-lg shadow-red-500/20"
+                       >
+                           CONFIRMAR
+                       </button>
                    </div>
                </div>
            </div>

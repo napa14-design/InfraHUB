@@ -3,6 +3,7 @@ import { PestControlEntry, PestControlSettings, User, UserRole } from '../types'
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logService } from './logService';
 import { authService } from './authService';
+import { notificationService } from './notificationService';
 
 const excelToISO = (serial: number) => {
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -132,8 +133,19 @@ export const pestService = {
         const u = authService.getCurrentUser();
         if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Unidade: ${item.sedeId}, Status: ${item.status}`);
 
+        // ALERTAS INSTANTÂNEOS
         if (isCompletion) {
             await pestService.generateNextTask(item);
+            // Se concluído, marca notificações relacionadas como lidas imediatamente
+            await notificationService.resolveAlert(item.id);
+        }
+        
+        // Dispara atualização da UI
+        if(u) {
+            // Re-checa status geral (gera novas notificações ou mantém as atuais)
+            await notificationService.checkSystemStatus(u);
+            // Avisa o Layout para buscar tudo de novo
+            notificationService.notifyRefresh();
         }
     },
 
@@ -142,8 +154,6 @@ export const pestService = {
         const target = completedItem.target;
         const sedeId = completedItem.sedeId;
 
-        // Check duplicate: if there is already a PENDING task for this target/sede with date > scheduledDate
-        // This prevents creating duplicate future tasks if the user edits a Realized task multiple times.
         const allEntries = await pestService.getAll({ role: UserRole.ADMIN } as User); 
         const exists = allEntries.some(e => 
             e.sedeId === completedItem.sedeId && 
@@ -152,12 +162,8 @@ export const pestService = {
             new Date(e.scheduledDate) > new Date(completedItem.scheduledDate)
         );
         
-        if (exists) return; // Already scheduled next task
+        if (exists) return; 
 
-        // Lógica de Prioridade de Frequência:
-        // 1. Sede específica?
-        // 2. Global por praga?
-        // 3. Fallback (15 dias)
         let daysToAdd = 15;
         
         if (settings.sedeFrequencies[sedeId] && settings.sedeFrequencies[sedeId][target]) {
@@ -175,10 +181,10 @@ export const pestService = {
             sedeId: completedItem.sedeId,
             item: completedItem.item,
             target: completedItem.target,
-            product: '', // IMPORTANTE: Limpar produto para o novo agendamento
+            product: '',
             frequency: daysToAdd === 7 ? 'Semanal' : daysToAdd === 15 ? 'Quinzenal' : daysToAdd === 30 ? 'Mensal' : `${daysToAdd} dias`,
-            method: '', // IMPORTANTE: Limpar método para o novo agendamento
-            technician: completedItem.technician, // Técnico mantém, mas pode ser alterado
+            method: '',
+            technician: completedItem.technician,
             scheduledDate: nextDate.toISOString().split('T')[0],
             status: 'PENDENTE',
             observation: ''
@@ -201,5 +207,8 @@ export const pestService = {
             const idx = MOCK_PEST_ENTRIES.findIndex(e => e.id === id);
             if (idx >= 0) MOCK_PEST_ENTRIES.splice(idx, 1);
         }
+        // Se deletado, limpa notificações e atualiza UI
+        await notificationService.resolveAlert(id);
+        notificationService.notifyRefresh();
     }
 };

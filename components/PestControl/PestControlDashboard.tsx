@@ -10,6 +10,26 @@ interface Props {
   user: User;
 }
 
+// Helper para consistência de status (mesma lógica da Execução)
+const getDynamicStatus = (entry: PestControlEntry) => {
+    if (entry.status === 'REALIZADO') return 'REALIZADO';
+    
+    // Comparação de datas (Ignorando horas para precisão de dia)
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    
+    if (!entry.scheduledDate) return 'PENDENTE';
+    
+    // Parse manual YYYY-MM-DD para evitar problemas de timezone
+    const [year, month, day] = entry.scheduledDate.split('-').map(Number);
+    const target = new Date(year, month - 1, day);
+    
+    // Se a data alvo for menor que hoje (ontem ou antes), está atrasado
+    if (target.getTime() < today.getTime()) return 'ATRASADO';
+    
+    return 'PENDENTE';
+};
+
 const MenuCard = ({ title, description, icon: Icon, onClick, colorClass, isAdminOnly }: any) => (
     <button 
         onClick={onClick}
@@ -56,26 +76,36 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
       const loadStats = async () => {
           const entries = await pestService.getAll(user);
           
-          // Pending and Delayed
-          const pending = entries.filter(e => e.status === 'PENDENTE').length;
-          const delayed = entries.filter(e => e.status === 'ATRASADO').length;
-          
-          // Next Visit logic
-          const today = new Date().toISOString().split('T')[0];
-          const future = entries
-            .filter(e => e.status === 'PENDENTE' || e.status === 'ATRASADO')
-            .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
-          
-          const nextDate = future.length > 0 ? new Date(future[0].scheduledDate).toLocaleDateString() : 'N/A';
+          let pendingCount = 0;
+          let delayedCount = 0;
+          const futureList: PestControlEntry[] = [];
 
-          setStats({
-              pending,
-              delayed,
-              nextDate,
-              status: delayed > 0 ? 'CRÍTICO' : pending > 0 ? 'PENDENTE' : 'REGULAR'
+          entries.forEach(e => {
+              // Use dynamic status calculation to match Execution List logic
+              const status = getDynamicStatus(e);
+              
+              if (status === 'PENDENTE') pendingCount++;
+              if (status === 'ATRASADO') delayedCount++;
+              
+              if (status !== 'REALIZADO') {
+                  // Inject dynamic status into the object for the list display
+                  futureList.push({ ...e, status: status as any }); 
+              }
           });
           
-          setUpcoming(future.slice(0, 3)); // Top 3 next actions
+          // Sort by date (oldest first for upcoming/delayed tasks)
+          futureList.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+          
+          const nextDate = futureList.length > 0 ? new Date(futureList[0].scheduledDate).toLocaleDateString() : 'N/A';
+
+          setStats({
+              pending: pendingCount,
+              delayed: delayedCount,
+              nextDate,
+              status: delayedCount > 0 ? 'CRÍTICO' : pendingCount > 0 ? 'PENDENTE' : 'REGULAR'
+          });
+          
+          setUpcoming(futureList.slice(0, 3)); // Top 3 next actions
       };
       loadStats();
   }, [user]);
@@ -197,14 +227,14 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
                     ) : (
                         upcoming.map(item => (
                             <div key={item.id} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 relative group hover:border-amber-500/30 transition-colors">
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-xl"></div>
+                                <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-xl ${item.status === 'ATRASADO' ? 'bg-red-500' : 'bg-amber-500'}`}></div>
                                 <div className="pl-3">
                                     <div className="flex justify-between items-start mb-1">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">{new Date(item.scheduledDate).toLocaleDateString()}</span>
                                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${item.status === 'ATRASADO' ? 'bg-red-100 text-red-600' : 'bg-slate-200 text-slate-600'}`}>{item.status}</span>
                                     </div>
                                     <p className="font-bold text-slate-800 dark:text-slate-200 text-sm">{item.target}</p>
-                                    <p className="text-xs text-slate-500 truncate">{item.sedeId} - {item.method}</p>
+                                    <p className="text-xs text-slate-500 truncate">{item.sedeId} - {item.method || 'A Definir'}</p>
                                 </div>
                             </div>
                         ))
