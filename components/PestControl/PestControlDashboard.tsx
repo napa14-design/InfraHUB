@@ -5,6 +5,7 @@ import { ArrowLeft, Bug, ShieldAlert, PieChart, Settings, HelpCircle, ChevronRig
 import { User, UserRole, PestControlEntry } from '../../types';
 import { orgService } from '../../services/orgService';
 import { pestService } from '../../services/pestService';
+import { Breadcrumbs } from '../Shared/Breadcrumbs';
 
 interface Props {
   user: User;
@@ -133,12 +134,12 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
       </div>
 
       <div className="relative z-10 px-4 md:px-8 py-6 space-y-8 max-w-7xl mx-auto pb-24">
+        
+        <Breadcrumbs />
+
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
             <div>
-                <button onClick={() => navigate('/')} className="group flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors text-xs font-bold uppercase tracking-widest mb-3">
-                    <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Hub Principal
-                </button>
                 <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter flex items-center gap-3">
                     CONTROLE DE <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 to-orange-600">PRAGAS</span>
                 </h1>

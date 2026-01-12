@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, Lock, ChevronRight, Activity, AlertTriangle, Gauge, Thermometer, Waves, FileDown, Calendar, Download, X } from 'lucide-react';
 import { User, UserRole, HydroCertificado, HydroFiltro } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
-import { orgService } from '../services/orgService';
-import { hydroService } from '../services/hydroService';
+import { orgService } from '../../services/orgService';
+import { hydroService } from '../../services/hydroService';
 import { exportToCSV } from '../utils/csvExport';
+import { Breadcrumbs } from './Shared/Breadcrumbs';
 
 interface Props {
   user: User;
@@ -220,14 +221,13 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       </div>
 
       <div className="relative z-10 px-4 md:px-8 py-6 space-y-6 pb-24 md:pb-8">
+        <Breadcrumbs />
+        
         <header className={`relative overflow-hidden border border-slate-200 dark:border-white/5 bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm transition-all duration-700 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'}`}>
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
           <div className="p-6 md:p-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               <div className="space-y-4">
-                <button onClick={() => navigate('/')} className="group flex items-center gap-2 text-slate-500 dark:text-white/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all text-xs font-mono uppercase tracking-widest">
-                  <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Hub Principal
-                </button>
                 <div className="flex items-center gap-5">
                   <div className="w-16 h-16 border-2 border-cyan-500/20 dark:border-cyan-500/50 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl">
                     <Waves size={32} className="text-cyan-600 dark:text-cyan-500" strokeWidth={1.5} />
@@ -301,7 +301,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           </div>
         </div>
 
-        {/* Modal code remains same, omitted for brevity as no logic changed there */}
+        {/* Modal code remains same */}
         {isReportModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 overflow-hidden">

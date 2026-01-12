@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, HydroCloroEntry, HydroSettings, Sede, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
+import { Breadcrumbs } from '../Shared/Breadcrumbs';
 
 export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
@@ -90,14 +91,13 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
       <div className="relative z-10 px-4 md:px-8 py-6 space-y-6 pb-24 md:pb-8 max-w-7xl mx-auto">
         
+        <Breadcrumbs />
+
         {/* HEADER */}
         <header className="relative overflow-hidden border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#111114]/90 backdrop-blur-sm rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
             <div className="p-6 md:p-8 flex flex-col md:flex-row justify-between items-center gap-6">
                 <div className="space-y-4 w-full md:w-auto">
-                    <button onClick={() => navigate('/module/hydrosys')} className="group flex items-center gap-2 text-slate-500 dark:text-white/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all text-xs font-mono uppercase tracking-widest">
-                        <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Voltar ao Painel
-                    </button>
                     <div className="flex items-center gap-5">
                         <div className="w-14 h-14 border-2 border-cyan-500/20 dark:border-cyan-500/50 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl">
                             <TestTube size={28} className="text-cyan-600 dark:text-cyan-500" strokeWidth={1.5} />

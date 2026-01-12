@@ -11,6 +11,7 @@ import { User, PestControlEntry, UserRole, Sede, PestControlSettings } from '../
 import { pestService } from '../../services/pestService';
 import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
+import { Breadcrumbs } from '../Shared/Breadcrumbs';
 
 // Helper de Data Robusto (Ignora Fuso Horário para comparação de dias puros)
 const getDaysDiff = (dateStr: string) => {
@@ -200,12 +201,10 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
        {/* Top Bar */}
        <div className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#111114]/80 backdrop-blur-md sticky top-0 z-30">
            <div className="max-w-7xl mx-auto px-4 md:px-6 py-4">
+               <Breadcrumbs />
                <div className="flex flex-col gap-6">
                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <button onClick={() => navigate('/module/pestcontrol')} className="flex items-center text-slate-500 hover:text-amber-600 transition-colors text-xs font-mono uppercase tracking-widest mb-1">
-                                <ArrowLeft size={14} className="mr-1" /> Voltar
-                            </button>
                             <h1 className="text-2xl font-black text-slate-900 dark:text-white font-mono flex items-center gap-2 uppercase tracking-tight">
                                 <ShieldAlert className="text-amber-600" size={24} /> Ordem de Serviço
                             </h1>
@@ -250,7 +249,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                <select className="bg-slate-100 dark:bg-slate-900 border-none text-xs font-bold px-3 rounded-xl outline-none text-slate-600 dark:text-slate-300 min-w-[100px]" value={selectedSedeId} onChange={e => setSelectedSedeId(e.target.value)}>
                                    {isAdmin && <option value="">Global</option>}
                                    {availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                               </select>
+                                </select>
                            )}
                        </div>
                    </div>
