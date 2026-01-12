@@ -8,11 +8,13 @@ import {
 import { User, PestControlSettings, Sede } from '../../types';
 import { pestService } from '../../services/pestService';
 import { orgService } from '../../services/orgService';
+import { useToast } from '../Shared/ToastContext';
 
 type ConfigTab = 'GLOBAL' | 'LISTS' | 'SEDES';
 
 export const PestControlConfig: React.FC<{ user: User }> = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast(); // Hook de notificação
   const [activeTab, setActiveTab] = useState<ConfigTab>('GLOBAL');
   const [settings, setSettings] = useState<PestControlSettings>({
       pestTypes: [],
@@ -44,36 +46,53 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
   const handleSave = async () => {
       await pestService.saveSettings(settings);
       setSaved(true);
+      addToast("Configurações salvas com sucesso.", "success");
       setTimeout(() => setSaved(false), 2000);
   };
 
   const addPest = () => {
-      if (newPest && !settings.pestTypes.includes(newPest)) {
+      const name = newPest.trim();
+      if (name && !settings.pestTypes.includes(name)) {
           setSettings({
               ...settings,
-              pestTypes: [...settings.pestTypes, newPest],
-              globalFrequencies: { ...settings.globalFrequencies, [newPest]: 15 }
+              pestTypes: [...settings.pestTypes, name],
+              // AUTOMATICAMENTE CRIA O CICLO GLOBAL DE 15 DIAS
+              globalFrequencies: { ...settings.globalFrequencies, [name]: 15 }
           });
           setNewPest('');
+          addToast(`${name} adicionada! Ciclo padrão de 15 dias definido na aba Global.`, "success");
+      } else if (settings.pestTypes.includes(name)) {
+          addToast("Esta praga já está cadastrada.", "warning");
       }
   };
 
   const removePest = (p: string) => {
-      setSettings({
-          ...settings,
-          pestTypes: settings.pestTypes.filter(x => x !== p)
-      });
+      if(confirm(`Remover "${p}" da lista? Isso não apaga registros passados.`)) {
+        const newGlobals = { ...settings.globalFrequencies };
+        delete newGlobals[p]; // Limpa o ciclo também
+        
+        setSettings({
+            ...settings,
+            pestTypes: settings.pestTypes.filter(x => x !== p),
+            globalFrequencies: newGlobals
+        });
+        addToast(`${p} removida.`, "info");
+      }
   };
 
   const addTech = () => {
-      if (newTech && !settings.technicians.includes(newTech)) {
-          setSettings({ ...settings, technicians: [...settings.technicians, newTech] });
+      const name = newTech.trim();
+      if (name && !settings.technicians.includes(name)) {
+          setSettings({ ...settings, technicians: [...settings.technicians, name] });
           setNewTech('');
+          addToast("Técnico adicionado com sucesso.", "success");
       }
   };
 
   const removeTech = (t: string) => {
-      setSettings({ ...settings, technicians: settings.technicians.filter(x => x !== t) });
+      if(confirm(`Remover técnico "${t}"?`)) {
+        setSettings({ ...settings, technicians: settings.technicians.filter(x => x !== t) });
+      }
   };
 
   const updateGlobalFreq = (pest: string, days: number) => {
@@ -105,6 +124,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
       else newAllSedes[selectedSedeId] = newSedeFreqs;
 
       setSettings({ ...settings, sedeFrequencies: newAllSedes });
+      addToast(`Exceção removida. Usando ciclo global para ${pest}.`, "info");
   };
 
   return (
