@@ -179,8 +179,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                 {label}
             </span>
         )}
+        
+        {/* Tooltip Fix: Moved to fixed positioning relative to parent or smarter absolute handling */}
         {isCollapsed && (
-            <div className="absolute left-14 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl transition-opacity translate-x-2 group-hover:translate-x-0">
+            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-[100] shadow-xl transition-all duration-200">
+                <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-900"></div>
                 {label}
             </div>
         )}
@@ -204,7 +207,8 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
                   <Link to="/" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-slate-500 hover:text-brand-600 transition-colors" title="Voltar ao Hub">
                       <ArrowLeft size={20} />
                   </Link>
-                  <div className="absolute left-14 top-1/2 -translate-y-1/2 ml-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 shadow-xl">
+                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 bg-slate-900 text-white text-xs font-medium rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-[100] shadow-xl transition-all duration-200">
+                      <div className="absolute left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-900"></div>
                       Voltar ao Hub
                   </div>
               </div>
@@ -311,9 +315,12 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             </div>
             <button className="lg:hidden text-slate-500 hover:text-brand-500 ml-auto" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>
           </div>
-          <nav className="flex-1 overflow-y-auto px-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 overflow-x-hidden">
+          
+          {/* NAV CONTAINER FIX: Switch overflow based on state to allow tooltips */}
+          <nav className={`flex-1 px-3 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-800 ${isCollapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden'}`}>
             {isHydroSys ? renderHydroSysSidebar() : isPestControl ? renderPestControlSidebar() : renderMainSidebar()}
           </nav>
+          
           <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-2">
              {!isCollapsed && (
                 <div className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 mb-1 border ${isMockData ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
