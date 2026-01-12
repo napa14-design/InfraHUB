@@ -6,8 +6,9 @@ import {
   Activity, AlertTriangle, CheckCircle2, Database, X 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { LogEntry } from '../types';
+import { LogEntry, UserRole, User as AppUser } from '../types';
 import { logService } from '../services/logService';
+import { authService } from '../services/authService';
 import { exportToCSV } from '../utils/csvExport';
 import { TableRowSkeleton } from './Shared/Skeleton';
 
@@ -64,6 +65,7 @@ export const AuditLogs: React.FC = () => {
   const navigate = useNavigate();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,14 +78,33 @@ export const AuditLogs: React.FC = () => {
   const itemsPerPage = 15;
 
   useEffect(() => {
-    loadData();
+    const u = authService.getCurrentUser();
+    setCurrentUser(u);
+    loadData(u);
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (user: AppUser | null = currentUser) => {
     setIsLoading(true);
     // Simulate slight network delay for skeleton demo
     setTimeout(async () => {
-        const data = await logService.getAll();
+        let data = await logService.getAll();
+        
+        // Filter for GESTOR: only show logs for users in their Sedes
+        if (user && user.role === UserRole.GESTOR) {
+            const allUsers = await authService.getAllUsers();
+            const mySedes = user.sedeIds || [];
+            
+            // Find users that share at least one Sede with the Gestor
+            const relevantUserIds = allUsers
+                .filter(u => u.sedeIds?.some(s => mySedes.includes(s)))
+                .map(u => u.id);
+            
+            // Ensure Gestor sees their own logs too
+            if (!relevantUserIds.includes(user.id)) relevantUserIds.push(user.id);
+
+            data = data.filter(log => relevantUserIds.includes(log.userId));
+        }
+
         setLogs(data);
         setIsLoading(false);
     }, 600);
@@ -174,10 +195,14 @@ export const AuditLogs: React.FC = () => {
             <Shield className="text-brand-600 dark:text-brand-400" size={28} />
             CONSOLE DE AUDITORIA
           </h1>
-          <p className="text-sm text-slate-500 font-mono">Registro imutável de operações do sistema.</p>
+          <p className="text-sm text-slate-500 font-mono">
+              {currentUser?.role === UserRole.GESTOR 
+                ? 'Registro de operações da sua unidade.' 
+                : 'Registro imutável de operações do sistema.'}
+          </p>
         </div>
         <div className="flex gap-2">
-            <button onClick={loadData} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
+            <button onClick={() => loadData(currentUser)} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
                 <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} /> Atualizar
             </button>
             <button onClick={handleExport} className="px-4 py-2 bg-brand-600 text-white rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20">

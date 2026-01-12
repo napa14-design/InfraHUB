@@ -38,7 +38,8 @@ import {
   Settings,
   Bug,
   ShieldAlert,
-  HelpCircle
+  HelpCircle,
+  FileText
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -266,6 +267,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         {(isAdmin || canManageUsers) && <SectionLabel label="Administração" />}
         {isAdmin && <NavItem to="/admin/org" icon={Building2} label="Estrutura Org." />}
         {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão Usuários" />}
+        {(isAdmin || isGestor) && <NavItem to="/admin/logs" icon={FileText} label="Logs de Auditoria" />}
         {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo Apps" />}
         {isAdmin && <NavItem to="#" onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} icon={Bell} label="Central de Alertas" />}
       </>

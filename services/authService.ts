@@ -67,6 +67,15 @@ export const authService = {
               }
 
               if (profileData) {
+                  // --- BLOCK IF INACTIVE ---
+                  if (profileData.status !== 'ACTIVE') {
+                      await supabase.auth.signOut(); // Kill the session immediately
+                      return { 
+                          user: null, 
+                          error: "Acesso negado. Sua conta foi desativada pelo administrador." 
+                      };
+                  }
+
                   const appUser: User = {
                     id: authData.user.id,
                     email: authData.user.email || '',
@@ -89,6 +98,14 @@ export const authService = {
       // 2. Fallback to MOCK_USERS if Supabase failed or not configured
       const mockUser = MOCK_USERS.find(u => u.email === email);
       if (mockUser) {
+          // --- BLOCK IF INACTIVE (MOCK) ---
+          if (mockUser.status !== 'ACTIVE') {
+              return { 
+                  user: null, 
+                  error: "Acesso negado. Sua conta foi desativada pelo administrador." 
+              };
+          }
+
           console.log("[Auth] Mock user found.");
           localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
           return { user: mockUser };
@@ -119,6 +136,13 @@ export const authService = {
             const parsed = JSON.parse(stored);
             // Defensive check for name
             if (!parsed.name) parsed.name = 'Usuário';
+            
+            // Optional: Re-check status if token is stale (handled better by full re-auth, but good safeguard)
+            if (parsed.status !== 'ACTIVE') {
+                localStorage.removeItem(SESSION_KEY);
+                return null;
+            }
+
             return parsed;
         } catch (e) {
             return null;
@@ -275,7 +299,12 @@ export const authService = {
     const currentUser = authService.getCurrentUser();
     if (currentUser && currentUser.id === id) {
        const merged = { ...currentUser, ...updates };
-       localStorage.setItem(SESSION_KEY, JSON.stringify(merged));
+       // If I updated my own status to inactive, logout immediately on next refresh/check
+       if (merged.status !== 'ACTIVE') {
+           localStorage.removeItem(SESSION_KEY);
+       } else {
+           localStorage.setItem(SESSION_KEY, JSON.stringify(merged));
+       }
        return merged;
     }
     return null;

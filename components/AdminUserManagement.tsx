@@ -415,14 +415,17 @@ export const AdminUserManagement: React.FC = () => {
                         <button 
                             onClick={() => toggleStatus(user)} 
                             disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}
-                            className="focus:outline-none disabled:opacity-50"
+                            title="Clique para alterar status"
+                            className={`
+                                relative inline-flex items-center justify-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all duration-200
+                                ${user.status === 'ACTIVE' 
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40' 
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700'}
+                                disabled:opacity-50 disabled:cursor-not-allowed
+                            `}
                         >
-                            <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 ${user.status === 'ACTIVE' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-                                <span className={`text-xs font-bold uppercase ${user.status === 'ACTIVE' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                                    {user.status === 'ACTIVE' ? 'ONLINE' : 'OFFLINE'}
-                                </span>
-                            </div>
+                            {user.status === 'ACTIVE' && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 animate-pulse" />}
+                            {user.status === 'ACTIVE' ? 'ATIVO' : 'INATIVO'}
                         </button>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 opacity-60 group-hover:opacity-100 transition-opacity">
