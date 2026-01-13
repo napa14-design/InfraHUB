@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Bug, ShieldAlert, PieChart, Settings, HelpCircle, ChevronRight, AlertTriangle, CalendarCheck, CheckCircle2, TrendingUp, Clock, MapPin } from 'lucide-react';
+import { ArrowLeft, Bug, ShieldAlert, PieChart, Settings, HelpCircle, ChevronRight, AlertTriangle, CalendarCheck, CheckCircle2, TrendingUp, Clock, MapPin, Database, Activity } from 'lucide-react';
 import { User, UserRole, PestControlEntry } from '../../types';
 import { orgService } from '../../services/orgService';
 import { pestService } from '../../services/pestService';
@@ -43,6 +43,56 @@ const KPICard = ({ label, value, icon: Icon, color, subtext, delay }: any) => (
     </div>
 );
 
+// Novo componente de visualização de dados
+const OverviewWidget = ({ total, completed, pending, delayed }: any) => {
+    const getPct = (val: number) => total > 0 ? (val / total) * 100 : 0;
+    
+    return (
+        <div className="col-span-full bg-white dark:bg-[#16161a] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-sm mb-2 animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-4 gap-4">
+                <div>
+                    <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                        <Activity size={16} className="text-blue-500" /> Resumo Operacional
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-mono">
+                        Progresso geral dos agendamentos
+                    </p>
+                </div>
+                <div className="flex gap-4 text-[10px] font-bold uppercase tracking-wider">
+                    <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500"></span> Concluído
+                    </div>
+                    <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> Pendente
+                    </div>
+                    <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span> Atrasado
+                    </div>
+                </div>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                <div style={{ width: `${getPct(completed)}%` }} className="h-full bg-emerald-500 transition-all duration-1000 ease-out relative group">
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+                <div style={{ width: `${getPct(pending)}%` }} className="h-full bg-amber-500 transition-all duration-1000 ease-out relative group">
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+                <div style={{ width: `${getPct(delayed)}%` }} className="h-full bg-red-500 transition-all duration-1000 ease-out relative group">
+                    <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+            </div>
+            
+            <div className="flex justify-between mt-2 text-[10px] font-mono text-slate-400">
+                <span>0%</span>
+                <span>{Math.round(getPct(completed))}% EFICIÊNCIA</span>
+                <span>100%</span>
+            </div>
+        </div>
+    );
+};
+
 const ActionCard = ({ title, desc, icon: Icon, onClick, color, delay }: any) => (
     <button 
         onClick={onClick}
@@ -70,11 +120,10 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
   const isAdmin = user.role === UserRole.ADMIN;
 
   const [stats, setStats] = useState({
+      total: 0,
       pending: 0,
       delayed: 0,
       completed: 0,
-      nextDate: '',
-      nextLocation: '',
       status: 'REGULAR'
   });
   const [upcoming, setUpcoming] = useState<PestControlEntry[]>([]);
@@ -83,6 +132,7 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
       const loadStats = async () => {
           const entries = await pestService.getAll(user);
           
+          const total = entries.length;
           let pendingCount = 0;
           let delayedCount = 0;
           let completedCount = 0;
@@ -101,16 +151,11 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
           
           futureList.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
           
-          const nextItem = futureList.length > 0 ? futureList[0] : null;
-          const nextDate = nextItem ? new Date(nextItem.scheduledDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) : '--';
-          const nextLocation = nextItem ? nextItem.sedeId : '--';
-
           setStats({
+              total,
               pending: pendingCount,
               delayed: delayedCount,
               completed: completedCount,
-              nextDate,
-              nextLocation,
               status: delayedCount > 0 ? 'CRÍTICO' : pendingCount > 0 ? 'PENDENTE' : 'REGULAR'
           });
           
@@ -155,12 +200,20 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
             </div>
         </header>
 
-        {/* KPI Grid */}
+        {/* Visual Summary Widget */}
+        <OverviewWidget 
+            total={stats.total} 
+            completed={stats.completed} 
+            pending={stats.pending} 
+            delayed={stats.delayed} 
+        />
+
+        {/* KPI Grid - Updated to Requested Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard label="Próxima Visita" value={stats.nextDate} icon={CalendarCheck} color="amber" subtext={stats.nextLocation} delay="0ms" />
-            <KPICard label="Pendências" value={stats.pending} icon={Clock} color="blue" delay="100ms" />
-            <KPICard label="Atrasados" value={stats.delayed} icon={AlertTriangle} color="red" subtext={stats.delayed > 0 ? "Ação Imediata" : "Regular"} delay="200ms" />
-            <KPICard label="Realizados (Total)" value={stats.completed} icon={CheckCircle2} color="emerald" delay="300ms" />
+            <KPICard label="Total Agendamentos" value={stats.total} icon={Database} color="slate" delay="0ms" />
+            <KPICard label="Pendentes" value={stats.pending} icon={Clock} color="amber" subtext="Dentro do Prazo" delay="100ms" />
+            <KPICard label="Realizados" value={stats.completed} icon={CheckCircle2} color="emerald" delay="200ms" />
+            <KPICard label="Atrasados" value={stats.delayed} icon={AlertTriangle} color="red" subtext={stats.delayed > 0 ? "Ação Imediata" : "Regular"} delay="300ms" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
