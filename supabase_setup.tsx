@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, ArrowLeft, Database, Copy, Terminal } from 'lucide-react';
+import { CheckCircle2, ArrowLeft, Database, Copy, Terminal, FileSpreadsheet, Droplet, Waves, Box } from 'lucide-react';
 
 export const SCHEMA_SQL = `
 -- =============================================
@@ -32,9 +32,18 @@ CREATE TABLE IF NOT EXISTS pest_control_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
   pest_types TEXT[] DEFAULT '{}',
   technicians TEXT[] DEFAULT '{}',
+  technicians_list JSONB DEFAULT '[]'::jsonb, -- Nova coluna para lista estruturada
   global_frequencies JSONB DEFAULT '{}'::jsonb,
   sede_frequencies JSONB DEFAULT '{}'::jsonb
 );
+
+-- Migração segura (Execute se a tabela já existir)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pest_control_settings' AND column_name = 'technicians_list') THEN
+        ALTER TABLE pest_control_settings ADD COLUMN technicians_list JSONB DEFAULT '[]'::jsonb;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS pest_control_entries (
   id TEXT PRIMARY KEY,
@@ -48,7 +57,8 @@ CREATE TABLE IF NOT EXISTS pest_control_entries (
   scheduled_date DATE NOT NULL,
   performed_date DATE,
   observation TEXT,
-  status TEXT DEFAULT 'PENDENTE'
+  status TEXT DEFAULT 'PENDENTE',
+  photo_url TEXT -- Novo campo para foto
 );
 
 ALTER TABLE pest_control_settings ENABLE ROW LEVEL SECURITY;
@@ -107,6 +117,36 @@ ALTER TABLE hydro_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Read Hydro Settings" ON hydro_settings FOR SELECT USING (true);
 CREATE POLICY "Public Update Hydro Settings" ON hydro_settings FOR UPDATE USING (true);
 CREATE POLICY "Public Insert Hydro Settings" ON hydro_settings FOR INSERT WITH CHECK (true);
+
+-- Atualização na tabela de Cloro para foto
+CREATE TABLE IF NOT EXISTS hydro_cloro (
+  id TEXT PRIMARY KEY,
+  sede_id TEXT NOT NULL,
+  date DATE NOT NULL,
+  cl FLOAT,
+  ph FLOAT,
+  medida_corretiva TEXT,
+  responsavel TEXT,
+  photo_url TEXT
+);
+ALTER TABLE hydro_cloro ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Cloro" ON hydro_cloro FOR SELECT USING (true);
+CREATE POLICY "Public Write Cloro" ON hydro_cloro FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Cloro" ON hydro_cloro FOR UPDATE USING (true);
+
+-- =============================================
+-- 5. STORAGE BUCKETS (EXECUTAR NO EDITOR SQL)
+-- =============================================
+-- Insira um por vez no SQL Editor se falhar
+insert into storage.buckets (id, name, public) values ('pest-control-images', 'pest-control-images', true);
+insert into storage.buckets (id, name, public) values ('hydro-cloro-images', 'hydro-cloro-images', true);
+
+-- Políticas de Storage (Pode fazer pela UI do Supabase também)
+create policy "Public Access Pest" on storage.objects for select using ( bucket_id = 'pest-control-images' );
+create policy "Public Insert Pest" on storage.objects for insert with check ( bucket_id = 'pest-control-images' );
+
+create policy "Public Access Cloro" on storage.objects for select using ( bucket_id = 'hydro-cloro-images' );
+create policy "Public Insert Cloro" on storage.objects for insert with check ( bucket_id = 'hydro-cloro-images' );
 `;
 
 export const SEED_SQL = `
@@ -136,9 +176,181 @@ INSERT INTO notification_rules (id, module_id, name, description, warning_days, 
 ON CONFLICT (id) DO NOTHING;
 `;
 
+export const CERTIFICADOS_IMPORT_SQL = `
+-- =============================================
+-- IMPORTAÇÃO DE CERTIFICADOS (2025.2 - 2026.1)
+-- =============================================
+
+-- Limpa a tabela atual (Opcional, remova se quiser manter o histórico antigo)
+DELETE FROM hydro_certificados;
+
+-- Insere os novos dados
+INSERT INTO hydro_certificados (
+    id, sede_id, parceiro, status, semestre, 
+    validade_semestre, data_analise, validade, 
+    link_micro, link_fisico, empresa, agendamento, observacao
+) VALUES
+(gen_random_uuid(), 'ALD', 'ALD - VL', 'VIGENTE', '2º/2025', '2026-02-18', '2025-08-22', '2026-02-18', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'ALD', 'ALD - TP', 'VIGENTE', '2º/2025', '2026-03-16', '2025-09-17', '2026-03-16', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'ALD', 'ALD - VM', 'VIGENTE', '2º/2025', '2026-03-16', '2025-09-17', '2026-03-16', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'BN', 'BN', 'VIGENTE', '2º/2025', '2026-03-16', '2025-09-17', '2026-03-16', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'BS', 'BS', 'VIGENTE', '2º/2025', '2026-03-04', '2025-09-05', '2026-03-04', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'DL', 'DL', 'VIGENTE', '2º/2025', '2026-03-25', '2025-09-26', '2026-03-25', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'DT', 'DT', 'VIGENTE', '2º/2025', '2026-03-04', '2025-09-05', '2026-03-04', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'EUS', 'EUS', 'VIGENTE', '2º/2025', '2026-02-25', '2025-08-29', '2026-02-25', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PE', 'PE', 'VIGENTE', '2º/2025', '2026-03-25', '2025-09-26', '2026-03-25', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PJF', 'PJF', 'VENCIDO', '2º/2025', NULL, NULL, NULL, NULL, NULL, 'AC LAB', 'AGENDAR', '19/11/2025'),
+(gen_random_uuid(), 'PNV', 'PNV', 'VIGENTE', '2º/2025', '2026-03-04', '2025-09-05', '2026-03-04', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PQL1', 'PQL1', 'VIGENTE', '2º/2025', '2026-03-09', '2025-09-10', '2026-03-09', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PQL2', 'PQL2', 'VIGENTE', '2º/2025', '2026-03-09', '2025-09-10', '2026-03-09', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PQL3', 'PQL3', 'VIGENTE', '2º/2025', '2026-03-09', '2025-09-10', '2026-03-09', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'PQL3', 'FISIOTERAPIA - PQL3', 'VENCIDO', '2º/2025', NULL, NULL, NULL, NULL, NULL, 'AC LAB', 'REAGENDAR', 'AGENDAMENTO PENDENTE'),
+(gen_random_uuid(), 'PSUL', 'PSUL', 'VIGENTE', '2º/2025', '2026-03-28', '2025-09-29', '2026-03-28', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'SP', 'SP', 'VIGENTE', '2º/2025', '2026-03-04', '2025-09-05', '2026-03-04', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'SUL1', 'SUL1', 'VIGENTE', '2º/2025', '2026-03-09', '2025-09-10', '2026-03-09', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'SUL2', 'SUL2', 'VIGENTE', '2º/2025', '2026-03-29', '2025-09-30', '2026-03-29', 'LINK', 'LINK', 'AC LAB', NULL, NULL),
+(gen_random_uuid(), 'SUL3', 'SUL3', 'VIGENTE', '2º/2025', '2026-03-28', '2025-09-29', '2026-03-28', 'LINK', 'LINK', 'AC LAB', NULL, NULL);
+`;
+
+export const POCOS_IMPORT_SQL = `
+-- =============================================
+-- IMPORTAÇÃO DE POÇOS ARTESIANOS
+-- =============================================
+
+-- Limpa os poços atuais para evitar duplicidade (Opcional)
+DELETE FROM hydro_reservatorios WHERE tipo = 'POCO';
+
+-- Insere os novos dados
+INSERT INTO hydro_reservatorios (
+    id, sede_id, tipo, local, responsavel,
+    data_ultima_limpeza, referencia_bomba,
+    data_limpeza_1, situacao_limpeza, ficha_operacional, proxima_limpeza,
+    ultima_troca_filtro, situacao_filtro, proxima_troca_filtro, refil
+) VALUES
+(gen_random_uuid(), 'ALD', 'POCO', 'SUBSOLO', 'JOSY', '2024-01-24', NULL, '2025-07-09', 'DENTRO DO PRAZO', 'LINK', '2026-07-09', '2025-07-09', 'DENTRO DO PRAZO', '2026-01-05', '10"'),
+(gen_random_uuid(), 'ALD', 'POCO', 'SUBSOLO', 'JOSY', '2024-01-24', NULL, '2025-07-14', 'DENTRO DO PRAZO', 'LINK', '2026-07-14', '2025-07-14', 'DENTRO DO PRAZO', '2026-01-10', '10"'),
+(gen_random_uuid(), 'BN', 'POCO', 'CORREDOR (BOSQUE)', 'REBECCA', '2024-01-01', NULL, '2025-04-19', 'DENTRO DO PRAZO', 'LINK', '2026-04-19', '2025-04-19', 'DENTRO DO PRAZO', '2025-10-16', '20"'),
+(gen_random_uuid(), 'BS', 'POCO', 'RESIDÊNCIA', NULL, '2024-01-01', NULL, NULL, 'FORA DO PRAZO', 'LINK', NULL, NULL, 'NÃO POSSUI', NULL, '-'),
+(gen_random_uuid(), 'BS', 'POCO', 'JARDIM', NULL, '2024-12-14', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-12', 'DENTRO DO PRAZO', '2025-12-09', '10"'),
+(gen_random_uuid(), 'BS', 'POCO', 'SUBSOLO', NULL, '2024-12-20', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-18', 'DENTRO DO PRAZO', '2025-12-15', '10"'),
+(gen_random_uuid(), 'DL', 'POCO', 'NPJ', 'RAYANNE', '2024-01-25', NULL, '2025-02-26', 'DENTRO DO PRAZO', 'LINK', '2026-02-26', NULL, 'NÃO POSSUI', NULL, '-'),
+(gen_random_uuid(), 'DL', 'POCO', 'NPT', 'RAYANNE', '2024-01-30', NULL, '2025-03-11', 'DENTRO DO PRAZO', 'LINK', '2026-03-11', NULL, 'NÃO POSSUI', NULL, '-'),
+(gen_random_uuid(), 'DL', 'POCO', 'SUBSOLO 02', 'RAYANNE', '2024-04-01', NULL, '2025-02-05', 'DENTRO DO PRAZO', 'LINK', '2026-02-05', '2024-09-28', 'FORA DO PRAZO', '2025-03-27', '20"'),
+(gen_random_uuid(), 'DL', 'POCO', 'ESTACIONAMENTO (GUARITA)', 'RAYANNE', '2024-04-04', NULL, '2025-02-17', 'DENTRO DO PRAZO', 'LINK', '2026-02-17', '2024-10-01', 'FORA DO PRAZO', '2025-03-30', '10"'),
+(gen_random_uuid(), 'DL', 'POCO', 'ESTACIONAMENTO (EXTERNO)', 'RAYANNE', '2024-04-09', NULL, '2025-02-12', 'DENTRO DO PRAZO', 'LINK', '2026-02-12', '2024-10-06', 'FORA DO PRAZO', '2025-04-04', '10"'),
+(gen_random_uuid(), 'DL', 'POCO', 'QUADRA (AV. VIRGÍLIO TÁVORA)', 'RAYANNE', '2024-04-15', NULL, '2025-03-17', 'DENTRO DO PRAZO', 'LINK', '2026-03-17', '2024-10-12', 'FORA DO PRAZO', '2025-04-10', '10"'),
+(gen_random_uuid(), 'DT', 'POCO', 'PORTARIA 03', 'ELANO', '2024-08-28', 'MB-37', NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-02-24', 'FORA DO PRAZO', '2025-08-23', '20"'),
+(gen_random_uuid(), 'DT', 'POCO', 'CPA', 'ELANO', '2024-10-31', 'MB-133', NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-04-29', 'DENTRO DO PRAZO', '2025-10-26', '10"'),
+(gen_random_uuid(), 'DT', 'POCO', 'PORTARIA 02', 'ELANO', '2024-11-09', 'MB-117', NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-05-08', 'DENTRO DO PRAZO', '2025-11-04', '10"'),
+(gen_random_uuid(), 'DT', 'POCO', 'JARDIM (INFANTIL)', 'ELANO', '2024-11-22', 'MB-151', NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-05-21', 'DENTRO DO PRAZO', '2025-11-17', '20"'),
+(gen_random_uuid(), 'DT', 'POCO', 'PORTARIA 04', 'ELANO', '2024-12-05', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-03', 'DENTRO DO PRAZO', '2025-11-30', '10"'),
+(gen_random_uuid(), 'EUS', 'POCO', 'UNIVERSIDADE', 'DÂNIA', '2024-12-17', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-15', 'DENTRO DO PRAZO', '2025-12-12', '10"'),
+(gen_random_uuid(), 'EUS', 'POCO', 'CONSTRUTORA', 'DÂNIA', '2024-12-17', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-15', 'DENTRO DO PRAZO', '2025-12-12', '10"'),
+(gen_random_uuid(), 'PE', 'POCO', 'SUBSOLO 2 (RAMPA)', 'DANIELLE', '2024-03-18', NULL, '2025-08-29', 'DENTRO DO PRAZO', 'LINK', NULL, '2024-09-14', 'FORA DO PRAZO', '2025-03-13', '10"'),
+(gen_random_uuid(), 'PE', 'POCO', 'COPA (CAJUEIRO)', 'DANIELLE', '2024-10-01', NULL, '2025-08-28', 'DENTRO DO PRAZO', 'LINK', '2026-08-28', '2025-03-30', 'DENTRO DO PRAZO', '2025-09-26', '20"'),
+(gen_random_uuid(), 'PE', 'POCO', 'PORTARIA', 'DANIELLE', '2024-10-16', NULL, '2025-08-26', 'DENTRO DO PRAZO', 'LINK', '2026-08-26', '2025-04-14', 'DENTRO DO PRAZO', '2025-10-11', '10"'),
+(gen_random_uuid(), 'PJF', 'POCO', 'PÁTIO (CANTINA)', 'ALVARO', '2024-01-01', NULL, '2025-03-24', 'DENTRO DO PRAZO', 'LINK', '2026-03-24', '2024-06-29', 'FORA DO PRAZO', '2024-12-26', '10"'),
+(gen_random_uuid(), 'PNV', 'POCO', 'ESTACIONAMENTO (LATERAL)', NULL, '2024-12-26', NULL, NULL, 'DENTRO DO PRAZO', 'LINK', NULL, '2025-06-24', 'DENTRO DO PRAZO', '2025-12-21', '10"'),
+(gen_random_uuid(), 'PQL1', 'POCO', 'INFRA (COPA)', 'ALVARO', '2024-06-11', NULL, '2025-08-16', 'DENTRO DO PRAZO', 'LINK', NULL, '2024-12-08', 'FORA DO PRAZO', '2025-06-06', '20"'),
+(gen_random_uuid(), 'PQL2', 'POCO', 'LOJINHA', 'ALVARO', '2024-05-22', NULL, NULL, 'FORA DO PRAZO', 'LINK', NULL, '2024-11-18', 'FORA DO PRAZO', '2025-05-17', '10"'),
+(gen_random_uuid(), 'PQL3', 'POCO', 'PÁTIO (CANTINA)', 'JOÃO VICTOR', '2024-05-27', NULL, NULL, 'FORA DO PRAZO', 'LINK', NULL, '2024-11-23', 'FORA DO PRAZO', '2025-05-22', '10"'),
+(gen_random_uuid(), 'PQL3', 'POCO', 'CLÍNICA DE FISIOTERAPIA', 'JOÃO VICTOR', NULL, NULL, '2025-08-18', 'DENTRO DO PRAZO', NULL, NULL, NULL, NULL, NULL, NULL),
+(gen_random_uuid(), 'PSUL', 'POCO', 'SALA 03 (AUDITÓRIO)', 'LARISSA', '2024-01-01', NULL, '2025-10-11', 'DENTRO DO PRAZO', 'LINK', '2026-10-11', '2024-06-29', 'FORA DO PRAZO', '2024-12-26', '20"'),
+(gen_random_uuid(), 'SP', 'POCO', 'JARDIM (JV)', NULL, NULL, NULL, '2025-01-02', 'DENTRO DO PRAZO', 'LINK', '2026-01-02', '2025-01-02', 'DENTRO DO PRAZO', '2025-07-01', '10"'),
+(gen_random_uuid(), 'SP', 'POCO', 'PORTARIA (CAPELA)', NULL, NULL, NULL, '2025-01-09', 'DENTRO DO PRAZO', 'LINK', '2026-01-09', '2025-01-09', 'DENTRO DO PRAZO', '2025-07-08', '10"'),
+(gen_random_uuid(), 'SUL2', 'POCO', 'INFRA (GUARITA)', 'LARISSA', '2024-05-06', NULL, '2025-09-02', 'DENTRO DO PRAZO', 'LINK', '2026-09-02', '2025-09-02', 'DENTRO DO PRAZO', '2026-03-01', '20"'),
+(gen_random_uuid(), 'SUL2', 'POCO', 'QUADRA 01', 'LARISSA', '2024-05-15', NULL, '2025-08-28', 'DENTRO DO PRAZO', 'LINK', '2026-08-28', '2025-08-28', 'DENTRO DO PRAZO', '2026-02-24', '10"'),
+(gen_random_uuid(), 'SUL3', 'POCO', 'ESTACIONAMENTO (QUADRA)', 'LARISSA', '2024-04-24', NULL, '2025-09-08', 'DENTRO DO PRAZO', 'LINK', '2026-09-08', '2024-10-21', 'FORA DO PRAZO', '2025-04-19', '10"'),
+(gen_random_uuid(), 'SUL3', 'POCO', 'ESTACIONAMENTO (GUARITA)', 'LARISSA', '2024-04-29', NULL, '2025-09-03', 'DENTRO DO PRAZO', 'LINK', '2026-09-03', '2024-10-26', 'FORA DO PRAZO', '2025-04-24', '10"');
+`;
+
+export const CISTERNAS_IMPORT_SQL = `
+-- =============================================
+-- IMPORTAÇÃO DE CISTERNAS
+-- =============================================
+
+-- Limpa as cisternas atuais para evitar duplicidade (Opcional)
+DELETE FROM hydro_reservatorios WHERE tipo = 'CISTERNA';
+
+-- Insere os novos dados
+INSERT INTO hydro_reservatorios (
+    id, sede_id, tipo, local, responsavel,
+    num_celulas, capacidade,
+    previsao_limpeza_1, data_limpeza_1,
+    previsao_limpeza_2, data_limpeza_2,
+    situacao_limpeza, proxima_limpeza
+) VALUES
+(gen_random_uuid(), 'ALD', 'CISTERNA', 'SUBSOLO', 'JOSY', 2, '80.000', NULL, '2025-01-07', '2025-07-06', '2025-08-11', 'DENTRO DO PRAZO', '2026-02-11'),
+(gen_random_uuid(), 'BS', 'CISTERNA', 'SUBSOLO', 'HÉRIC', 1, '116.000', '2025-06-14', NULL, NULL, '2025-07-05', 'DENTRO DO PRAZO', '2026-01-05'),
+(gen_random_uuid(), 'DL', 'CISTERNA', 'SUBSOLO 02', 'RAYANNE', 2, '57.600', '2025-06-07', NULL, NULL, '2025-08-15', 'DENTRO DO PRAZO', '2026-02-15'),
+(gen_random_uuid(), 'DT', 'CISTERNA', 'PÁTIO DOS ELEVADORES', 'ALVÁRO', 1, '50.600', NULL, NULL, NULL, NULL, 'FORA DO PRAZO', NULL),
+(gen_random_uuid(), 'PE', 'CISTERNA', 'TERRENO PRÓX. ALMOX.', 'DANIELLE', 2, '101.200', '2025-06-17', NULL, NULL, '2025-07-05', 'DENTRO DO PRAZO', '2026-01-05'),
+(gen_random_uuid(), 'PE', 'CISTERNA', 'SUBSOLO 01', 'DANIELLE', 4, '30.000', '2025-06-17', NULL, NULL, '2025-07-03', 'DENTRO DO PRAZO', '2026-01-03'),
+(gen_random_uuid(), 'PJF', 'CISTERNA', 'PÁTIO (ENTRADA)', 'RAFAEL', 1, '15.200', NULL, '2025-04-04', '2025-10-01', NULL, 'DENTRO DO PRAZO', '2025-10-01'),
+(gen_random_uuid(), 'PNV', 'CISTERNA', 'PÁTIO (TÉRREO)', 'HÉRIC', 2, '31.200', '2025-06-26', NULL, NULL, '2025-07-23', 'DENTRO DO PRAZO', '2026-01-23'),
+(gen_random_uuid(), 'PQL1', 'CISTERNA', 'ENTRADA (AV. HUMB. MONTE)', 'RAFAEL', 1, '78.500', '2025-06-27', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-27'),
+(gen_random_uuid(), 'PQL2', 'CISTERNA', 'PÁTIO (CANTINA)', 'RAFAEL', 1, '50.400', '2025-06-18', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-18'),
+(gen_random_uuid(), 'PQL3', 'CISTERNA', 'SUBSOLO (CAPELA)', 'NERISSA', 2, '68.000', NULL, '2025-01-23', '2025-07-22', NULL, 'DENTRO DO PRAZO', '2025-07-22'),
+(gen_random_uuid(), 'SUL2', 'CISTERNA', 'SUBSOLO', 'LARISSA', 2, '105.000', '2025-06-23', NULL, NULL, '2025-07-26', 'DENTRO DO PRAZO', '2026-01-26');
+`;
+
+export const CAIXAS_IMPORT_SQL = `
+-- =============================================
+-- IMPORTAÇÃO DE CAIXAS D'ÁGUA
+-- =============================================
+
+-- Limpa as caixas atuais para evitar duplicidade (Opcional)
+DELETE FROM hydro_reservatorios WHERE tipo = 'CAIXA';
+
+-- Insere os novos dados
+INSERT INTO hydro_reservatorios (
+    id, sede_id, tipo, local, responsavel,
+    num_celulas, capacidade,
+    previsao_limpeza_1, data_limpeza_1,
+    previsao_limpeza_2, data_limpeza_2,
+    situacao_limpeza, proxima_limpeza
+) VALUES
+(gen_random_uuid(), 'ALD', 'CAIXA', 'BLOCO A', 'JOZY', 2, '80.000', '2025-06-30', NULL, NULL, '2025-08-30', 'DENTRO DO PRAZO', '2026-02-28'),
+(gen_random_uuid(), 'BN', 'CAIXA', 'BLOCO A  (1º ANDAR)', 'REBECCA', 2, '79.000', '2025-05-28', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-05-28'),
+(gen_random_uuid(), 'BN', 'CAIXA', 'QUADRA', 'REBECCA', 1, NULL, NULL, NULL, NULL, NULL, 'DESATIVADO', NULL),
+(gen_random_uuid(), 'BN', 'CAIXA', 'BOSQUE (BIBLIOTECA)', 'REBECCA', 1, '10.000', NULL, NULL, NULL, NULL, 'DESATIVADO', NULL),
+(gen_random_uuid(), 'BS', 'CAIXA', 'BLOCO C', 'HÉRIC', 2, '40.000', '2025-06-11', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-11'),
+(gen_random_uuid(), 'BS', 'CAIXA', 'OBSERVATÓRIO', 'HÉRIC', 2, '80.000', NULL, '2025-01-18', '2025-07-17', NULL, 'DENTRO DO PRAZO', '2025-07-17'),
+(gen_random_uuid(), 'DL', 'CAIXA', '16º ANDAR', 'RAYANNE', 2, '138.400', '2025-06-28', NULL, NULL, '2025-08-15', 'DENTRO DO PRAZO', '2026-02-15'),
+(gen_random_uuid(), 'DT', 'CAIXA', '2º ANDAR (PDT)', 'ALVARO', 1, '10.000', NULL, '2025-03-05', '2025-09-01', NULL, 'DENTRO DO PRAZO', '2025-09-01'),
+(gen_random_uuid(), 'DT', 'CAIXA', '3º ANDAR (DT1 VELHO)', 'ALVARO', 2, '50.000', NULL, '2025-03-05', '2025-09-01', NULL, 'DENTRO DO PRAZO', '2025-09-01'),
+(gen_random_uuid(), 'DT', 'CAIXA', '5º ANDAR (DT1 NOVO)', 'ALVARO', 2, '44.000', '2025-06-11', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-11'),
+(gen_random_uuid(), 'DT', 'CAIXA', '10º ANDAR', 'ALVARO', 1, '60.000', NULL, NULL, NULL, NULL, 'FORA DO PRAZO', NULL),
+(gen_random_uuid(), 'DT', 'CAIXA', 'CPA', 'ALVARO', 2, '4.000', NULL, NULL, NULL, NULL, 'FORA DO PRAZO', NULL),
+(gen_random_uuid(), 'DT', 'CAIXA', 'IDIOMAS', 'ALVARO', 1, '2.000', NULL, NULL, NULL, NULL, 'FORA DO PRAZO', NULL),
+(gen_random_uuid(), 'DT', 'CAIXA', 'VIVÊNCIA DOS FUNCIONÁRIOS', 'ALVARO', 2, '20.000', NULL, NULL, NULL, NULL, 'DESATIVADO', NULL),
+(gen_random_uuid(), 'EUS', 'CAIXA', '4º ANDAR (ABASTECIMENTO)', 'DÂNIA', 2, '16.400', NULL, '2025-03-08', '2025-09-04', '2025-07-26', 'DENTRO DO PRAZO', '2026-01-26'),
+(gen_random_uuid(), 'EUS', 'CAIXA', '4º ANDAR (REÚSO)', 'DÂNIA', 2, '16.400', NULL, '2025-04-05', '2025-10-02', '2025-07-26', 'DENTRO DO PRAZO', '2026-01-26'),
+(gen_random_uuid(), 'PE', 'CAIXA', '5º ANDAR', 'DANIELLE', 2, '79.000', NULL, '2025-01-17', '2025-07-16', '2025-07-07', 'DENTRO DO PRAZO', '2026-01-07'),
+(gen_random_uuid(), 'PE', 'CAIXA', '12º ANDAR', 'DANIELLE', 2, '81.000', NULL, '2025-01-22', '2025-07-21', '2025-07-07', 'DENTRO DO PRAZO', '2026-01-07'),
+(gen_random_uuid(), 'PE', 'CAIXA', 'ESTACIONAMENTO (CES)', 'DANIELLE', 3, '7.500', NULL, NULL, NULL, NULL, 'DESATIVADO', NULL),
+(gen_random_uuid(), 'PE', 'CAIXA', 'GASTRONOMIA', 'DANIELLE', 1, '10.000', NULL, '2025-01-24', '2025-07-23', '2025-07-15', 'DENTRO DO PRAZO', '2026-01-15'),
+(gen_random_uuid(), 'PJF', 'CAIXA', 'CANTINA', 'RAFAEL', 1, '21.000', NULL, NULL, NULL, NULL, 'FORA DO PRAZO', NULL),
+(gen_random_uuid(), 'PJF', 'CAIXA', 'BIBLIOTECA', 'RAFAEL', 1, '9.000', NULL, '2025-01-15', '2025-07-14', NULL, 'DENTRO DO PRAZO', '2025-07-14'),
+(gen_random_uuid(), 'PNV', 'CAIXA', '4º ANDAR', 'HÉRIC', 1, '24.500', '2025-06-26', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-26'),
+(gen_random_uuid(), 'PQL1', 'CAIXA', '4º ANDAR', 'RAFAEL', 2, '69.900', '2025-06-30', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-30'),
+(gen_random_uuid(), 'PQL2', 'CAIXA', '5º ANDAR', 'RAFAEL', 2, '56.600', '2025-06-26', NULL, NULL, NULL, 'DENTRO DO PRAZO', '2025-06-26'),
+(gen_random_uuid(), 'PQL3', 'CAIXA', '4º ANDAR', 'NERISSA', 2, '68.400', NULL, '2025-01-03', '2025-07-02', NULL, 'DENTRO DO PRAZO', '2025-07-02'),
+(gen_random_uuid(), 'PSUL', 'CAIXA', '1º ANDAR', 'LARISSA', 2, '21.600', '2025-06-18', NULL, NULL, '2025-07-22', 'DENTRO DO PRAZO', '2026-01-22'),
+(gen_random_uuid(), 'SP', 'CAIXA', 'JV', 'HÉRIC', 2, '132.000', '2025-06-30', NULL, NULL, '2025-07-25', 'DENTRO DO PRAZO', '2026-01-25'),
+(gen_random_uuid(), 'SP', 'CAIXA', 'SP', 'HÉRIC', 2, '25.000', NULL, '2025-01-07', '2025-07-06', '2025-08-14', 'DENTRO DO PRAZO', '2026-02-14'),
+(gen_random_uuid(), 'SUL2', 'CAIXA', '5º ANDAR', 'LARISSA', 2, '118.000', '2025-06-28', NULL, NULL, '2025-08-16', 'DENTRO DO PRAZO', '2026-02-16'),
+(gen_random_uuid(), 'SUL3', 'CAIXA', '6º ANDAR', 'LARISSA', 2, '63.000', NULL, '2025-01-02', '2025-07-01', '2025-07-24', 'DENTRO DO PRAZO', '2026-01-24'),
+(gen_random_uuid(), 'SUL3', 'CAIXA', '6º ANDAR (REÚSO)', 'LARISSA', 1, '21.000', NULL, NULL, NULL, NULL, 'DESATIVADO', NULL);
+`;
+
 export const Instructions = () => {
   const [copiedSchema, setCopiedSchema] = useState(false);
   const [copiedSeed, setCopiedSeed] = useState(false);
+  const [copiedCert, setCopiedCert] = useState(false);
+  const [copiedPocos, setCopiedPocos] = useState(false);
+  const [copiedCisternas, setCopiedCisternas] = useState(false);
+  const [copiedCaixas, setCopiedCaixas] = useState(false);
 
   const handleCopySchema = () => {
     navigator.clipboard.writeText(SCHEMA_SQL);
@@ -150,6 +362,30 @@ export const Instructions = () => {
     navigator.clipboard.writeText(SEED_SQL);
     setCopiedSeed(true);
     setTimeout(() => setCopiedSeed(false), 2000);
+  };
+
+  const handleCopyCert = () => {
+    navigator.clipboard.writeText(CERTIFICADOS_IMPORT_SQL);
+    setCopiedCert(true);
+    setTimeout(() => setCopiedCert(false), 2000);
+  };
+
+  const handleCopyPocos = () => {
+    navigator.clipboard.writeText(POCOS_IMPORT_SQL);
+    setCopiedPocos(true);
+    setTimeout(() => setCopiedPocos(false), 2000);
+  };
+
+  const handleCopyCisternas = () => {
+    navigator.clipboard.writeText(CISTERNAS_IMPORT_SQL);
+    setCopiedCisternas(true);
+    setTimeout(() => setCopiedCisternas(false), 2000);
+  };
+
+  const handleCopyCaixas = () => {
+    navigator.clipboard.writeText(CAIXAS_IMPORT_SQL);
+    setCopiedCaixas(true);
+    setTimeout(() => setCopiedCaixas(false), 2000);
   };
 
   return (
@@ -199,6 +435,90 @@ export const Instructions = () => {
             <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
                 <pre className="text-[10px] font-mono text-blue-400 whitespace-pre-wrap leading-relaxed">
                     {SEED_SQL}
+                </pre>
+            </div>
+        </div>
+
+        {/* Step 3: Certificados Import */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <FileSpreadsheet size={16} className="text-cyan-500"/> 3. Importar Certificados
+                </h3>
+                <button 
+                    onClick={handleCopyCert}
+                    className="text-xs font-bold text-cyan-600 hover:text-cyan-500 flex items-center gap-1"
+                >
+                    {copiedCert ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedCert ? 'Copiado!' : 'Copiar SQL'}
+                </button>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-cyan-400 whitespace-pre-wrap leading-relaxed">
+                    {CERTIFICADOS_IMPORT_SQL}
+                </pre>
+            </div>
+        </div>
+
+        {/* Step 4: Pocos Import */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Droplet size={16} className="text-blue-500"/> 4. Importar Poços
+                </h3>
+                <button 
+                    onClick={handleCopyPocos}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-500 flex items-center gap-1"
+                >
+                    {copiedPocos ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedPocos ? 'Copiado!' : 'Copiar SQL'}
+                </button>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-blue-400 whitespace-pre-wrap leading-relaxed">
+                    {POCOS_IMPORT_SQL}
+                </pre>
+            </div>
+        </div>
+
+        {/* Step 5: Cisternas Import */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Waves size={16} className="text-indigo-500"/> 5. Importar Cisternas
+                </h3>
+                <button 
+                    onClick={handleCopyCisternas}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-500 flex items-center gap-1"
+                >
+                    {copiedCisternas ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedCisternas ? 'Copiado!' : 'Copiar SQL'}
+                </button>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-indigo-400 whitespace-pre-wrap leading-relaxed">
+                    {CISTERNAS_IMPORT_SQL}
+                </pre>
+            </div>
+        </div>
+
+        {/* Step 6: Caixas Import */}
+        <div className="mb-8">
+            <div className="flex justify-between items-center mb-2 px-2">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Box size={16} className="text-purple-500"/> 6. Importar Caixas D'água
+                </h3>
+                <button 
+                    onClick={handleCopyCaixas}
+                    className="text-xs font-bold text-purple-600 hover:text-purple-500 flex items-center gap-1"
+                >
+                    {copiedCaixas ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copiedCaixas ? 'Copiado!' : 'Copiar SQL'}
+                </button>
+            </div>
+            <div className="bg-slate-900 rounded-xl p-4 overflow-x-auto max-h-48 border border-slate-800 shadow-inner">
+                <pre className="text-[10px] font-mono text-purple-400 whitespace-pre-wrap leading-relaxed">
+                    {CAIXAS_IMPORT_SQL}
                 </pre>
             </div>
         </div>

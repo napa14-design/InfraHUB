@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     ArrowLeft, ShieldAlert, Plus, Calendar, Filter, 
     Search, CheckCircle2, AlertTriangle, Clock, 
     Edit2, Trash2, Save, X, Check, User as UserIcon, 
-    Bug, Beaker, ClipboardList, History, CalendarCheck, AlertCircle, MapPin
+    Bug, Beaker, ClipboardList, History, CalendarCheck, AlertCircle, MapPin, Camera, Loader2, Image
 } from 'lucide-react';
 import { User, PestControlEntry, UserRole, Sede, PestControlSettings } from '../../types';
 import { pestService } from '../../services/pestService';
@@ -26,6 +26,8 @@ const getDaysDiff = (dateStr: string) => {
 
 export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [entries, setEntries] = useState<PestControlEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<PestControlEntry[]>([]);
   const [settings, setSettings] = useState<PestControlSettings | null>(null);
@@ -40,6 +42,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<PestControlEntry | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [editingItem, setEditingItem] = useState<Partial<PestControlEntry>>({});
   const [historyItems, setHistoryItems] = useState<PestControlEntry[]>([]);
@@ -100,6 +103,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   }, [entries, search, selectedSedeId, statusFilter]);
 
   const handleAddNew = () => {
+      const defaultTechnician = settings?.technicians.find(t => !t.sedeId) || settings?.technicians[0];
       setEditingItem({
           id: Date.now().toString(),
           sedeId: selectedSedeId || (availableSedes.length > 0 ? availableSedes[0].id : ''),
@@ -108,9 +112,10 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
           product: '',
           frequency: 'Quinzenal',
           method: '',
-          technician: settings?.technicians[0] || '',
+          technician: defaultTechnician?.name || '',
           scheduledDate: new Date().toISOString().split('T')[0],
-          status: 'PENDENTE'
+          status: 'PENDENTE',
+          photoUrl: ''
       });
       setIsModalOpen(true);
   };
@@ -173,6 +178,32 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       }
   };
 
+  // UPLOAD HANDLER
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      try {
+          const url = await pestService.uploadPhoto(file);
+          if (url) {
+              setEditingItem(prev => ({ ...prev, photoUrl: url }));
+          } else {
+              alert("Erro no upload da imagem.");
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Erro ao enviar imagem.");
+      } finally {
+          setIsUploading(false);
+      }
+  };
+
+  const removePhoto = () => {
+      setEditingItem(prev => ({ ...prev, photoUrl: '' }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const stats = {
       delayed: entries.filter(e => getDynamicStatus(e) === 'ATRASADO').length,
       pending: entries.filter(e => getDynamicStatus(e) === 'PENDENTE').length,
@@ -189,6 +220,15 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       if (status === 'ATRASADO') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20 animate-pulse"><AlertTriangle size={12}/> Atrasado ({Math.abs(diff)}d)</span>;
       return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20"><Clock size={12}/> Aguardando</span>;
   };
+
+  // Filter technicians based on Sede in editing mode
+  const filteredTechnicians = settings?.technicians.filter(t => {
+      // Always show global techs (no sedeId)
+      if (!t.sedeId) return true;
+      // If editingItem has a sedeId, allow matching techs
+      if (editingItem.sedeId && t.sedeId === editingItem.sedeId) return true;
+      return false;
+  }) || [];
 
   return (
     <div className="relative min-h-screen bg-slate-50 dark:bg-[#0A0A0C] pb-20 overflow-hidden">
@@ -312,6 +352,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                            <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
                                                <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded"><UserIcon size={12}/> {entry.technician}</span>
                                                <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded"><Calendar size={12}/> {entry.frequency}</span>
+                                               {entry.photoUrl && <span className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 px-2 py-1 rounded"><Image size={12}/> Foto Anexada</span>}
                                            </div>
                                        </div>
                                    </div>
@@ -409,7 +450,9 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                     <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Técnico Responsável</label>
                                     <select className="w-full p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-amber-500" value={editingItem.technician} onChange={e => setEditingItem({...editingItem, technician: e.target.value})}>
                                         <option value="">Selecione...</option>
-                                        {settings?.technicians.map(t => <option key={t} value={t}>{t}</option>)}
+                                        {filteredTechnicians.map((t, idx) => (
+                                            <option key={`${t.name}-${idx}`} value={t.name}>{t.name} {t.sedeId ? `(${t.sedeId})` : ''}</option>
+                                        ))}
                                     </select>
                                 </div>
                                 <div className="space-y-1.5 md:col-span-2">
@@ -440,6 +483,50 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                         <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Método de Aplicação</label>
                                         <input className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm outline-none" value={editingItem.method} onChange={e => setEditingItem({...editingItem, method: e.target.value})} placeholder="Ex: Pulverização em área externa" />
                                    </div>
+                                   
+                                   {/* PHOTO UPLOAD */}
+                                   <div className="space-y-1.5 md:col-span-2">
+                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1"><Camera size={12}/> Evidência Fotográfica</label>
+                                        <input 
+                                            type="file" 
+                                            accept="image/*" 
+                                            capture="environment"
+                                            ref={fileInputRef}
+                                            className="hidden"
+                                            onChange={handleFileChange}
+                                        />
+                                        
+                                        {editingItem.photoUrl ? (
+                                            <div className="relative group rounded-xl overflow-hidden border border-emerald-200 dark:border-emerald-800">
+                                                <img src={editingItem.photoUrl} alt="Evidência" className="w-full h-32 object-cover" />
+                                                <button 
+                                                    onClick={removePhoto}
+                                                    className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg shadow-lg hover:bg-red-600 transition-colors"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button 
+                                                onClick={() => fileInputRef.current?.click()}
+                                                disabled={isUploading}
+                                                className="w-full py-4 border-2 border-dashed border-emerald-200 dark:border-emerald-800 bg-white dark:bg-slate-950 rounded-xl flex flex-col items-center justify-center text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-all gap-2"
+                                            >
+                                                {isUploading ? (
+                                                    <>
+                                                        <Loader2 size={24} className="animate-spin" />
+                                                        <span className="text-xs font-bold uppercase">Enviando Imagem...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Camera size={24} />
+                                                        <span className="text-xs font-bold uppercase">Anexar Foto da Execução</span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                   </div>
+
                                    <div className="space-y-1.5 md:col-span-2">
                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Observações</label>
                                        <textarea className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm outline-none resize-none" rows={2} value={editingItem.observation || ''} onChange={e => setEditingItem({...editingItem, observation: e.target.value})} placeholder="Notas adicionais..."></textarea>
@@ -497,6 +584,11 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                                     <p className="text-emerald-600 font-mono font-bold flex items-center gap-1 mb-1"><CalendarCheck size={10}/> Realizado: {new Date(item.performedDate).toLocaleDateString()}</p>
                                                     {item.product && <p className="text-slate-500"><span className="font-bold">Prod:</span> {item.product}</p>}
                                                     {item.method && <p className="text-slate-500"><span className="font-bold">Método:</span> {item.method}</p>}
+                                                    {item.photoUrl && (
+                                                        <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-400 font-bold hover:text-emerald-600 flex items-center gap-1">
+                                                            <Image size={10} /> Ver Foto
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
                                        </div>

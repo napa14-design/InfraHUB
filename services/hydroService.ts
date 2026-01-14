@@ -46,7 +46,8 @@ const mapCloroFromDB = (db: any): HydroCloroEntry => ({
     cl: db.cl,
     ph: db.ph,
     medidaCorretiva: db.medida_corretiva,
-    responsavel: db.responsavel
+    responsavel: db.responsavel,
+    photoUrl: db.photo_url // Mapeamento novo
 });
 
 const mapCloroToDB = (app: HydroCloroEntry) => ({
@@ -56,7 +57,8 @@ const mapCloroToDB = (app: HydroCloroEntry) => ({
     cl: app.cl,
     ph: app.ph,
     medida_corretiva: app.medidaCorretiva,
-    responsavel: app.responsavel
+    responsavel: app.responsavel,
+    photo_url: app.photoUrl // Mapeamento novo
 });
 
 const mapFiltroFromDB = (db: any): HydroFiltro => ({
@@ -171,6 +173,27 @@ const getCurrentUserForLog = () => {
 }
 
 export const hydroService = {
+  // Helper de Upload
+  uploadPhoto: async (file: File): Promise<string | null> => {
+      if (!isSupabaseConfigured()) return URL.createObjectURL(file); // Mock: Retorna Blob URL local
+      
+      const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+      const { data, error } = await supabase.storage
+          .from('hydro-cloro-images')
+          .upload(fileName, file);
+      
+      if (error) {
+          console.error("Erro upload:", error);
+          return null;
+      }
+      
+      const { data: publicData } = supabase.storage
+          .from('hydro-cloro-images')
+          .getPublicUrl(fileName);
+          
+      return publicData.publicUrl;
+  },
+
   getCertificados: async (user: User): Promise<HydroCertificado[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -216,7 +239,7 @@ export const hydroService = {
     if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
     // Log detalhado para auditoria: inclui a Data de Referência (dia do cloro registrado)
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, Data Ref: ${entry.date}, CL: ${entry.cl}, pH: ${entry.ph}`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, Data Ref: ${entry.date}, CL: ${entry.cl}, pH: ${entry.ph} ${entry.photoUrl ? '(Com Foto)' : ''}`);
   },
 
   getFiltros: async (user: User): Promise<HydroFiltro[]> => {

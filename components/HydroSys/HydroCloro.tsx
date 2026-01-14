@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info, Camera, Image, Trash2, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, HydroCloroEntry, HydroSettings, Sede, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
@@ -9,6 +9,8 @@ import { Breadcrumbs } from '../Shared/Breadcrumbs';
 
 export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const [entries, setEntries] = useState<HydroCloroEntry[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,7 +28,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     phMin: 7.4,
     phMax: 7.6
   });
-  const [form, setForm] = useState<Partial<HydroCloroEntry>>({ cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name });
+  const [form, setForm] = useState<Partial<HydroCloroEntry>>({ cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' });
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -57,8 +60,33 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     setSelectedDateStr(dateStr);
     const entry = getEntry(dateStr);
-    setForm(entry || { id: undefined, cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name });
+    setForm(entry || { id: undefined, cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' });
     setIsModalOpen(true);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      setIsUploading(true);
+      try {
+          const url = await hydroService.uploadPhoto(file);
+          if (url) {
+              setForm(prev => ({ ...prev, photoUrl: url }));
+          } else {
+              alert("Erro no upload da imagem.");
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Erro ao enviar imagem.");
+      } finally {
+          setIsUploading(false);
+      }
+  };
+
+  const removePhoto = () => {
+      setForm(prev => ({ ...prev, photoUrl: '' }));
+      if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleSave = async () => {
@@ -70,7 +98,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             cl: Number(form.cl),
             ph: Number(form.ph),
             medidaCorretiva: form.medidaCorretiva,
-            responsavel: form.responsavel || user.name
+            responsavel: form.responsavel || user.name,
+            photoUrl: form.photoUrl
         });
         setEntries(await hydroService.getCloro(user));
         setIsModalOpen(false);
@@ -298,7 +327,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
         {/* MODAL */}
         {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="bg-white dark:bg-[#111114] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 border border-slate-200 dark:border-slate-800">
+                <div className="bg-white dark:bg-[#111114] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 border border-slate-200 dark:border-slate-800 flex flex-col max-h-[90vh]">
                     <div className="flex justify-between items-center mb-6">
                         <div>
                             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lançamento Diário</p>
@@ -306,7 +335,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                         </div>
                         <button onClick={() => setIsModalOpen(false)} className="bg-slate-100 dark:bg-slate-800 p-2 rounded-full"><X size={20} className="text-slate-500" /></button>
                     </div>
-                    <div className="space-y-6">
+                    <div className="space-y-6 overflow-y-auto flex-1">
                         <div className="grid grid-cols-2 gap-4">
                             <div className={`p-4 rounded-2xl border ${isSafe(Number(form.cl), settings.cloroMin, settings.cloroMax) ? 'bg-cyan-50 dark:bg-cyan-900/10 border-cyan-200 dark:border-cyan-800' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900'}`}>
                                 <label className="block text-[10px] font-bold uppercase mb-2 text-slate-500">Cloro (ppm)</label>
@@ -317,6 +346,53 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                 <input type="number" step="0.1" className="w-full bg-transparent outline-none text-3xl font-black text-center text-slate-800 dark:text-white" value={form.ph} onChange={e => setForm({...form, ph: Number(e.target.value)})} />
                             </div>
                         </div>
+                        
+                        {/* PHOTO UPLOAD SECTION */}
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                                <Camera size={14} /> Registro Fotográfico
+                            </label>
+                            
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                capture="environment"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+
+                            {form.photoUrl ? (
+                                <div className="relative group rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                                    <img src={form.photoUrl} alt="Registro" className="w-full h-32 object-cover" />
+                                    <button 
+                                        onClick={removePhoto}
+                                        className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg shadow-lg hover:bg-red-600 transition-colors"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                    className="w-full py-4 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:border-cyan-500 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 transition-all gap-2"
+                                >
+                                    {isUploading ? (
+                                        <>
+                                            <Loader2 size={24} className="animate-spin" />
+                                            <span className="text-xs font-bold uppercase">Enviando...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Camera size={24} />
+                                            <span className="text-xs font-bold uppercase">Tirar Foto / Anexar</span>
+                                        </>
+                                    )}
+                                </button>
+                            )}
+                        </div>
+
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Responsável</label>
                             <div className="relative">

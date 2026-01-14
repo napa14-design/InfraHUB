@@ -62,7 +62,6 @@ export const notificationService = {
   // Usado quando resolvemos um problema (ex: Certificado renovado)
   resolveAlert: async (relatedId: string) => {
       // Tenta marcar como lida qualquer notificação que contenha o ID do item
-      // Isso cobre 'pest-crit-{id}', 'pest-warn-{id}', etc.
       if (isSupabaseConfigured()) {
           // Busca IDs parecidos
           const { data } = await supabase.from('notifications').select('id').ilike('id', `%${relatedId}%`).eq('read', false);
@@ -72,7 +71,6 @@ export const notificationService = {
               await supabase.from('notifications').update({ read: true }).in('id', ids);
           }
       }
-      // Não chamamos notifyRefresh aqui pois geralmente isso é chamado antes de um checkSystemStatus
   },
 
   markByLink: async (link: string) => {
@@ -109,29 +107,28 @@ export const notificationService = {
   },
 
   checkSystemStatus: async (user: User) => {
+    // Operacionais não veem notificações de sistema, apenas Gestores e Admins
     if (user.role === UserRole.OPERATIONAL) return;
 
     const rules = await configService.getNotificationRules();
     const today = new Date();
-    // Normalize today for accurate day diff calculation
     today.setHours(0,0,0,0);
 
     const getDiffDays = (dateStr: string) => {
         if (!dateStr) return 999;
-        // Manual parse to ensure local date without timezone shifts
         const [year, month, day] = dateStr.split('-').map(Number);
         const target = new Date(year, month - 1, day);
-        
         const diff = target.getTime() - today.getTime();
         return Math.ceil(diff / (1000 * 60 * 60 * 24));
     };
 
-    // 1. HydroSys Certificates
+    // ==========================================
+    // 1. HYDROSYS CERTIFICADOS (Individual)
+    // ==========================================
     const certRule = rules.find(r => r.id === 'rule_cert');
     if (certRule && certRule.enabled) {
         const certs = await hydroService.getCertificados(user);
-        
-        // Deduplicate Certs (Only latest per Partner/Sede matters for alerts)
+        // Deduplicate
         const uniqueCerts = Array.from(certs.reduce((map, item) => {
             const key = `${item.sedeId}-${item.parceiro}`;
             const existing = map.get(key);
@@ -169,40 +166,124 @@ export const notificationService = {
         }
     }
 
-    // 2. Pest Control (Dedetização)
+    // ==========================================
+    // 2. HYDROSYS AGREGADO (Reservatórios e Filtros)
+    // ==========================================
+    // Lógica para agrupar alertas por SEDE e evitar poluição (spam)
+    const resRule = rules.find(r => r.id === 'rule_res');
+    const filtroRule = rules.find(r => r.id === 'rule_filtros');
+
+    if ((resRule && resRule.enabled) || (filtroRule && filtroRule.enabled)) {
+        const [pocos, cist, caixas, filtros] = await Promise.all([
+            hydroService.getPocos(user),
+            hydroService.getCisternas(user),
+            hydroService.getCaixas(user),
+            hydroService.getFiltros(user)
+        ]);
+
+        const allReservatorios = [...pocos, ...cist, ...caixas];
+        
+        // Mapa de problemas por Sede
+        // Ex: { 'DT': { resCrit: 2, resWarn: 1, filtCrit: 0, filtWarn: 5 } }
+        type SedeIssues = { resCrit: number, resWarn: number, filtCrit: number, filtWarn: number };
+        const issuesMap: Record<string, SedeIssues> = {};
+
+        // Helper para inicializar map
+        const getIssueObj = (sedeId: string) => {
+            if (!issuesMap[sedeId]) issuesMap[sedeId] = { resCrit: 0, resWarn: 0, filtCrit: 0, filtWarn: 0 };
+            return issuesMap[sedeId];
+        };
+
+        // Processar Reservatórios
+        if (resRule && resRule.enabled) {
+            allReservatorios.forEach(item => {
+                const days = getDiffDays(item.proximaLimpeza);
+                if (days <= resRule.criticalDays) getIssueObj(item.sedeId).resCrit++;
+                else if (days <= resRule.warningDays) getIssueObj(item.sedeId).resWarn++;
+            });
+        }
+
+        // Processar Filtros
+        if (filtroRule && filtroRule.enabled) {
+            // Deduplicate filtros (mesma lógica do dashboard)
+            const uniqueFiltros = Array.from(filtros.reduce((map, item) => {
+                const key = `${item.sedeId}-${item.patrimonio}`; 
+                const existing = map.get(key);
+                if (!existing || new Date(item.dataTroca) > new Date(existing.dataTroca)) map.set(key, item);
+                return map;
+            }, new Map<string, any>()).values());
+
+            uniqueFiltros.forEach(item => {
+                const days = getDiffDays(item.proximaTroca);
+                if (days <= filtroRule.criticalDays) getIssueObj(item.sedeId).filtCrit++;
+                else if (days <= filtroRule.warningDays) getIssueObj(item.sedeId).filtWarn++;
+            });
+        }
+
+        // GERAR NOTIFICAÇÕES AGRUPADAS
+        for (const [sedeId, counts] of Object.entries(issuesMap)) {
+            const totalCrit = counts.resCrit + counts.filtCrit;
+            const totalWarn = counts.resWarn + counts.filtWarn;
+
+            if (totalCrit > 0 || totalWarn > 0) {
+                // Constroi mensagem resumida
+                let parts = [];
+                if (counts.resCrit > 0) parts.push(`${counts.resCrit} Res. Vencidos`);
+                if (counts.resWarn > 0) parts.push(`${counts.resWarn} Res. Próximos`);
+                if (counts.filtCrit > 0) parts.push(`${counts.filtCrit} Filtros Vencidos`);
+                if (counts.filtWarn > 0) parts.push(`${counts.filtWarn} Filtros Próximos`);
+
+                const message = parts.join(', ') + '.';
+                const isCritical = totalCrit > 0;
+
+                // ID estático baseado na sede e no dia para não duplicar no mesmo dia,
+                // mas permitir que reapareça se não resolvido no dia seguinte.
+                // Ou melhor: ID fixo por sede/tipo para que o UPSERT atualize a contagem.
+                const notifId = `hydro-agg-${sedeId}`;
+
+                await notificationService.add({
+                    id: notifId,
+                    title: isCritical ? `Atenção Crítica: ${sedeId}` : `Manutenção Prevista: ${sedeId}`,
+                    message: message,
+                    type: isCritical ? 'ERROR' : 'WARNING',
+                    read: false,
+                    timestamp: new Date(),
+                    link: '/module/hydrosys/reservatorios', // Link principal
+                    moduleSource: 'hydrosys'
+                });
+            } else {
+                // Se não tem problemas, tentamos "limpar" a notificação antiga se existir (auto-resolve)
+                // Isso exigiria uma lógica de delete ou update read=true se count == 0.
+                // Por enquanto, deixamos manual ou via resolveAlert.
+            }
+        }
+    }
+
+    // ==========================================
+    // 3. PEST CONTROL (Individual com lógica de pragas)
+    // ==========================================
     const pestEntries = await pestService.getAll(user);
     
-    // Find Specific Rules
     const rodentRule = rules.find(r => r.id === 'rule_pest_rodents');
     const insectRule = rules.find(r => r.id === 'rule_pest_insects');
     const vectorRule = rules.find(r => r.id === 'rule_pest_vector');
-    const generalRule = rules.find(r => r.id === 'rule_pest_general') || rules.find(r => r.id === 'rule_pest'); // Fallback to old 'rule_pest' if exists
+    const generalRule = rules.find(r => r.id === 'rule_pest_general') || rules.find(r => r.id === 'rule_pest'); 
 
     for (const entry of pestEntries) {
-        // IGNORE COMPLETED ITEMS
-        if (entry.status === 'REALIZADO' || entry.performedDate) {
-            continue; 
-        }
+        if (entry.status === 'REALIZADO' || entry.performedDate) continue; 
 
-        // Determine specific rule based on target string
         let activeRule = generalRule;
         const targetLower = entry.target.toLowerCase();
         
-        if (targetLower.includes('rato') || targetLower.includes('roedor')) {
-            activeRule = rodentRule;
-        } else if (targetLower.includes('mosquito') || targetLower.includes('muriçoca') || targetLower.includes('vetor')) {
-            activeRule = vectorRule;
-        } else if (targetLower.includes('barata') || targetLower.includes('formiga') || targetLower.includes('escorpião')) {
-            activeRule = insectRule;
-        }
+        if (targetLower.includes('rato') || targetLower.includes('roedor')) activeRule = rodentRule;
+        else if (targetLower.includes('mosquito') || targetLower.includes('muriçoca') || targetLower.includes('vetor')) activeRule = vectorRule;
+        else if (targetLower.includes('barata') || targetLower.includes('formiga') || targetLower.includes('escorpião')) activeRule = insectRule;
 
-        // Check if rule exists and is enabled
         if (!activeRule || !activeRule.enabled) continue;
 
         const days = getDiffDays(entry.scheduledDate);
         const link = '/module/pestcontrol/execution';
         
-        // CRITICAL: Overdue items (Negative days)
         if (days < 0) {
             await notificationService.add({
                 id: `pest-crit-${entry.id}`,
@@ -214,9 +295,7 @@ export const notificationService = {
                 link,
                 moduleSource: 'pestcontrol'
             });
-        } 
-        // WARNING: Upcoming items within warning range
-        else if (days <= activeRule.warningDays) {
+        } else if (days <= activeRule.warningDays) {
             await notificationService.add({
                 id: `pest-warn-${entry.id}`,
                 title: 'Dedetização Próxima',

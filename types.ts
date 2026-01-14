@@ -145,6 +145,7 @@ export interface HydroCloroEntry {
   ph: number;
   medidaCorretiva?: string;
   responsavel: string;
+  photoUrl?: string; // Novo campo
 }
 
 export interface HydroFiltro {
@@ -189,9 +190,14 @@ export type HydroCaixa = HydroReservatorio;
 
 // --- PEST CONTROL TYPES (ENHANCED) ---
 
+export interface PestTechnician {
+  name: string;
+  sedeId?: string; // Opcional: Se vazio, é Global/Externo
+}
+
 export interface PestControlSettings {
   pestTypes: string[];
-  technicians: string[];
+  technicians: PestTechnician[]; // Alterado de string[] para objeto estruturado
   // Frequências globais: Record<"Nome da Praga", dias_intervalo>
   globalFrequencies: Record<string, number>;
   // Frequências por sede: Record<"sedeId", Record<"Nome da Praga", dias_intervalo>>
@@ -211,4 +217,5 @@ export interface PestControlEntry {
   performedDate?: string; 
   observation?: string;
   status: 'PENDENTE' | 'REALIZADO' | 'ATRASADO';
+  photoUrl?: string; // Novo campo
 }

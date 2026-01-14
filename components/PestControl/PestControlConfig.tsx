@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
     ArrowLeft, Settings, Save, Clock, User as UserIcon, CheckCircle2, 
-    Plus, Trash2, Bug, Building2, MapPin, AlertCircle, Info, ChevronRight
+    Plus, Trash2, Bug, Building2, MapPin, AlertCircle, Info, ChevronRight,
+    Globe
 } from 'lucide-react';
 import { User, PestControlSettings, Sede } from '../../types';
 import { pestService } from '../../services/pestService';
@@ -29,6 +30,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
   // Aux state for adding to lists
   const [newPest, setNewPest] = useState('');
   const [newTech, setNewTech] = useState('');
+  const [newTechSede, setNewTechSede] = useState(''); // New state for Tech Location
 
   useEffect(() => {
       const load = async () => {
@@ -82,16 +84,26 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
 
   const addTech = () => {
       const name = newTech.trim();
-      if (name && !settings.technicians.includes(name)) {
-          setSettings({ ...settings, technicians: [...settings.technicians, name] });
+      if (name) {
+          // Check if exists
+          if (settings.technicians.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+              addToast("Técnico já cadastrado.", "warning");
+              return;
+          }
+
+          setSettings({ 
+              ...settings, 
+              technicians: [...settings.technicians, { name, sedeId: newTechSede || undefined }] 
+          });
           setNewTech('');
+          setNewTechSede('');
           addToast("Técnico adicionado com sucesso.", "success");
       }
   };
 
-  const removeTech = (t: string) => {
-      if(confirm(`Remover técnico "${t}"?`)) {
-        setSettings({ ...settings, technicians: settings.technicians.filter(x => x !== t) });
+  const removeTech = (name: string) => {
+      if(confirm(`Remover técnico "${name}"?`)) {
+        setSettings({ ...settings, technicians: settings.technicians.filter(x => x.name !== name) });
       }
   };
 
@@ -211,15 +223,35 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                             <div className="flex items-center justify-between">
                                 <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2"><UserIcon size={20} className="text-cyan-600"/> Equipe / Técnicos</h3>
                             </div>
-                            <div className="flex gap-2">
-                                <input className="flex-1 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono" placeholder="Nome do Técnico" value={newTech} onChange={e => setNewTech(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTech()} />
-                                <button onClick={addTech} className="p-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700"><Plus size={20}/></button>
+                            <div className="flex flex-col gap-2">
+                                <input 
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono" 
+                                    placeholder="Nome do Técnico" 
+                                    value={newTech} 
+                                    onChange={e => setNewTech(e.target.value)} 
+                                />
+                                <div className="flex gap-2">
+                                    <select 
+                                        className="flex-1 p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono"
+                                        value={newTechSede}
+                                        onChange={e => setNewTechSede(e.target.value)}
+                                    >
+                                        <option value="">Global / Todas</option>
+                                        {availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    </select>
+                                    <button onClick={addTech} className="p-3 bg-cyan-600 text-white rounded-xl hover:bg-cyan-700"><Plus size={20}/></button>
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                {settings.technicians.map(t => (
-                                    <div key={t} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl group">
-                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{t}</span>
-                                        <button onClick={() => removeTech(t)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
+                            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+                                {settings.technicians.map((t, idx) => (
+                                    <div key={`${t.name}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl group">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{t.name}</span>
+                                            <span className="text-[10px] font-mono uppercase text-slate-400 flex items-center gap-1">
+                                                {t.sedeId ? <><Building2 size={10}/> {t.sedeId}</> : <><Globe size={10}/> Global</>}
+                                            </span>
+                                        </div>
+                                        <button onClick={() => removeTech(t.name)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
                                     </div>
                                 ))}
                             </div>

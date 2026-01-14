@@ -1,5 +1,5 @@
 
-import { PestControlEntry, PestControlSettings, User, UserRole } from '../types';
+import { PestControlEntry, PestControlSettings, User, UserRole, PestTechnician } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logService } from './logService';
 import { authService } from './authService';
@@ -20,7 +20,10 @@ const MOCK_PEST_ENTRIES: PestControlEntry[] = [
 
 let LOCAL_SETTINGS: PestControlSettings = {
     pestTypes: ["Rato / Roedores", "Barata / Escorpião", "Muriçoca / Mosquitos"],
-    technicians: ["Fabio", "Bernardo", "Santana", "Fernando", "Chagas", "Paulo"],
+    technicians: [
+        { name: "Fabio" }, { name: "Bernardo" }, { name: "Santana" }, 
+        { name: "Fernando" }, { name: "Chagas" }, { name: "Paulo" }
+    ],
     globalFrequencies: {
         "Rato / Roedores": 15,
         "Barata / Escorpião": 15,
@@ -41,7 +44,8 @@ const mapEntryFromDB = (db: any): PestControlEntry => ({
     scheduledDate: db.scheduled_date,
     performedDate: db.performed_date,
     observation: db.observation,
-    status: db.status
+    status: db.status,
+    photoUrl: db.photo_url // New field
 });
 
 const mapEntryToDB = (app: PestControlEntry) => ({
@@ -56,10 +60,32 @@ const mapEntryToDB = (app: PestControlEntry) => ({
     scheduled_date: app.scheduledDate,
     performed_date: app.performedDate,
     observation: app.observation,
-    status: app.status
+    status: app.status,
+    photo_url: app.photoUrl // New field
 });
 
 export const pestService = {
+    // Helper Upload
+    uploadPhoto: async (file: File): Promise<string | null> => {
+        if (!isSupabaseConfigured()) return URL.createObjectURL(file); // Mock
+        
+        const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+        const { data, error } = await supabase.storage
+            .from('pest-control-images')
+            .upload(fileName, file);
+        
+        if (error) {
+            console.error("Erro upload:", error);
+            return null;
+        }
+        
+        const { data: publicData } = supabase.storage
+            .from('pest-control-images')
+            .getPublicUrl(fileName);
+            
+        return publicData.publicUrl;
+    },
+
     getAll: async (user: User): Promise<PestControlEntry[]> => {
         try {
             if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -79,9 +105,18 @@ export const pestService = {
             if (!isSupabaseConfigured()) throw new Error("Mock");
             const { data } = await supabase.from('pest_control_settings').select('*').single();
             if (data) {
+                // Mapeamento Inteligente: Tenta usar a lista JSONB, senão faz fallback para array de strings
+                let techs: PestTechnician[] = [];
+                if (data.technicians_list && Array.isArray(data.technicians_list) && data.technicians_list.length > 0) {
+                    techs = data.technicians_list;
+                } else if (data.technicians && Array.isArray(data.technicians)) {
+                    // Fallback para legado
+                    techs = data.technicians.map((name: string) => ({ name, sedeId: '' }));
+                }
+
                 return {
                     pestTypes: data.pest_types || [],
-                    technicians: data.technicians || [],
+                    technicians: techs,
                     globalFrequencies: data.global_frequencies || {},
                     sedeFrequencies: data.sede_frequencies || {}
                 };
@@ -97,7 +132,9 @@ export const pestService = {
             await supabase.from('pest_control_settings').upsert({
                 id: 'default',
                 pest_types: settings.pestTypes,
-                technicians: settings.technicians,
+                // Salva ambos para compatibilidade
+                technicians: settings.technicians.map(t => t.name), // Array simples para legado
+                technicians_list: settings.technicians, // JSONB rico
                 global_frequencies: settings.globalFrequencies,
                 sede_frequencies: settings.sedeFrequencies
             });
@@ -131,7 +168,7 @@ export const pestService = {
         }
 
         const u = authService.getCurrentUser();
-        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Unidade: ${item.sedeId}, Status: ${item.status}`);
+        if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Unidade: ${item.sedeId}, Status: ${item.status} ${item.photoUrl ? '(Com Foto)' : ''}`);
 
         // ALERTAS INSTANTÂNEOS
         if (isCompletion) {
