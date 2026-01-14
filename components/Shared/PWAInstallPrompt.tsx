@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Download, Share, Smartphone } from 'lucide-react';
+import { Download, Share } from 'lucide-react';
 
 interface Props {
     collapsed?: boolean;
@@ -13,7 +13,7 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false }) => {
 
   useEffect(() => {
     // Verifica se já está instalado (Standalone mode)
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true) {
       setIsStandalone(true);
     }
 
@@ -22,13 +22,21 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false }) => {
     const ios = /iphone|ipad|ipod/.test(userAgent);
     setIsIOS(ios);
 
-    // Captura o evento de instalação
+    // 1. Check if event was already captured globally (in index.tsx)
+    // @ts-ignore
+    if (window.deferredPrompt) {
+        console.log("PWA: Found global deferred prompt");
+        // @ts-ignore
+        setDeferredPrompt(window.deferredPrompt);
+    }
+
+    // 2. Listen for future events (if not fired yet)
     const handler = (e: Event) => {
-      // CRITICO: Previne o comportamento padrão (mini-infobar no Android)
-      // para garantir que o botão customizado funcione e apareça quando quisermos.
       e.preventDefault();
+      // @ts-ignore
+      window.deferredPrompt = e;
       setDeferredPrompt(e);
-      console.log("PWA Install Event captured & stashed");
+      console.log("PWA: Event captured in component");
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -37,17 +45,20 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false }) => {
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
+    const promptEvent = deferredPrompt || (window as any).deferredPrompt;
+    if (!promptEvent) return;
 
     // Mostra o prompt nativo
-    deferredPrompt.prompt();
+    promptEvent.prompt();
     
     // Aguarda a escolha do usuário
-    const { outcome } = await deferredPrompt.userChoice;
+    const { outcome } = await promptEvent.userChoice;
     
     if (outcome === 'accepted') {
       console.log('User accepted the install prompt');
       setDeferredPrompt(null);
+      // @ts-ignore
+      window.deferredPrompt = null;
     }
   };
 
