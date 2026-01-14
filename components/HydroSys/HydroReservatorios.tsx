@@ -4,10 +4,10 @@ import {
   Droplet, Edit, X, Search, ArrowLeft,
   Waves, Box, History, User as UserIcon, ChevronRight,
   Download, Activity, Filter, Settings, FileText, Calendar, Lock, RotateCw, Building2,
-  AlertCircle, CheckCircle2, FileJson, Loader2
+  AlertCircle, CheckCircle2, FileJson, Loader2, Save, Ruler, Gauge, Clock, ClipboardList, AlertTriangle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings, Sede, LogEntry } from '../../types';
+import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings, Sede, LogEntry, FichaPoco } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
@@ -15,10 +15,9 @@ import { EmptyState } from '../Shared/EmptyState';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 
-// Helper para formatar data ignorando fuso horário (UTC vs Local)
+// --- HELPERS ---
 const formatDate = (dateStr: string) => {
     if (!dateStr) return '--/--/--';
-    // Se estiver no formato ISO YYYY-MM-DD
     if (dateStr.includes('-')) {
         const [year, month, day] = dateStr.split('-');
         return `${day}/${month}/${year}`;
@@ -26,52 +25,82 @@ const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('pt-BR');
 };
 
-// Helper para calcular status dinamicamente baseado na data de hoje
 const getComputedStatus = (dateStr?: string) => {
     if (!dateStr) return 'PENDENTE';
-    
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     const [year, month, day] = dateStr.split('-').map(Number);
-    const targetDate = new Date(year, month - 1, day); // Mês é 0-indexado
-
+    const targetDate = new Date(year, month - 1, day);
     if (targetDate < today) return 'FORA DO PRAZO';
     return 'DENTRO DO PRAZO';
+};
+
+// --- DATA STRUCTURES FOR CHECKLIST ---
+const MATERIALS_LIST = ['CANO', 'LUVAS', 'CORDA', 'ELETRODO', 'QUADRO DE COMANDO', 'REFIL FILTRO'];
+const EPI_LIST = ['Luva nitrílica', 'Bota de borracha', 'Máscara respiratória PFF2', 'Óculos de proteção'];
+const STEPS_DIA_1 = [
+    '1.1. Desmontar sistema de bomba e retirar canos',
+    '1.2. Montar sistema de compressor',
+    '1.3. Diluir 1 kg do produto AMC Easy Clean (Hexa T)',
+    '1.4. Ligar compressor p/ homogenização (30 min)',
+    '1.5. Deixar produto agir (min 6 horas)'
+];
+const STEPS_DIA_2 = [
+    '2.1. Ligar compressor p/ movimentar produto (30 min) e descarte',
+    '2.2. Bombear água suja com compressor (início limpeza)',
+    '2.3. Limpeza dos canos com cloro puro e palha de aço'
+];
+const STEPS_DIA_3 = [
+    '3.1. Continuar bombeando água suja até meio dia',
+    '3.2. Desmontar sistema de compressor',
+    '3.3. Montar sistema da bomba',
+    '3.4. Iniciar função do poço'
+];
+const NECESSITIES_LIST = [
+    '1. Substituição dos 3 eletrodos da encanação',
+    '2. Verificação do estado das luvas galvanizadas',
+    '3. Verificação do estado da corda de fixação',
+    '4. Substituição do filtro do poço (se 6 meses uso)'
+];
+
+const INITIAL_FICHA: FichaPoco = {
+    inicioLimpeza: '', terminoLimpeza: '', supervisor: '', coordenador: '', bombeiro: '',
+    profundidadeBomba: '', potenciaBomba: '', numEstagios: '', patrimonioBomba: '', marcaBomba: '', modeloBomba: '',
+    preLimpeza: { profundidade: '', nivelEstatico: '', nivelDinamico: '', tempo: '', vazao: '' },
+    posLimpeza: { profundidade: '', nivelEstatico: '', nivelDinamico: '', tempo: '', vazao: '' },
+    materiais: MATERIALS_LIST.map(m => ({ item: m, situacao: 'BOM', obs: '' })),
+    checklist: { epis: [], dia1: [], dia2: [], dia3: [] },
+    necessidades: [],
+    observacoes: ''
 };
 
 export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<Tab>('pocos');
+  
+  // Data
   const [pocos, setPocos] = useState<HydroPoco[]>([]);
   const [cisternas, setCisternas] = useState<HydroCisterna[]>([]);
   const [caixas, setCaixas] = useState<HydroCaixa[]>([]);
   
-  // Filters
+  // Filters & Settings
   const [filterText, setFilterText] = useState('');
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
-  // Settings
-  const [settings, setSettings] = useState<HydroSettings>({
-    validadeCertificadoMeses: 6,
-    validadeFiltroMeses: 6,
-    validadeLimpezaCaixa: 6,
-    validadeLimpezaCisterna: 6,
-    validadeLimpezaPoco: 6,
-    cloroMin: 1.0,
-    cloroMax: 3.0,
-    phMin: 7.4,
-    phMax: 7.6
-  });
-  
-  // Modals & History State
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // Modals
+  const [isModalOpen, setIsModalOpen] = useState(false); // Generic Edit
+  const [isFichaOpen, setIsFichaOpen] = useState(false); // Poço Specific
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [historyLogs, setHistoryLogs] = useState<LogEntry[]>([]);
   
   const [editItem, setEditItem] = useState<any>(null);
+  const [fichaData, setFichaData] = useState<FichaPoco>(INITIAL_FICHA);
+  const [activeFichaTab, setActiveFichaTab] = useState<'GERAL' | 'DADOS' | 'CHECKLIST'>('GERAL');
+
+  // History
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState<LogEntry[]>([]);
   const [historyItem, setHistoryItem] = useState<any>(null);
 
   const isAdmin = user.role === UserRole.ADMIN;
@@ -90,91 +119,110 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
     setSettings(await hydroService.getSettings());
   };
 
-  const handleEdit = (item: any) => { setEditItem({ ...item }); setIsModalOpen(true); };
-  
-  const handleHistory = async (item: any) => { 
-      setHistoryItem(item); 
-      setIsHistoryOpen(true); 
-      setLoadingHistory(true);
+  // --- ACTIONS ---
+
+  const handleEdit = (item: any) => { 
+      setEditItem({ ...item });
       
-      try {
-          const allLogs = await logService.getAll();
-          const relevant = allLogs.filter(l => 
-              l.module === 'HYDROSYS' && 
-              (l.target.includes(item.local) || (l.details && l.details.includes(item.local)))
-          );
-          setHistoryLogs(relevant);
-      } catch (e) {
-          console.error("Erro ao buscar histórico", e);
-      } finally {
-          setLoadingHistory(false);
+      if (item.tipo === 'POCO') {
+          // Load Ficha Data if exists, else generic info mapping
+          if (item.dadosFicha) {
+              setFichaData(item.dadosFicha);
+          } else {
+              // Pre-fill what we can from flat structure
+              setFichaData({
+                  ...INITIAL_FICHA,
+                  supervisor: item.responsavel || '',
+                  patrimonioBomba: item.referenciaBomba || '',
+                  // Tenta preservar materiais se já editou antes mas não salvou estrutura completa
+                  materiais: INITIAL_FICHA.materiais
+              });
+          }
+          setIsFichaOpen(true);
+      } else {
+          setIsModalOpen(true);
       }
   };
-
-  const handleSave = async () => {
-      // Recalcula status antes de salvar para persistir corretamente
-      if (editItem.proximaLimpeza) {
-          editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
-      }
-      if (editItem.tipo === 'POCO' && editItem.proximaTrocaFiltro) {
-          editItem.situacaoFiltro = getComputedStatus(editItem.proximaTrocaFiltro);
-      }
-
-      if (activeTab === 'pocos') await hydroService.savePoco(editItem);
-      else if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
+  
+  const handleSaveGeneric = async () => {
+      // Recalcula status
+      if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
+      
+      if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
       else await hydroService.saveCaixa(editItem);
+      
       await refreshData();
       setIsModalOpen(false);
   };
 
-  const calculateNextDate = (dateStr: string, months: number) => {
-      if (!dateStr) return '';
-      const d = new Date(dateStr);
-      d.setMonth(d.getMonth() + months);
-      return d.toISOString().split('T')[0];
-  };
+  const handleSaveFicha = async () => {
+      if (!editItem) return;
 
-  const handleDateChange = (field: 'LIMPEZA' | 'FILTRO', dateValue: string) => {
-      let duration = 6;
-      if (field === 'LIMPEZA') {
-          if (editItem.tipo === 'POCO') duration = settings.validadeLimpezaPoco || 6;
-          else if (editItem.tipo === 'CISTERNA') duration = settings.validadeLimpezaCisterna || 6;
-          else duration = settings.validadeLimpezaCaixa || 6;
-      } else {
-          duration = settings?.validadeFiltroMeses || 6;
+      // Calcular Data de Validade baseada no término da limpeza (12 meses conforme PDF)
+      let nextLimpeza = editItem.proximaLimpeza;
+      let statusLimpeza = editItem.situacaoLimpeza;
+
+      if (fichaData.terminoLimpeza) {
+          const end = new Date(fichaData.terminoLimpeza);
+          end.setFullYear(end.getFullYear() + 1); // Validade 12 meses (PDF)
+          nextLimpeza = end.toISOString().split('T')[0];
+          statusLimpeza = getComputedStatus(nextLimpeza);
       }
 
-      const nextDate = calculateNextDate(dateValue, duration);
-      // Calcula status imediatamente baseado na nova data calculada
-      const status = getComputedStatus(nextDate);
+      // Update basic fields from Ficha
+      const updatedPoco = {
+          ...editItem,
+          responsavel: fichaData.supervisor || editItem.responsavel,
+          referenciaBomba: fichaData.patrimonioBomba || editItem.referenciaBomba,
+          dataUltimaLimpeza: fichaData.terminoLimpeza || editItem.dataUltimaLimpeza,
+          proximaLimpeza: nextLimpeza,
+          situacaoLimpeza: statusLimpeza,
+          dadosFicha: fichaData // Armazena a estrutura completa
+      };
 
-      if (field === 'LIMPEZA') {
-          setEditItem((prev: any) => ({
-              ...prev,
-              dataUltimaLimpeza: dateValue,
-              proximaLimpeza: nextDate,
-              situacaoLimpeza: status
-          }));
-      } else {
-          setEditItem((prev: any) => ({
-              ...prev,
-              ultimaTrocaFiltro: dateValue,
-              proximaTrocaFiltro: nextDate,
-              situacaoFiltro: status
-          }));
-      }
+      await hydroService.savePoco(updatedPoco);
+      await refreshData();
+      setIsFichaOpen(false);
   };
 
-  const TabButton = ({ id, label, count, icon: Icon }: { id: Tab, label: string, count: number, icon: any }) => (
-    <button
-        onClick={() => { setActiveTab(id); setFilterText(''); }}
-        className={`
-            flex-1 py-4 text-xs md:text-sm font-bold rounded-2xl transition-all flex flex-col md:flex-row items-center justify-center gap-2 border-2 uppercase tracking-wide
-            ${activeTab === id 
-                ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-500 text-cyan-700 dark:text-cyan-300 shadow-md' 
-                : 'bg-white dark:bg-slate-900/50 border-transparent text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}
-        `}
-    >
+  // --- HISTORY ---
+  const handleHistory = async (item: any) => { 
+      setHistoryItem(item); 
+      setIsHistoryOpen(true); 
+      setLoadingHistory(true);
+      try {
+          const allLogs = await logService.getAll();
+          const relevant = allLogs.filter(l => l.module === 'HYDROSYS' && (l.target.includes(item.local) || (l.details && l.details.includes(item.local))));
+          setHistoryLogs(relevant);
+      } catch (e) { console.error(e); } finally { setLoadingHistory(false); }
+  };
+
+  // --- HELPERS FOR FICHA ---
+  const updateFicha = (field: keyof FichaPoco, value: any) => setFichaData(prev => ({ ...prev, [field]: value }));
+  const updateNestedFicha = (section: 'preLimpeza' | 'posLimpeza', field: string, value: string) => {
+      setFichaData(prev => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
+  };
+  const toggleCheck = (listName: keyof typeof fichaData.checklist, item: string) => {
+      setFichaData(prev => {
+          const list = prev.checklist[listName] as string[];
+          const newList = list.includes(item) ? list.filter(i => i !== item) : [...list, item];
+          return { ...prev, checklist: { ...prev.checklist, [listName]: newList } };
+      });
+  };
+  const toggleNecessidade = (item: string) => {
+      setFichaData(prev => ({
+          ...prev,
+          necessidades: prev.necessidades.includes(item) ? prev.necessidades.filter(i => i !== item) : [...prev.necessidades, item]
+      }));
+  };
+  const updateMaterial = (idx: number, field: 'situacao' | 'obs', value: string) => {
+      const newMats = [...fichaData.materiais];
+      newMats[idx] = { ...newMats[idx], [field]: value };
+      setFichaData(prev => ({ ...prev, materiais: newMats }));
+  };
+
+  const TabButton = ({ id, label, count, icon: Icon }: any) => (
+    <button onClick={() => { setActiveTab(id); setFilterText(''); }} className={`flex-1 py-4 text-xs md:text-sm font-bold rounded-2xl border-2 uppercase tracking-wide flex flex-col md:flex-row items-center justify-center gap-2 ${activeTab === id ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-500 text-cyan-700 dark:text-cyan-300' : 'bg-white dark:bg-slate-900/50 border-transparent text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
         <Icon size={18} className={activeTab === id ? 'text-cyan-600' : 'text-slate-400'} />
         <span>{label}</span>
         <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === id ? 'bg-cyan-200 text-cyan-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>{count}</span>
@@ -190,176 +238,103 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
   const data = activeTab === 'pocos' ? filterList(pocos) : activeTab === 'cisternas' ? filterList(cisternas) : filterList(caixas);
 
-  // Helper para o Card de Poços
-  const PocoStatusIndicator = ({ label, status, date }: { label: string, status: string, date?: string }) => {
-      const isLate = status === 'FORA DO PRAZO';
-      const isOk = status === 'DENTRO DO PRAZO';
-      
-      let colorClass = 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700';
-      if (isLate) colorClass = 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400 border-red-200 dark:border-red-900/30';
-      else if (isOk) colorClass = 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/30';
-
-      return (
-          <div className={`p-2 rounded-xl border ${colorClass} flex flex-col items-center justify-center text-center flex-1`}>
-              <span className="text-[9px] font-black uppercase mb-1 opacity-70">{label}</span>
-              <span className="text-xs font-mono font-bold">{formatDate(date || '')}</span>
-              <span className="text-[8px] uppercase font-bold mt-1 tracking-wider">
-                  {isLate ? 'VENCIDO' : isOk ? 'EM DIA' : 'PENDENTE'}
-              </span>
-          </div>
-      );
-  };
-
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
-        {/* BACKGROUND */}
+        {/* Background */}
         <div className="fixed inset-0 -z-10 pointer-events-none">
             <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-[#0A0A0C] dark:via-[#0D0D10] dark:to-[#0A0A0C]" />
             <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] text-slate-400 dark:text-cyan-500" style={{ backgroundImage: `linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)`, backgroundSize: '80px 80px' }} />
         </div>
 
         <div className="relative z-10 px-4 md:px-8 py-6 space-y-6 pb-24 md:pb-8 max-w-7xl mx-auto">
-            {/* HEADER */}
-            <header className="relative overflow-hidden border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#111114]/90 backdrop-blur-sm rounded-3xl shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
+            {/* Header */}
+            <header className="relative overflow-hidden border border-slate-200 dark:border-white/5 bg-white/90 dark:bg-[#111114]/90 backdrop-blur-sm rounded-3xl shadow-sm">
                 <div className="p-6 md:p-8 flex flex-col lg:flex-row justify-between items-center gap-6">
                     <div className="space-y-4 w-full lg:w-auto">
-                        <button onClick={() => navigate('/module/hydrosys')} className="group flex items-center gap-2 text-slate-500 dark:text-white/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all text-xs font-mono uppercase tracking-widest">
-                            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Voltar ao Painel
+                        <button onClick={() => navigate('/module/hydrosys')} className="group flex items-center gap-2 text-slate-500 hover:text-cyan-600 transition-all text-xs font-mono uppercase tracking-widest">
+                            <ArrowLeft size={14} /> Voltar ao Painel
                         </button>
                         <div className="flex items-center gap-5">
-                            <div className="w-14 h-14 border-2 border-cyan-500/20 dark:border-cyan-500/5 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl">
-                                <Droplet size={28} className="text-cyan-600 dark:text-cyan-500" strokeWidth={1.5} />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight font-mono uppercase">
-                                    RESERVATÓRIOS
-                                </h1>
-                                <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">
-                                    Monitoramento de Limpeza e Manutenção.
-                                </p>
-                            </div>
+                            <div className="w-14 h-14 border-2 border-cyan-500/20 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl text-cyan-600"><Droplet size={28} /></div>
+                            <div><h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono uppercase">Reservatórios</h1><p className="text-slate-500 text-xs font-mono">Monitoramento de Limpeza.</p></div>
                         </div>
                     </div>
-                    
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                         {isAdmin && (
                             <div className="relative group w-full sm:w-auto">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                                    <Building2 size={14} />
-                                </div>
-                                <select
-                                    className="w-full sm:w-48 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none focus:ring-2 focus:ring-cyan-500/50 appearance-none uppercase transition-all hover:border-cyan-500/30"
-                                    value={selectedSedeFilter}
-                                    onChange={(e) => setSelectedSedeFilter(e.target.value)}
-                                >
+                                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                                <select className="w-full sm:w-48 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none uppercase" value={selectedSedeFilter} onChange={(e) => setSelectedSedeFilter(e.target.value)}>
                                     <option value="">Todas as Sedes</option>
-                                    {availableSedes.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                    ))}
+                                    {availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
-                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-slate-400">
-                                    <Filter size={12} />
-                                </div>
                             </div>
                         )}
-
                         <div className="w-full sm:w-64 relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                            <input 
-                                type="text" 
-                                placeholder="Buscar Local..." 
-                                className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-cyan-500 transition-all font-mono uppercase"
-                                value={filterText}
-                                onChange={e => setFilterText(e.target.value)}
-                            />
+                            <input type="text" placeholder="Buscar Local..." className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none uppercase font-mono" value={filterText} onChange={e => setFilterText(e.target.value)} />
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* TABS */}
-            <div className="flex flex-col md:flex-row gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+            {/* Tabs */}
+            <div className="flex flex-col md:flex-row gap-4">
                 <TabButton id="pocos" label="Poços Artesianos" count={filterList(pocos).length} icon={Activity} />
                 <TabButton id="cisternas" label="Cisternas" count={filterList(cisternas).length} icon={Waves} />
                 <TabButton id="caixas" label="Caixas D'água" count={filterList(caixas).length} icon={Box} />
             </div>
 
-            {/* LIST */}
+            {/* List */}
             {data.length === 0 ? (
-                <EmptyState icon={Droplet} title="Nenhum registro" description={selectedSedeFilter ? `Não encontramos ${activeTab} nesta unidade.` : `Não encontramos ${activeTab} na busca.`} />
+                <EmptyState icon={Droplet} title="Nenhum registro" description="Não encontramos itens com os filtros atuais." />
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
+                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {data.map((item: any) => {
-                        // CALCULO DINAMICO DE STATUS (Ignora o texto do banco se a data já venceu)
                         const computedStatusLimpeza = getComputedStatus(item.proximaLimpeza);
                         const isDelayed = computedStatusLimpeza === 'FORA DO PRAZO';
-                        
-                        // Para Poços, calculamos o status do filtro também
                         const computedStatusFiltro = item.tipo === 'POCO' ? getComputedStatus(item.proximaTrocaFiltro) : 'PENDENTE';
 
                         return (
-                            <div key={item.id} className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800/60 shadow-sm hover:shadow-lg transition-all flex flex-col overflow-hidden group">
-                                {/* Card Header */}
-                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 relative">
-                                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-cyan-500/5 to-transparent rounded-bl-3xl"></div>
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{item.sedeId}</span>
-                                                <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-0.5 rounded">{activeTab === 'pocos' ? 'POÇO' : activeTab === 'cisternas' ? 'CISTERNA' : 'CAIXA'}</span>
-                                            </div>
-                                            <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight uppercase">{item.local}</h3>
+                            <div key={item.id} className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800/60 shadow-sm hover:shadow-lg transition-all flex flex-col group">
+                                <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-[10px] font-black uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{item.sedeId}</span>
+                                            <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-0.5 rounded">{activeTab === 'pocos' ? 'POÇO' : activeTab === 'cisternas' ? 'CISTERNA' : 'CAIXA'}</span>
                                         </div>
-                                        {activeTab !== 'pocos' && (
-                                            <div className={`px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-wider ${!isDelayed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100 animate-pulse'}`}>
-                                                {computedStatusLimpeza}
-                                            </div>
-                                        )}
+                                        <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight uppercase">{item.local}</h3>
                                     </div>
+                                    {activeTab !== 'pocos' && (
+                                        <div className={`px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-wider ${!isDelayed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100 animate-pulse'}`}>
+                                            {computedStatusLimpeza}
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Card Content */}
                                 <div className="p-5 space-y-5 flex-1">
                                     {activeTab === 'pocos' ? (
                                         <>
-                                            {/* Tech Info Row */}
-                                            <div className="flex gap-2">
-                                                <div className="flex-1 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                                                    <Settings size={14} className="text-slate-400"/>
-                                                    <div>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Ref. Bomba</p>
-                                                        <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{item.referenciaBomba || 'N/A'}</p>
-                                                    </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                                <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Bomba</p>
+                                                    <p className="font-mono font-bold">{item.referenciaBomba || 'N/A'}</p>
                                                 </div>
-                                                <div className="flex-1 bg-slate-50 dark:bg-slate-900/50 p-2 rounded-lg border border-slate-100 dark:border-slate-800 flex items-center gap-2">
-                                                    <Filter size={14} className="text-slate-400"/>
-                                                    <div>
-                                                        <p className="text-[9px] font-bold text-slate-400 uppercase">Refil Filtro</p>
-                                                        <p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{item.refil || 'N/A'}</p>
-                                                    </div>
+                                                <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded border border-slate-100 dark:border-slate-800">
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase">Filtro</p>
+                                                    <p className="font-mono font-bold">{item.refil || 'N/A'}</p>
                                                 </div>
                                             </div>
-
-                                            {/* Cleaning Status Block */}
                                             <div>
-                                                <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase text-slate-400">
-                                                    <Droplet size={12} className="text-blue-500" /> Higienização / Limpeza
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <PocoStatusIndicator label="Realizada" status="OK" date={item.dataUltimaLimpeza} />
-                                                    <PocoStatusIndicator label="Vencimento" status={computedStatusLimpeza} date={item.proximaLimpeza} />
-                                                </div>
-                                            </div>
-
-                                            {/* Filter Status Block */}
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase text-slate-400">
-                                                    <Filter size={12} className="text-amber-500" /> Elemento Filtrante
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    <PocoStatusIndicator label="Trocado em" status="OK" date={item.ultimaTrocaFiltro} />
-                                                    <PocoStatusIndicator label="Próx. Troca" status={computedStatusFiltro} date={item.proximaTrocaFiltro} />
+                                                <div className="flex gap-2 mb-2 text-[10px] font-bold uppercase text-slate-400"><Droplet size={12} className="text-blue-500" /> Limpeza</div>
+                                                <div className="grid grid-cols-2 gap-2 text-center">
+                                                    <div className="p-2 rounded border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30">
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">Última</span>
+                                                        <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatDate(item.dataUltimaLimpeza || '')}</span>
+                                                    </div>
+                                                    <div className={`p-2 rounded border ${isDelayed ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">Próxima</span>
+                                                        <span className={`text-xs font-mono font-bold ${isDelayed ? 'text-red-600' : 'text-slate-600 dark:text-slate-400'}`}>{formatDate(item.proximaLimpeza || '')}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </>
@@ -370,14 +345,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                                 <div className="w-px h-3 bg-slate-300"></div>
                                                 <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.numCelulas}</span> CÉLULAS</div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <div className={`p-2 rounded-xl border text-center ${item.dataLimpeza1 ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                                            <div className="grid grid-cols-2 gap-3 text-center">
+                                                <div className="p-2 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
                                                     <p className="text-[9px] font-bold uppercase text-slate-400">1º Semestre</p>
-                                                    <p className={`text-xs font-bold font-mono ${item.dataLimpeza1 ? 'text-emerald-600' : 'text-slate-400'}`}>{item.dataLimpeza1 ? formatDate(item.dataLimpeza1) : 'PENDENTE'}</p>
+                                                    <p className={`text-xs font-bold font-mono ${item.dataLimpeza1 ? 'text-emerald-500' : 'text-slate-400'}`}>{item.dataLimpeza1 ? formatDate(item.dataLimpeza1) : 'PENDENTE'}</p>
                                                 </div>
-                                                <div className={`p-2 rounded-xl border text-center ${item.dataLimpeza2 ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                <div className="p-2 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
                                                     <p className="text-[9px] font-bold uppercase text-slate-400">2º Semestre</p>
-                                                    <p className={`text-xs font-bold font-mono ${item.dataLimpeza2 ? 'text-emerald-600' : 'text-slate-400'}`}>{item.dataLimpeza2 ? formatDate(item.dataLimpeza2) : 'PENDENTE'}</p>
+                                                    <p className={`text-xs font-bold font-mono ${item.dataLimpeza2 ? 'text-emerald-500' : 'text-slate-400'}`}>{item.dataLimpeza2 ? formatDate(item.dataLimpeza2) : 'PENDENTE'}</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -386,29 +361,17 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
                                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button 
-                                            onClick={() => handleEdit(item)} 
-                                            className={`py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm`}
-                                        >
-                                            <RotateCw size={14} /> Manutenção
+                                        <button onClick={() => handleEdit(item)} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm">
+                                            {activeTab === 'pocos' ? <ClipboardList size={14}/> : <RotateCw size={14}/>} 
+                                            {activeTab === 'pocos' ? 'Ficha Técnica' : 'Manutenção'}
                                         </button>
                                         
                                         {item.fichaOperacional && item.fichaOperacional !== 'LINK' ? (
-                                            <a 
-                                                href={item.fichaOperacional} 
-                                                target="_blank" 
-                                                rel="noreferrer"
-                                                className="py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-blue-100 dark:hover:bg-blue-900/30"
-                                            >
-                                                <FileJson size={14} /> Ficha Op.
-                                            </a>
+                                            <a href={item.fichaOperacional} target="_blank" rel="noreferrer" className="py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-blue-100"><FileJson size={14} /> Ficha Antiga</a>
                                         ) : (
-                                            <button disabled className="py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-60">
-                                                <FileJson size={14} /> Sem Ficha
-                                            </button>
+                                            <button disabled className="py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-60"><FileJson size={14} /> Sem Anexo</button>
                                         )}
                                     </div>
-                                    
                                     <div className="flex justify-between items-center px-1 pt-1">
                                         <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 uppercase"><UserIcon size={12}/> {item.responsavel || 'N/A'}</div>
                                         <button onClick={() => handleHistory(item)} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors"><History size={18}/></button>
@@ -420,10 +383,225 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* MODAL EDIT */}
+            {/* --- MODAL FICHA TÉCNICA (POÇO) --- */}
+            {isFichaOpen && editItem && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4">
+                    <div className="bg-white dark:bg-[#111114] w-full max-w-5xl h-full md:h-auto md:max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300">
+                        {/* Header */}
+                        <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex justify-between items-center shrink-0">
+                            <div>
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-blue-600 text-white rounded-lg"><ClipboardList size={20}/></div>
+                                    <div>
+                                        <h2 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">Ficha Operacional de Limpeza</h2>
+                                        <p className="text-xs text-slate-500 font-mono uppercase">{editItem.sedeId} // {editItem.local}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="hidden md:flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
+                                    {['GERAL', 'DADOS', 'CHECKLIST'].map(t => (
+                                        <button 
+                                            key={t}
+                                            onClick={() => setActiveFichaTab(t as any)}
+                                            className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeFichaTab === t ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                                <button onClick={() => setIsFichaOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500"><X size={20}/></button>
+                            </div>
+                        </div>
+
+                        {/* Content Scrollable */}
+                        <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50/50 dark:bg-[#0A0A0C]">
+                            
+                            {/* SECTION: GERAL & EQUIPE */}
+                            <div className={activeFichaTab === 'GERAL' ? 'block space-y-6' : 'hidden'}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* Dates */}
+                                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Clock size={14}/> Cronograma</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Início Limpeza</label><input type="date" className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.inicioLimpeza} onChange={e => updateFicha('inicioLimpeza', e.target.value)} /></div>
+                                            <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Término Limpeza</label><input type="date" className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.terminoLimpeza} onChange={e => updateFicha('terminoLimpeza', e.target.value)} /></div>
+                                        </div>
+                                    </div>
+                                    {/* Team */}
+                                    <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><UserIcon size={14}/> Equipe Responsável</h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Supervisor:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.supervisor} onChange={e => updateFicha('supervisor', e.target.value)} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Coord.:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.coordenador} onChange={e => updateFicha('coordenador', e.target.value)} /></div>
+                                            <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Bombeiro:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.bombeiro} onChange={e => updateFicha('bombeiro', e.target.value)} /></div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pump Data */}
+                                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Settings size={14}/> Especificações da Bomba</h3>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Profundidade (m)</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.profundidadeBomba} onChange={e => updateFicha('profundidadeBomba', e.target.value)} /></div>
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Potência (cv)</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.potenciaBomba} onChange={e => updateFicha('potenciaBomba', e.target.value)} /></div>
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Nº Estágios</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.numEstagios} onChange={e => updateFicha('numEstagios', e.target.value)} /></div>
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Patrimônio</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-bold text-blue-600" value={fichaData.patrimonioBomba} onChange={e => updateFicha('patrimonioBomba', e.target.value)} /></div>
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Marca</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.marcaBomba} onChange={e => updateFicha('marcaBomba', e.target.value)} /></div>
+                                        <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Modelo</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.modeloBomba} onChange={e => updateFicha('modeloBomba', e.target.value)} /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION: DADOS TÉCNICOS (PRE/POS) */}
+                            <div className={activeFichaTab === 'DADOS' ? 'block space-y-6' : 'hidden'}>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {/* PRE */}
+                                    <div className="bg-amber-50/50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                                        <h3 className="text-xs font-black text-amber-600 uppercase tracking-widest mb-4 flex items-center gap-2"><Ruler size={14}/> Pré-Limpeza</h3>
+                                        <div className="space-y-3">
+                                            {['profundidade', 'nivelEstatico', 'tempo', 'vazao'].map(field => (
+                                                <div key={field} className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-500">{field.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                    <input className="w-24 p-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-right font-mono text-sm" 
+                                                        value={(fichaData.preLimpeza as any)[field]} 
+                                                        onChange={e => updateNestedFicha('preLimpeza', field, e.target.value)} 
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    {/* POS */}
+                                    <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
+                                        <h3 className="text-xs font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2"><Gauge size={14}/> Pós-Limpeza</h3>
+                                        <div className="space-y-3">
+                                            {['profundidade', 'nivelEstatico', 'tempo', 'vazao'].map(field => (
+                                                <div key={field} className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-500">{field.replace(/([A-Z])/g, ' $1').trim()}</span>
+                                                    <input className="w-24 p-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded text-right font-mono text-sm" 
+                                                        value={(fichaData.posLimpeza as any)[field]} 
+                                                        onChange={e => updateNestedFicha('posLimpeza', field, e.target.value)} 
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* MATERIALS */}
+                                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Materiais Utilizados</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-50 dark:bg-slate-950 text-[9px] font-bold text-slate-500 uppercase">
+                                                <tr>
+                                                    <th className="p-3">Item</th>
+                                                    <th className="p-3">Situação</th>
+                                                    <th className="p-3">Observações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                                {fichaData.materiais.map((mat, idx) => (
+                                                    <tr key={idx}>
+                                                        <td className="p-3 font-bold text-xs uppercase">{mat.item}</td>
+                                                        <td className="p-3">
+                                                            <div className="flex gap-2">
+                                                                {['BOM', 'REGULAR', 'RUIM'].map(opt => (
+                                                                    <label key={opt} className="flex items-center gap-1 cursor-pointer">
+                                                                        <input type="radio" name={`mat-${idx}`} checked={mat.situacao === opt} onChange={() => updateMaterial(idx, 'situacao', opt as any)} className="accent-blue-600"/>
+                                                                        <span className="text-[9px] font-bold">{opt}</span>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        <td className="p-3"><input className="w-full bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 text-xs p-1 outline-none" value={mat.obs} onChange={e => updateMaterial(idx, 'obs', e.target.value)} placeholder="..." /></td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION: CHECKLIST & NOTES */}
+                            <div className={activeFichaTab === 'CHECKLIST' ? 'block space-y-6' : 'hidden'}>
+                                {/* EPIs */}
+                                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">EPIs Obrigatórios</h4>
+                                    <div className="flex flex-wrap gap-4">
+                                        {EPI_LIST.map(epi => (
+                                            <label key={epi} className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                <input type="checkbox" checked={fichaData.checklist.epis.includes(epi)} onChange={() => toggleCheck('epis', epi)} className="accent-blue-600 rounded" />
+                                                <span className="text-xs font-medium">{epi}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Days Steps */}
+                                <div className="grid grid-cols-1 gap-4">
+                                    {[
+                                        { title: '1º Dia - Desmontagem e Aplicação Química', list: STEPS_DIA_1, key: 'dia1' },
+                                        { title: '2º Dia - Movimentação e Limpeza', list: STEPS_DIA_2, key: 'dia2' },
+                                        { title: '3º Dia - Montagem e Finalização', list: STEPS_DIA_3, key: 'dia3' }
+                                    ].map((block, i) => (
+                                        <div key={block.key} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+                                            <h4 className="text-xs font-black uppercase text-blue-600 mb-3">{block.title}</h4>
+                                            <div className="space-y-2">
+                                                {block.list.map(step => (
+                                                    <label key={step} className="flex items-start gap-3 cursor-pointer group">
+                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors mt-0.5 ${fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}>
+                                                            {fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step) && <CheckCircle2 size={14}/>}
+                                                        </div>
+                                                        <input type="checkbox" className="hidden" checked={fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step)} onChange={() => toggleCheck(block.key as any, step)} />
+                                                        <span className="text-xs text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">{step}</span>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Necessities */}
+                                <div className="bg-amber-50/50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/30">
+                                    <h4 className="text-xs font-black uppercase text-amber-600 mb-3 flex items-center gap-2"><AlertTriangle size={14}/> Necessidades Identificadas</h4>
+                                    <div className="space-y-2">
+                                        {NECESSITIES_LIST.map(nec => (
+                                            <label key={nec} className="flex items-start gap-3 cursor-pointer">
+                                                <input type="checkbox" className="accent-amber-600 mt-0.5" checked={fichaData.necessidades.includes(nec)} onChange={() => toggleNecessidade(nec)} />
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{nec}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                    <textarea 
+                                        className="w-full mt-4 p-3 bg-white dark:bg-slate-950 border border-amber-200 dark:border-amber-900/50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/50" 
+                                        rows={3} 
+                                        placeholder="Observações adicionais e cálculos..." 
+                                        value={fichaData.observacoes} 
+                                        onChange={e => updateFicha('observacoes', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex justify-between items-center shrink-0">
+                            <div className="text-xs text-slate-400 font-mono hidden md:block">Validade Automática: 12 Meses</div>
+                            <div className="flex gap-3 w-full md:w-auto">
+                                <button onClick={() => setIsFichaOpen(false)} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-xs uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 transition-colors">Cancelar</button>
+                                <button onClick={handleSaveFicha} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-black text-xs uppercase bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
+                                    <Save size={16} /> Salvar Ficha
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MODAL GENÉRICO (CAIXAS/CISTERNAS) */}
             {isModalOpen && editItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-2xl p-0 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
+                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg p-0 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
                             <div>
                                 <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-wider text-lg">
@@ -434,185 +612,52 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                             <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} className="text-slate-500"/></button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Localização</label>
-                                    <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" 
-                                        value={editItem.local} onChange={e => setEditItem({...editItem, local: e.target.value})} placeholder="Ex: Subsolo 1" />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Responsável</label>
-                                    <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" 
-                                        value={editItem.responsavel} onChange={e => setEditItem({...editItem, responsavel: e.target.value})} placeholder="Técnico" />
-                                </div>
+                        <div className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade</label><input className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.capacidade || ''} onChange={e => setEditItem({...editItem, capacidade: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Células</label><input type="number" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} /></div>
                             </div>
-
-                            {editItem.tipo === 'POCO' && (
-                                <div className="p-4 bg-blue-50/50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 rounded-2xl space-y-4">
-                                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-400 font-black text-[10px] uppercase mb-1">
-                                        <FileText size={14} /> Dados Técnicos
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Ref. Bomba</label>
-                                            <input className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.referenciaBomba || ''} onChange={e => setEditItem({...editItem, referenciaBomba: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Link Ficha Op.</label>
-                                            <input className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.fichaOperacional || ''} onChange={e => setEditItem({...editItem, fichaOperacional: e.target.value})} placeholder="URL do Arquivo" />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {(editItem.tipo === 'CISTERNA' || editItem.tipo === 'CAIXA') && (
-                                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30 rounded-2xl space-y-4">
-                                    <div className="flex items-center gap-2 text-indigo-700 dark:text-indigo-400 font-black text-[10px] uppercase mb-1">
-                                        <Box size={14} /> Capacidade Estrutural
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade (Litros)</label>
-                                            <input className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.capacidade || ''} onChange={e => setEditItem({...editItem, capacidade: e.target.value})} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Número de Células</label>
-                                            <input type="number" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {editItem.tipo === 'POCO' && (
-                                <div className="p-4 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 rounded-2xl space-y-4">
-                                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-black text-[10px] uppercase mb-1">
-                                        <Filter size={14} /> Troca de Filtro
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Refil</label>
-                                            <input className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.refil || ''} onChange={e => setEditItem({...editItem, refil: e.target.value})} placeholder='10"' />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Data Troca</label>
-                                            <input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.ultimaTrocaFiltro || ''} onChange={e => handleDateChange('FILTRO', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Próxima</label>
-                                            <input type="date" className="w-full p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono text-slate-500" 
-                                                value={editItem.proximaTrocaFiltro || ''} readOnly />
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl space-y-4">
-                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 font-black text-[10px] uppercase mb-1">
-                                    <Calendar size={14} /> Cronograma de Higienização
-                                </div>
-                                
-                                {editItem.tipo === 'POCO' ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Data Realização</label>
-                                            <input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" 
-                                                value={editItem.dataUltimaLimpeza || ''} onChange={e => handleDateChange('LIMPEZA', e.target.value)} />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Vencimento</label>
-                                            <input type="date" className="w-full p-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono text-slate-500" 
-                                                value={editItem.proximaLimpeza || ''} readOnly />
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-2 gap-4 pb-4 border-b border-emerald-100 dark:border-emerald-900/20">
-                                            <div className="col-span-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest">1º Semestre</div>
-                                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Previsão</label><input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" value={editItem.previsaoLimpeza1 || ''} onChange={e => setEditItem({...editItem, previsaoLimpeza1: e.target.value})} /></div>
-                                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização</label><input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="col-span-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest">2º Semestre</div>
-                                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Previsão</label><input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" value={editItem.previsaoLimpeza2 || ''} onChange={e => setEditItem({...editItem, previsaoLimpeza2: e.target.value})} /></div>
-                                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização</label><input type="date" className="w-full p-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg text-sm font-mono" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
-                                        </div>
-                                    </div>
-                                )}
-                                
-                                <div className="space-y-1 pt-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase">Status Operacional</label>
-                                    <select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono"
-                                        value={editItem.situacaoLimpeza} onChange={e => setEditItem({...editItem, situacaoLimpeza: e.target.value})}
-                                    >
-                                        <option value="PENDENTE">PENDENTE</option>
-                                        <option value="DENTRO DO PRAZO">DENTRO DO PRAZO</option>
-                                        <option value="FORA DO PRAZO">FORA DO PRAZO</option>
-                                        <option value="DESATIVADO">DESATIVADO</option>
-                                    </select>
-                                </div>
+                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
+                                <div className="col-span-2 text-[10px] font-black uppercase text-emerald-600">Cronograma Semestral</div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização 1º Sem</label><input type="date" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização 2º Sem</label><input type="date" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
+                            </div>
+                            <div className="space-y-1 pt-2">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Status Operacional</label>
+                                <select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono uppercase" value={editItem.situacaoLimpeza} onChange={e => setEditItem({...editItem, situacaoLimpeza: e.target.value})}>
+                                    <option value="PENDENTE">PENDENTE</option>
+                                    <option value="DENTRO DO PRAZO">DENTRO DO PRAZO</option>
+                                    <option value="FORA DO PRAZO">FORA DO PRAZO</option>
+                                    <option value="DESATIVADO">DESATIVADO</option>
+                                </select>
                             </div>
                         </div>
 
                         <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-black/20">
-                            <button onClick={handleSave} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-lg shadow-cyan-500/20 uppercase tracking-widest font-mono text-sm transition-all active:scale-95">
-                                Salvar Alterações
-                            </button>
+                            <button onClick={handleSaveGeneric} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest font-mono text-sm transition-all">Salvar Alterações</button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* MODAL HISTORY */}
+            {/* HISTORY MODAL (SIMPLIFIED FOR BREVITY) */}
             {isHistoryOpen && historyItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 rounded-xl"><History size={20}/></div>
-                                <div>
-                                    <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rastreabilidade</h3>
-                                    <p className="text-[10px] text-slate-500 font-black uppercase">{historyItem.local}</p>
-                                </div>
-                            </div>
-                            <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} className="text-slate-500"/></button>
+                            <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rastreabilidade</h3>
+                            <button onClick={() => setIsHistoryOpen(false)}><X size={20}/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
-                            {loadingHistory ? (
-                                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                    <Loader2 size={32} className="animate-spin mb-2 text-purple-500" />
-                                    <p className="text-xs font-mono uppercase">Carregando logs...</p>
-                                </div>
-                            ) : historyLogs.length === 0 ? (
-                                <div className="text-center py-12 text-slate-400">
-                                    <Activity size={40} className="mx-auto mb-3 opacity-20" />
-                                    <p className="text-xs font-mono uppercase">Nenhum evento registrado.</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-6 relative border-l-2 border-slate-100 dark:border-slate-800 ml-4">
-                                    {historyLogs.map((log, idx) => (
-                                        <div key={log.id} className="relative pl-6 group">
-                                            <div className={`absolute -left-[9px] top-0 w-4 h-4 rounded-full border-4 border-white dark:border-[#111114] ${idx === 0 ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
-                                            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-purple-200 dark:hover:border-purple-900/50 transition-colors">
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <p className="font-black text-slate-800 dark:text-white text-xs uppercase">{new Date(log.timestamp).toLocaleDateString()}</p>
-                                                        <p className="text-[10px] text-slate-400 font-mono">{new Date(log.timestamp).toLocaleTimeString()}</p>
-                                                    </div>
-                                                    <span className="px-2 py-0.5 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[9px] font-bold rounded uppercase">{log.action}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <UserIcon size={12} className="text-purple-500"/>
-                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.userName}</span>
-                                                </div>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed">{log.details}</p>
+                            {loadingHistory ? <div className="text-center"><Loader2 className="animate-spin inline"/></div> : (
+                                <div className="space-y-4">
+                                    {historyLogs.length === 0 ? <p className="text-center text-slate-400 text-xs">Sem histórico.</p> : historyLogs.map((l, i) => (
+                                        <div key={i} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
+                                            <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
+                                                <span>{new Date(l.timestamp).toLocaleDateString()}</span>
+                                                <span>{l.userName}</span>
                                             </div>
+                                            <p className="text-xs">{l.details}</p>
                                         </div>
                                     ))}
                                 </div>

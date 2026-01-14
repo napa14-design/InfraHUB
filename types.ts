@@ -69,14 +69,12 @@ export interface AppModule {
   type: ModuleType;
 }
 
-// Fixed: Defined NotificationType as it was missing and being imported in multiple files
 export type NotificationType = 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
 
 export interface AppNotification {
   id: string;
   title: string;
   message: string;
-  // Fixed: Used the new NotificationType alias
   type: NotificationType;
   read: boolean;
   timestamp: Date;
@@ -111,7 +109,6 @@ export interface LogEntry {
 export interface HydroSettings {
   validadeCertificadoMeses: number;
   validadeFiltroMeses: number;
-  // Novos campos específicos
   validadeLimpezaCaixa: number;
   validadeLimpezaCisterna: number;
   validadeLimpezaPoco: number;
@@ -145,7 +142,7 @@ export interface HydroCloroEntry {
   ph: number;
   medidaCorretiva?: string;
   responsavel: string;
-  photoUrl?: string; // Novo campo
+  photoUrl?: string; 
 }
 
 export interface HydroFiltro {
@@ -156,6 +153,54 @@ export interface HydroFiltro {
   local: string;
   dataTroca: string;
   proximaTroca: string;
+}
+
+// --- TIPAGEM AVANÇADA FICHA POÇO ---
+export interface DadosPrePos {
+  profundidade: string;
+  nivelEstatico: string;
+  nivelDinamico: string;
+  tempo: string;
+  vazao: string;
+}
+
+export interface MaterialPoco {
+  item: string;
+  situacao: 'BOM' | 'REGULAR' | 'RUIM';
+  obs: string;
+}
+
+export interface ChecklistPoco {
+  epis: string[]; // IDs dos EPIs marcados
+  dia1: string[]; // IDs das etapas dia 1
+  dia2: string[]; // IDs das etapas dia 2
+  dia3: string[]; // IDs das etapas dia 3
+}
+
+export interface FichaPoco {
+  // Cabeçalho
+  inicioLimpeza: string;
+  terminoLimpeza: string;
+  supervisor: string;
+  coordenador: string;
+  bombeiro: string;
+  // Dados Bomba
+  profundidadeBomba: string;
+  potenciaBomba: string;
+  numEstagios: string;
+  patrimonioBomba: string;
+  marcaBomba: string;
+  modeloBomba: string;
+  // Especificação Poço
+  preLimpeza: DadosPrePos;
+  posLimpeza: DadosPrePos;
+  // Materiais
+  materiais: MaterialPoco[];
+  // Checklist
+  checklist: ChecklistPoco;
+  // Necessidades / Obs
+  necessidades: string[]; // IDs das necessidades marcadas
+  observacoes: string;
 }
 
 export type TipoReservatorio = 'POCO' | 'CISTERNA' | 'CAIXA';
@@ -171,7 +216,8 @@ export interface HydroReservatorio {
   situacaoLimpeza: 'DENTRO DO PRAZO' | 'FORA DO PRAZO' | 'PENDENTE' | 'DESATIVADO';
   bairro?: string;
   referenciaBomba?: string;
-  fichaOperacional?: string;
+  fichaOperacional?: string; // Link antigo (manter compatibilidade)
+  dadosFicha?: FichaPoco; // NOVO: Dados estruturados do PDF
   ultimaTrocaFiltro?: string;
   proximaTrocaFiltro?: string;
   situacaoFiltro?: string;
@@ -188,19 +234,15 @@ export type HydroPoco = HydroReservatorio;
 export type HydroCisterna = HydroReservatorio;
 export type HydroCaixa = HydroReservatorio;
 
-// --- PEST CONTROL TYPES (ENHANCED) ---
-
 export interface PestTechnician {
   name: string;
-  sedeId?: string; // Opcional: Se vazio, é Global/Externo
+  sedeId?: string;
 }
 
 export interface PestControlSettings {
   pestTypes: string[];
-  technicians: PestTechnician[]; // Alterado de string[] para objeto estruturado
-  // Frequências globais: Record<"Nome da Praga", dias_intervalo>
+  technicians: PestTechnician[];
   globalFrequencies: Record<string, number>;
-  // Frequências por sede: Record<"sedeId", Record<"Nome da Praga", dias_intervalo>>
   sedeFrequencies: Record<string, Record<string, number>>;
 }
 
@@ -217,5 +259,5 @@ export interface PestControlEntry {
   performedDate?: string; 
   observation?: string;
   status: 'PENDENTE' | 'REALIZADO' | 'ATRASADO';
-  photoUrl?: string; // Novo campo
+  photoUrl?: string;
 }
