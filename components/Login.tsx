@@ -5,7 +5,6 @@ import { authService } from '../services/authService';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
-import { PWAInstallPrompt } from './Shared/PWAInstallPrompt';
 
 interface LoginProps {
   onLogin: (email: string) => Promise<boolean>;
@@ -452,12 +451,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                 </button>
               </form>
 
-              {/* Status Footer & Install Button */}
+              {/* Status Footer */}
               <div className="mt-8 pt-6 border-t border-slate-100 dark:border-white/5 space-y-4">
                 
-                {/* PWA Install Button (Debug Enabled) */}
-                <PWAInstallPrompt debug={true} className="w-full mb-2" />
-
                 <div className="flex items-center justify-between text-[10px] font-mono">
                   <div className="flex items-center gap-2 text-slate-400 dark:text-white/30">
                     <span className={`w-2 h-2 ${isSupabaseConfigured() ? 'bg-emerald-500' : 'bg-amber-500'}`} />

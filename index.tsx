@@ -9,12 +9,14 @@ import App from './App';
 window.deferredPrompt = null;
 
 window.addEventListener('beforeinstallprompt', (e) => {
-  // Prevent the mini-infobar from appearing on mobile
-  e.preventDefault();
-  // Stash the event so it can be triggered later.
+  // We do NOT call e.preventDefault() here.
+  // This allows the browser (especially Chrome on Android) to show its native
+  // "Add to Home Screen" mini-infobar automatically if criteria are met.
+  
+  // We still stash the event so it can be triggered later if the user dismisses the native prompt but clicks a button later.
   // @ts-ignore
   window.deferredPrompt = e;
-  console.log("Global: beforeinstallprompt captured");
+  console.log("Global: beforeinstallprompt captured (Native prompt allowed)");
 });
 
 const rootElement = document.getElementById('root');
