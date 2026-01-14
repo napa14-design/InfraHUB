@@ -6,7 +6,9 @@ import { logService } from './logService';
 import { authService } from './authService';
 import { notificationService } from './notificationService';
 
-// ... (KEEP ALL MAPPERS AS IS, DO NOT CHANGE THEM) ...
+// Cache em memória para Cloro quando offline/mock
+let MOCK_CLORO_CACHE: HydroCloroEntry[] = [];
+
 const mapCertificadoFromDB = (db: any): HydroCertificado => ({
     id: db.id,
     sedeId: db.sede_id,
@@ -47,7 +49,7 @@ const mapCloroFromDB = (db: any): HydroCloroEntry => ({
     ph: db.ph,
     medidaCorretiva: db.medida_corretiva,
     responsavel: db.responsavel,
-    photoUrl: db.photo_url // Mapeamento novo
+    photoUrl: db.photo_url
 });
 
 const mapCloroToDB = (app: HydroCloroEntry) => ({
@@ -58,7 +60,7 @@ const mapCloroToDB = (app: HydroCloroEntry) => ({
     ph: app.ph,
     medida_corretiva: app.medidaCorretiva,
     responsavel: app.responsavel,
-    photo_url: app.photoUrl // Mapeamento novo
+    photo_url: app.photoUrl
 });
 
 const mapFiltroFromDB = (db: any): HydroFiltro => ({
@@ -93,6 +95,7 @@ const mapReservatorioFromDB = (db: any): any => ({
     bairro: db.bairro,
     referenciaBomba: db.referencia_bomba,
     fichaOperacional: db.ficha_operacional,
+    dadosFicha: db.dados_ficha, // Novo campo JSON
     ultimaTrocaFiltro: db.ultima_troca_filtro,
     proximaTrocaFiltro: db.proxima_troca_filtro,
     situacaoFiltro: db.situacao_filtro,
@@ -117,6 +120,7 @@ const mapReservatorioToDB = (app: any) => ({
     bairro: app.bairro,
     referencia_bomba: app.referenciaBomba,
     ficha_operacional: app.fichaOperacional,
+    dados_ficha: app.dadosFicha, // Novo campo JSON
     ultima_troca_filtro: app.ultimaTrocaFiltro,
     proxima_troca_filtro: app.proximaTrocaFiltro,
     situacao_filtro: app.situacaoFiltro,
@@ -132,7 +136,6 @@ const mapReservatorioToDB = (app: any) => ({
 const mapSettingsFromDB = (db: any): HydroSettings => ({
     validadeCertificadoMeses: db.validade_certificado_meses,
     validadeFiltroMeses: db.validade_filtro_meses,
-    // Novos campos (com fallback para compatibilidade retroativa)
     validadeLimpezaCaixa: db.validade_limpeza_caixa || db.validade_limpeza_meses || 6,
     validadeLimpezaCisterna: db.validade_limpeza_cisterna || db.validade_limpeza_meses || 6,
     validadeLimpezaPoco: db.validade_limpeza_poco || db.validade_limpeza_meses || 6,
@@ -146,11 +149,9 @@ const mapSettingsToDB = (app: HydroSettings) => ({
     id: 'default',
     validade_certificado_meses: app.validadeCertificadoMeses,
     validade_filtro_meses: app.validadeFiltroMeses,
-    // Campos específicos
     validade_limpeza_caixa: app.validadeLimpezaCaixa,
     validade_limpeza_cisterna: app.validadeLimpezaCisterna,
     validade_limpeza_poco: app.validadeLimpezaPoco,
-    // Mantém o antigo por compatibilidade por enquanto
     validade_limpeza_meses: app.validadeLimpezaCaixa, 
     cloro_min: app.cloroMin,
     cloro_max: app.cloroMax,
@@ -174,17 +175,24 @@ const getCurrentUserForLog = () => {
 
 export const hydroService = {
   // Helper de Upload
-  uploadPhoto: async (file: File): Promise<string | null> => {
+  // Aceita Blob para suportar imagens comprimidas
+  uploadPhoto: async (file: File | Blob): Promise<string | null> => {
       if (!isSupabaseConfigured()) return URL.createObjectURL(file); // Mock: Retorna Blob URL local
       
-      const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
+      // Se for Blob, precisamos garantir um nome/extensão
+      const fileExt = file instanceof File ? file.name.split('.').pop() : 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      
       const { data, error } = await supabase.storage
           .from('hydro-cloro-images')
-          .upload(fileName, file);
+          .upload(fileName, file, {
+              contentType: 'image/jpeg', // Forçamos JPEG para comprimidos
+              upsert: false
+          });
       
       if (error) {
           console.error("Erro upload:", error);
-          return null;
+          throw error;
       }
       
       const { data: publicData } = supabase.storage
@@ -206,11 +214,13 @@ export const hydroService = {
     }
   },
   saveCertificado: async (item: HydroCertificado) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
+    if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('hydro_certificados').upsert(mapCertificadoToDB(item));
+        if (error) throw error;
+    }
     const u = getCurrentUserForLog();
     if(u) {
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `Certificado ${item.parceiro}`, `Status: ${item.status}`);
-        // Se status vigent, limpar alertas antigos
         if (item.status === 'VIGENTE') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();
@@ -232,12 +242,24 @@ export const hydroService = {
         const mapped = (data || []).map(mapCloroFromDB);
         return filterByScope(mapped, user);
     } catch (e) {
-        return [];
+        // Fallback para cache local (Mock)
+        return filterByScope(MOCK_CLORO_CACHE, user);
     }
   },
   saveCloro: async (entry: HydroCloroEntry) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
-    // Log detalhado para auditoria: inclui a Data de Referência (dia do cloro registrado)
+    if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
+        if (error) {
+            console.error("Erro detalhado do Supabase:", JSON.stringify(error, null, 2));
+            throw error; // Lança erro contendo a mensagem do banco
+        }
+    } else {
+        // Salva no cache local
+        const idx = MOCK_CLORO_CACHE.findIndex(e => e.id === entry.id);
+        if (idx >= 0) MOCK_CLORO_CACHE[idx] = entry;
+        else MOCK_CLORO_CACHE.push(entry);
+    }
+    
     const u = getCurrentUserForLog();
     if(u) logService.logAction(u, 'HYDROSYS', 'CREATE', `Medição Cloro`, `Sede: ${entry.sedeId}, Data Ref: ${entry.date}, CL: ${entry.cl}, pH: ${entry.ph} ${entry.photoUrl ? '(Com Foto)' : ''}`);
   },
@@ -254,7 +276,10 @@ export const hydroService = {
     }
   },
   saveFiltro: async (item: HydroFiltro) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
+    if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('hydro_filtros').upsert(mapFiltroToDB(item));
+        if (error) throw error;
+    }
     const u = getCurrentUserForLog();
     if(u) {
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `Filtro ${item.patrimonio}`);
@@ -283,7 +308,10 @@ export const hydroService = {
     }
   },
   savePoco: async (item: HydroPoco) => {
-    if (isSupabaseConfigured()) await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
+    if (isSupabaseConfigured()) {
+        const { error } = await supabase.from('hydro_reservatorios').upsert(mapReservatorioToDB({ ...item, tipo: 'POCO' }));
+        if (error) throw error;
+    }
     const u = getCurrentUserForLog();
     if(u) {
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`);

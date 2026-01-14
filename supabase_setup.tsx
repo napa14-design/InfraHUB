@@ -32,12 +32,12 @@ CREATE TABLE IF NOT EXISTS pest_control_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
   pest_types TEXT[] DEFAULT '{}',
   technicians TEXT[] DEFAULT '{}',
-  technicians_list JSONB DEFAULT '[]'::jsonb, -- Nova coluna para lista estruturada
+  technicians_list JSONB DEFAULT '[]'::jsonb,
   global_frequencies JSONB DEFAULT '{}'::jsonb,
   sede_frequencies JSONB DEFAULT '{}'::jsonb
 );
 
--- Migração segura (Execute se a tabela já existir)
+-- Migração segura (technicians_list)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'pest_control_settings' AND column_name = 'technicians_list') THEN
@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS pest_control_entries (
   performed_date DATE,
   observation TEXT,
   status TEXT DEFAULT 'PENDENTE',
-  photo_url TEXT -- Novo campo para foto
+  photo_url TEXT
 );
 
 ALTER TABLE pest_control_settings ENABLE ROW LEVEL SECURITY;
@@ -94,19 +94,16 @@ CREATE POLICY "Public Write Rules" ON notification_rules FOR INSERT WITH CHECK (
 CREATE POLICY "Public Update Rules" ON notification_rules FOR UPDATE USING (true);
 
 -- =============================================
--- 4. HYDRO SETTINGS (ATUALIZADO)
+-- 4. HYDRO SETTINGS & CLORO
 -- =============================================
 CREATE TABLE IF NOT EXISTS hydro_settings (
   id TEXT PRIMARY KEY DEFAULT 'default',
   validade_certificado_meses INTEGER DEFAULT 6,
   validade_filtro_meses INTEGER DEFAULT 6,
-  -- Campos novos para reservatórios específicos
   validade_limpeza_caixa INTEGER DEFAULT 6,
   validade_limpeza_cisterna INTEGER DEFAULT 6,
   validade_limpeza_poco INTEGER DEFAULT 6,
-  -- Mantendo legado por segurança
-  validade_limpeza_meses INTEGER DEFAULT 6,
-  
+  validade_limpeza_meses INTEGER DEFAULT 6, -- Legado
   cloro_min FLOAT DEFAULT 1.0,
   cloro_max FLOAT DEFAULT 3.0,
   ph_min FLOAT DEFAULT 7.4,
@@ -118,7 +115,6 @@ CREATE POLICY "Public Read Hydro Settings" ON hydro_settings FOR SELECT USING (t
 CREATE POLICY "Public Update Hydro Settings" ON hydro_settings FOR UPDATE USING (true);
 CREATE POLICY "Public Insert Hydro Settings" ON hydro_settings FOR INSERT WITH CHECK (true);
 
--- Atualização na tabela de Cloro para foto
 CREATE TABLE IF NOT EXISTS hydro_cloro (
   id TEXT PRIMARY KEY,
   sede_id TEXT NOT NULL,
@@ -129,24 +125,114 @@ CREATE TABLE IF NOT EXISTS hydro_cloro (
   responsavel TEXT,
   photo_url TEXT
 );
+
+-- MIGRATION CRÍTICA: Adicionar photo_url se não existir
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'hydro_cloro' AND column_name = 'photo_url') THEN
+        ALTER TABLE hydro_cloro ADD COLUMN photo_url TEXT;
+    END IF;
+END $$;
+
 ALTER TABLE hydro_cloro ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public Read Cloro" ON hydro_cloro FOR SELECT USING (true);
 CREATE POLICY "Public Write Cloro" ON hydro_cloro FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public Update Cloro" ON hydro_cloro FOR UPDATE USING (true);
 
 -- =============================================
--- 5. STORAGE BUCKETS (EXECUTAR NO EDITOR SQL)
+-- 5. TABELAS HYDRO FALTANTES (RESERVATÓRIOS, FILTROS, CERTIFICADOS)
 -- =============================================
--- Insira um por vez no SQL Editor se falhar
-insert into storage.buckets (id, name, public) values ('pest-control-images', 'pest-control-images', true);
-insert into storage.buckets (id, name, public) values ('hydro-cloro-images', 'hydro-cloro-images', true);
 
--- Políticas de Storage (Pode fazer pela UI do Supabase também)
-create policy "Public Access Pest" on storage.objects for select using ( bucket_id = 'pest-control-images' );
-create policy "Public Insert Pest" on storage.objects for insert with check ( bucket_id = 'pest-control-images' );
+-- Reservatórios
+CREATE TABLE IF NOT EXISTS hydro_reservatorios (
+  id TEXT PRIMARY KEY,
+  sede_id TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  local TEXT NOT NULL,
+  responsavel TEXT,
+  data_ultima_limpeza DATE,
+  proxima_limpeza DATE,
+  situacao_limpeza TEXT,
+  previsao_limpeza_1 DATE,
+  data_limpeza_1 DATE,
+  previsao_limpeza_2 DATE,
+  data_limpeza_2 DATE,
+  bairro TEXT,
+  referencia_bomba TEXT,
+  ficha_operacional TEXT,
+  dados_ficha JSONB,
+  ultima_troca_filtro DATE,
+  proxima_troca_filtro DATE,
+  situacao_filtro TEXT,
+  refil TEXT,
+  num_celulas INTEGER,
+  capacidade TEXT
+);
 
-create policy "Public Access Cloro" on storage.objects for select using ( bucket_id = 'hydro-cloro-images' );
-create policy "Public Insert Cloro" on storage.objects for insert with check ( bucket_id = 'hydro-cloro-images' );
+-- MIGRATION: dados_ficha em reservatorios
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'hydro_reservatorios' AND column_name = 'dados_ficha') THEN
+        ALTER TABLE hydro_reservatorios ADD COLUMN dados_ficha JSONB;
+    END IF;
+END $$;
+
+ALTER TABLE hydro_reservatorios ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Reservatorios" ON hydro_reservatorios FOR SELECT USING (true);
+CREATE POLICY "Public Write Reservatorios" ON hydro_reservatorios FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Reservatorios" ON hydro_reservatorios FOR UPDATE USING (true);
+CREATE POLICY "Public Delete Reservatorios" ON hydro_reservatorios FOR DELETE USING (true);
+
+-- Certificados
+CREATE TABLE IF NOT EXISTS hydro_certificados (
+  id TEXT PRIMARY KEY,
+  sede_id TEXT NOT NULL,
+  parceiro TEXT,
+  status TEXT,
+  semestre TEXT,
+  validade_semestre TEXT,
+  data_analise DATE,
+  validade DATE,
+  link_micro TEXT,
+  link_fisico TEXT,
+  empresa TEXT,
+  agendamento TEXT,
+  observacao TEXT
+);
+ALTER TABLE hydro_certificados ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Certificados" ON hydro_certificados FOR SELECT USING (true);
+CREATE POLICY "Public Write Certificados" ON hydro_certificados FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Certificados" ON hydro_certificados FOR UPDATE USING (true);
+CREATE POLICY "Public Delete Certificados" ON hydro_certificados FOR DELETE USING (true);
+
+-- Filtros
+CREATE TABLE IF NOT EXISTS hydro_filtros (
+  id TEXT PRIMARY KEY,
+  sede_id TEXT NOT NULL,
+  patrimonio TEXT,
+  bebedouro TEXT,
+  local TEXT,
+  data_troca DATE,
+  proxima_troca DATE
+);
+ALTER TABLE hydro_filtros ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public Read Filtros" ON hydro_filtros FOR SELECT USING (true);
+CREATE POLICY "Public Write Filtros" ON hydro_filtros FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public Update Filtros" ON hydro_filtros FOR UPDATE USING (true);
+CREATE POLICY "Public Delete Filtros" ON hydro_filtros FOR DELETE USING (true);
+
+-- =============================================
+-- 6. STORAGE BUCKETS
+-- =============================================
+-- Execute separadamente se der erro de duplicidade
+INSERT INTO storage.buckets (id, name, public) VALUES ('pest-control-images', 'pest-control-images', true) ON CONFLICT DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('hydro-cloro-images', 'hydro-cloro-images', true) ON CONFLICT DO NOTHING;
+
+CREATE POLICY "Public Access Pest" ON storage.objects FOR SELECT USING ( bucket_id = 'pest-control-images' );
+CREATE POLICY "Public Insert Pest" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'pest-control-images' );
+
+CREATE POLICY "Public Access Cloro" ON storage.objects FOR SELECT USING ( bucket_id = 'hydro-cloro-images' );
+CREATE POLICY "Public Insert Cloro" ON storage.objects FOR INSERT WITH CHECK ( bucket_id = 'hydro-cloro-images' );
 `;
 
 export const SEED_SQL = `
