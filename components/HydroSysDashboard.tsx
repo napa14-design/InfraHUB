@@ -83,19 +83,24 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               hydroService.getCloro(user)
           ]);
 
-          const uniqueCerts = Array.from(certs.reduce((map, item) => {
+          // Sort descending by validity date to ensure the most relevant is kept during dedupe
+          const sortedCerts = [...certs].sort((a, b) => new Date(b.validade).getTime() - new Date(a.validade).getTime());
+          
+          const uniqueCerts = Array.from(sortedCerts.reduce((map, item) => {
               const key = `${item.sedeId}-${item.parceiro}`;
-              const existing = map.get(key);
-              if (!existing || new Date(item.validade) > new Date(existing.validade)) {
+              // Since it's sorted descending, we just need to keep the first one encountered or check logic
+              if (!map.has(key)) {
                   map.set(key, item);
               }
               return map;
           }, new Map<string, HydroCertificado>()).values());
 
-          const uniqueFiltros = Array.from(filts.reduce((map, item) => {
+          // Sort filters by Next Exchange Date
+          const sortedFiltros = [...filts].sort((a, b) => new Date(b.proximaTroca).getTime() - new Date(a.proximaTroca).getTime());
+
+          const uniqueFiltros = Array.from(sortedFiltros.reduce((map, item) => {
               const key = `${item.sedeId}-${item.patrimonio}`; 
-              const existing = map.get(key);
-              if (!existing || new Date(item.dataTroca) > new Date(existing.dataTroca)) {
+              if (!map.has(key)) {
                   map.set(key, item);
               }
               return map;

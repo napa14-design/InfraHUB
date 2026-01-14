@@ -124,6 +124,11 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
       setIsUploading(true);
       try {
+          // If replacing, clean up old blob if it exists (simple check for blob protocol)
+          if (form.photoUrl && form.photoUrl.startsWith('blob:')) {
+              URL.revokeObjectURL(form.photoUrl);
+          }
+
           const compressedBlob = await compressImage(file, 1000, 0.6);
           const url = await hydroService.uploadPhoto(compressedBlob);
           if (url) setForm(prev => ({ ...prev, photoUrl: url }));
@@ -137,6 +142,9 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const removePhoto = () => {
+      if (form.photoUrl && form.photoUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(form.photoUrl);
+      }
       setForm(prev => ({ ...prev, photoUrl: '' }));
       if (fileInputRef.current) fileInputRef.current.value = '';
   };

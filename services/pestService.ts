@@ -32,6 +32,9 @@ let LOCAL_SETTINGS: PestControlSettings = {
     sedeFrequencies: {}
 };
 
+// Track blob URLs for cleanup
+const CREATED_BLOB_URLS: string[] = [];
+
 const mapEntryFromDB = (db: any): PestControlEntry => ({
     id: db.id,
     sedeId: db.sede_id,
@@ -65,9 +68,13 @@ const mapEntryToDB = (app: PestControlEntry) => ({
 });
 
 export const pestService = {
-    // Helper Upload
+    // Helper Upload with memory management for Mocks
     uploadPhoto: async (file: File): Promise<string | null> => {
-        if (!isSupabaseConfigured()) return URL.createObjectURL(file); // Mock
+        if (!isSupabaseConfigured()) {
+            const url = URL.createObjectURL(file);
+            CREATED_BLOB_URLS.push(url);
+            return url;
+        }
         
         const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
         const { data, error } = await supabase.storage
@@ -105,12 +112,11 @@ export const pestService = {
             if (!isSupabaseConfigured()) throw new Error("Mock");
             const { data } = await supabase.from('pest_control_settings').select('*').single();
             if (data) {
-                // Mapeamento Inteligente: Tenta usar a lista JSONB, senão faz fallback para array de strings
+                // Mapeamento Inteligente
                 let techs: PestTechnician[] = [];
                 if (data.technicians_list && Array.isArray(data.technicians_list) && data.technicians_list.length > 0) {
                     techs = data.technicians_list;
                 } else if (data.technicians && Array.isArray(data.technicians)) {
-                    // Fallback para legado
                     techs = data.technicians.map((name: string) => ({ name, sedeId: '' }));
                 }
 
@@ -132,9 +138,8 @@ export const pestService = {
             await supabase.from('pest_control_settings').upsert({
                 id: 'default',
                 pest_types: settings.pestTypes,
-                // Salva ambos para compatibilidade
-                technicians: settings.technicians.map(t => t.name), // Array simples para legado
-                technicians_list: settings.technicians, // JSONB rico
+                technicians: settings.technicians.map(t => t.name), 
+                technicians_list: settings.technicians,
                 global_frequencies: settings.globalFrequencies,
                 sede_frequencies: settings.sedeFrequencies
             });
@@ -170,18 +175,13 @@ export const pestService = {
         const u = authService.getCurrentUser();
         if(u) logService.logAction(u, 'PESTCONTROL', 'UPDATE', `${item.target}`, `Unidade: ${item.sedeId}, Status: ${item.status} ${item.photoUrl ? '(Com Foto)' : ''}`);
 
-        // ALERTAS INSTANTÂNEOS
         if (isCompletion) {
             await pestService.generateNextTask(item);
-            // Se concluído, marca notificações relacionadas como lidas imediatamente
             await notificationService.resolveAlert(item.id);
         }
         
-        // Dispara atualização da UI
         if(u) {
-            // Re-checa status geral (gera novas notificações ou mantém as atuais)
             await notificationService.checkSystemStatus(u);
-            // Avisa o Layout para buscar tudo de novo
             notificationService.notifyRefresh();
         }
     },
@@ -244,7 +244,6 @@ export const pestService = {
             const idx = MOCK_PEST_ENTRIES.findIndex(e => e.id === id);
             if (idx >= 0) MOCK_PEST_ENTRIES.splice(idx, 1);
         }
-        // Se deletado, limpa notificações e atualiza UI
         await notificationService.resolveAlert(id);
         notificationService.notifyRefresh();
     }

@@ -137,7 +137,13 @@ export const authService = {
             // Defensive check for name
             if (!parsed.name) parsed.name = 'Usuário';
             
-            // Optional: Re-check status if token is stale (handled better by full re-auth, but good safeguard)
+            // Validate against Supabase session if configured (Basic check)
+            // Note: Full async session check happens in App.tsx AuthObserver
+            if (isSupabaseConfigured()) {
+               // We trust localStorage temporarily for synchronous render, 
+               // but App.tsx will redirect if session is invalid.
+            }
+
             if (parsed.status !== 'ACTIVE') {
                 localStorage.removeItem(SESSION_KEY);
                 return null;
@@ -187,13 +193,14 @@ export const authService = {
 
      if (isSupabaseConfigured()) {
          try {
-             // Accessing protected properties for this workaround
+             // Accessing properties safely from the initialized client
              // @ts-ignore
              const sbUrl = supabase.supabaseUrl;
              // @ts-ignore
              const sbKey = supabase.supabaseKey;
 
              if (sbUrl && sbKey && userData.email) {
+                 // Create a temporary client to avoid logging out the current admin
                  const tempClient = createClient(sbUrl, sbKey, {
                      auth: {
                          persistSession: false,

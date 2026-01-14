@@ -1,5 +1,5 @@
 
-import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPoco, HydroCisterna, HydroCaixa, HydroSettings } from '../types';
+import { User, UserRole, HydroCertificado, HydroCloroEntry, HydroFiltro, HydroPoco, HydroCisterna, HydroCaixa, HydroSettings, HydroReservatorio } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS } from '../constants';
 import { logService } from './logService';
@@ -8,6 +8,17 @@ import { notificationService } from './notificationService';
 
 // Cache em memória para Cloro quando offline/mock
 let MOCK_CLORO_CACHE: HydroCloroEntry[] = [];
+
+// Track created URLs to avoid memory leaks
+const CREATED_BLOB_URLS: string[] = [];
+
+const cleanupBlobUrls = () => {
+    CREATED_BLOB_URLS.forEach(url => URL.revokeObjectURL(url));
+    CREATED_BLOB_URLS.length = 0;
+};
+
+// Expose cleanup if needed globally, but mostly handled internally or on unmount via useEffect in components if possible.
+// Since services are singletons, we rely on uploading over old blobs.
 
 const mapCertificadoFromDB = (db: any): HydroCertificado => ({
     id: db.id,
@@ -83,7 +94,7 @@ const mapFiltroToDB = (app: HydroFiltro) => ({
     proxima_troca: app.proximaTroca
 });
 
-const mapReservatorioFromDB = (db: any): any => ({
+const mapReservatorioFromDB = (db: any): HydroReservatorio => ({
     id: db.id,
     sedeId: db.sede_id,
     tipo: db.tipo,
@@ -95,7 +106,7 @@ const mapReservatorioFromDB = (db: any): any => ({
     bairro: db.bairro,
     referenciaBomba: db.referencia_bomba,
     fichaOperacional: db.ficha_operacional,
-    dadosFicha: db.dados_ficha, // Novo campo JSON
+    dadosFicha: db.dados_ficha, 
     ultimaTrocaFiltro: db.ultima_troca_filtro,
     proximaTrocaFiltro: db.proxima_troca_filtro,
     situacaoFiltro: db.situacao_filtro,
@@ -120,7 +131,7 @@ const mapReservatorioToDB = (app: any) => ({
     bairro: app.bairro,
     referencia_bomba: app.referenciaBomba,
     ficha_operacional: app.fichaOperacional,
-    dados_ficha: app.dadosFicha, // Novo campo JSON
+    dados_ficha: app.dadosFicha,
     ultima_troca_filtro: app.ultimaTrocaFiltro,
     proxima_troca_filtro: app.proximaTrocaFiltro,
     situacao_filtro: app.situacaoFiltro,
@@ -174,19 +185,23 @@ const getCurrentUserForLog = () => {
 }
 
 export const hydroService = {
-  // Helper de Upload
-  // Aceita Blob para suportar imagens comprimidas
+  // Clean up function exposed for app lifecycle management if needed
+  cleanupBlobUrls: cleanupBlobUrls,
+
   uploadPhoto: async (file: File | Blob): Promise<string | null> => {
-      if (!isSupabaseConfigured()) return URL.createObjectURL(file); // Mock: Retorna Blob URL local
+      if (!isSupabaseConfigured()) {
+          const url = URL.createObjectURL(file);
+          CREATED_BLOB_URLS.push(url); // Track for cleanup
+          return url;
+      }
       
-      // Se for Blob, precisamos garantir um nome/extensão
       const fileExt = file instanceof File ? file.name.split('.').pop() : 'jpg';
       const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
       
       const { data, error } = await supabase.storage
           .from('hydro-cloro-images')
           .upload(fileName, file, {
-              contentType: 'image/jpeg', // Forçamos JPEG para comprimidos
+              contentType: 'image/jpeg',
               upsert: false
           });
       
@@ -242,19 +257,14 @@ export const hydroService = {
         const mapped = (data || []).map(mapCloroFromDB);
         return filterByScope(mapped, user);
     } catch (e) {
-        // Fallback para cache local (Mock)
         return filterByScope(MOCK_CLORO_CACHE, user);
     }
   },
   saveCloro: async (entry: HydroCloroEntry) => {
     if (isSupabaseConfigured()) {
         const { error } = await supabase.from('hydro_cloro').upsert(mapCloroToDB(entry));
-        if (error) {
-            console.error("Erro detalhado do Supabase:", JSON.stringify(error, null, 2));
-            throw error; // Lança erro contendo a mensagem do banco
-        }
+        if (error) throw error;
     } else {
-        // Salva no cache local
         const idx = MOCK_CLORO_CACHE.findIndex(e => e.id === entry.id);
         if (idx >= 0) MOCK_CLORO_CACHE[idx] = entry;
         else MOCK_CLORO_CACHE.push(entry);
@@ -377,7 +387,7 @@ export const hydroService = {
             validadeFiltroMeses: 6,
             validadeLimpezaCaixa: 6,
             validadeLimpezaCisterna: 6,
-            validadeLimpezaPoco: 12, // UPDATED DEFAULT
+            validadeLimpezaPoco: 12,
             cloroMin: 1.0,
             cloroMax: 3.0,
             phMin: 7.4,
