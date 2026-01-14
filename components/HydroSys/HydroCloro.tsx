@@ -62,7 +62,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     validadeFiltroMeses: 6,
     validadeLimpezaCaixa: 6,
     validadeLimpezaCisterna: 6,
-    validadeLimpezaPoco: 6,
+    validadeLimpezaPoco: 12,
     cloroMin: 1.0,
     cloroMax: 3.0,
     phMin: 7.4,
@@ -75,7 +75,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   const [phInput, setPhInput] = useState('0');
 
   const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false); // Loading state para o botão salvar
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -111,7 +111,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     const newForm = entry || { id: undefined, cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' };
     setForm(newForm);
     
-    // Sync manual inputs (converting dots to commas for display if needed, though usually numbers render fine)
+    // Sync manual inputs (converting dots to commas for display)
     setClInput(newForm.cl !== undefined ? newForm.cl.toString().replace('.', ',') : '0');
     setPhInput(newForm.ph !== undefined ? newForm.ph.toString().replace('.', ',') : '0');
     
@@ -124,17 +124,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
       setIsUploading(true);
       try {
-          // 1. Comprimir Imagem
           const compressedBlob = await compressImage(file, 1000, 0.6);
-          
-          // 2. Upload do Blob Comprimido
           const url = await hydroService.uploadPhoto(compressedBlob);
-          
-          if (url) {
-              setForm(prev => ({ ...prev, photoUrl: url }));
-          } else {
-              alert("Erro no upload da imagem. Verifique a conexão.");
-          }
+          if (url) setForm(prev => ({ ...prev, photoUrl: url }));
+          else alert("Erro no upload da imagem. Verifique a conexão.");
       } catch (err) {
           console.error("Erro upload/compressão:", err);
           alert("Erro ao processar imagem.");
@@ -154,7 +147,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     setIsSaving(true);
     try {
         await hydroService.saveCloro({
-            id: form.id || `cl-${Date.now()}-${Math.floor(Math.random() * 1000)}`, // Garantir ID String único
+            id: form.id || `cl-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             sedeId: selectedSedeId,
             date: selectedDateStr,
             cl: Number(Number(form.cl).toFixed(1)),
@@ -164,12 +157,10 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             photoUrl: form.photoUrl
         });
         
-        // Refresh
         setEntries(await hydroService.getCloro(user));
         setIsModalOpen(false);
     } catch (error: any) {
         console.error("Save error:", error);
-        // Exibir mensagem de erro legível (JSON stringify se for objeto)
         const msg = error.message || JSON.stringify(error, null, 2);
         alert(`Erro ao salvar no banco de dados:\n${msg}`);
     } finally {
@@ -179,7 +170,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
 
   const adjustValue = (field: 'cl' | 'ph', delta: number) => {
       const current = Number(form[field] || 0);
-      const newValue = Math.max(0, parseFloat((current + delta).toFixed(1))); // Fix floating point weirdness
+      const newValue = Math.max(0, parseFloat((current + delta).toFixed(1)));
       
       setForm(prev => ({ ...prev, [field]: newValue }));
       
@@ -190,23 +181,24 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleManualChange = (field: 'cl' | 'ph', value: string) => {
-      // Allow only numbers and one comma/dot
+      // Regex: permite digitos, e apenas uma vírgula ou ponto
       if (!/^\d*[.,]?\d*$/.test(value)) return;
 
       if (field === 'cl') setClInput(value);
       else setPhInput(value);
 
       // Convert to number for internal logic (status color, etc)
+      // Replace comma with dot for parsing
       const numericVal = parseFloat(value.replace(',', '.'));
+      
       if (!isNaN(numericVal)) {
           setForm(prev => ({ ...prev, [field]: numericVal }));
       } else {
-          // If empty string, set to 0 internally but keep string empty
+          // If empty string or just "," set to 0 internally but keep string empty/partial
           if (value === '') setForm(prev => ({ ...prev, [field]: 0 }));
       }
   };
 
-  // Helper to get status string and color for modal
   const getStatusInfo = (val: number, min: number, max: number) => {
       if (val < min) return { text: 'BAIXO', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' };
       if (val > max) return { text: 'ALTO', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' };
@@ -228,7 +220,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
       </div>
 
       <div className="relative z-10 px-4 md:px-8 py-6 space-y-6 pb-24 md:pb-8 max-w-7xl mx-auto">
-        
         <Breadcrumbs />
 
         {/* HEADER */}
@@ -270,12 +261,11 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             </div>
         </header>
 
-        {/* STANDARDS INFO (MOVED TO TOP) */}
+        {/* STANDARDS INFO */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
              {/* Cloro Card */}
              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden">
                  <div className="absolute top-0 right-0 w-20 h-20 bg-cyan-500/10 rounded-bl-full -mr-10 -mt-10"></div>
-                 
                  <div className="flex items-center gap-4 mb-4 relative z-10">
                      <div className="w-12 h-12 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400">
                         <Droplets size={24} />
@@ -285,7 +275,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                         <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{settings.cloroMin} a {settings.cloroMax} <span className="text-sm font-bold text-slate-400">ppm</span></p>
                      </div>
                  </div>
-
                  <div className="grid grid-cols-2 gap-3 text-xs font-mono relative z-10">
                     <div className="bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/20">
                         <p className="font-bold text-red-600 dark:text-red-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &lt; {settings.cloroMin} ppm</p>
@@ -301,7 +290,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
              {/* pH Card */}
              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border border-slate-200 dark:border-slate-800 p-5 rounded-2xl flex flex-col justify-between shadow-sm relative overflow-hidden">
                  <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-bl-full -mr-10 -mt-10"></div>
-
                  <div className="flex items-center gap-4 mb-4 relative z-10">
                      <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 flex items-center justify-center text-blue-600 dark:text-blue-400">
                         <TestTube size={24} />
@@ -311,7 +299,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                         <p className="text-2xl font-black text-slate-900 dark:text-white font-mono">{settings.phMin} a {settings.phMax}</p>
                      </div>
                  </div>
-
                  <div className="grid grid-cols-2 gap-3 text-xs font-mono relative z-10">
                     <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
                         <p className="font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &lt; {settings.phMin}</p>
@@ -359,26 +346,21 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                   const clSafe = isSafe(entry.cl, settings.cloroMin, settings.cloroMax);
                                   const phSafe = isSafe(entry.ph, settings.phMin, settings.phMax);
                                   if (clSafe && phSafe) {
-                                      // OK
                                       cardStyle = "bg-gradient-to-br from-emerald-50/80 to-white dark:from-emerald-900/10 dark:to-slate-800/30 border-emerald-200 dark:border-emerald-800 shadow-sm";
                                       statusIndicator = <div className="absolute top-2 right-2 text-emerald-500"><CheckCircle2 size={14} /></div>;
                                   } else {
-                                      // IRREGULAR
                                       cardStyle = "bg-gradient-to-br from-red-50/80 to-white dark:from-red-900/10 dark:to-slate-800/30 border-red-200 dark:border-red-800 shadow-sm";
                                       statusIndicator = <div className="absolute top-2 right-2 text-red-500"><AlertTriangle size={14} /></div>;
                                   }
                               } else {
-                                  // MISSED
                                   cardStyle = "bg-slate-50 dark:bg-slate-900/20 border-dashed border-red-200 dark:border-red-900/40 text-red-300 opacity-80";
                                   statusIndicator = <div className="absolute top-2 right-2 text-red-300 opacity-50"><AlertTriangle size={12} /></div>;
                               }
                           } else if (isToday) {
                               if (entry) {
-                                  // TODAY DONE
                                   cardStyle = "bg-white dark:bg-slate-800 border-emerald-500 ring-2 ring-emerald-500/20 shadow-md";
                                   statusIndicator = <div className="absolute top-2 right-2 text-emerald-500"><CheckCircle2 size={14} /></div>;
                               } else {
-                                  // TODAY PENDING
                                   cardStyle = "bg-white dark:bg-slate-800 border-cyan-500 ring-2 ring-cyan-500/30 shadow-lg shadow-cyan-500/10";
                                   statusIndicator = <div className="absolute top-2 right-2 text-cyan-500 animate-pulse"><Clock size={14} /></div>;
                               }
@@ -387,12 +369,9 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                           return (
                               <button key={day} onClick={() => handleDayClick(day)} className={`group relative h-auto min-h-[90px] md:h-28 rounded-xl md:rounded-2xl flex flex-col p-2 md:p-3 border transition-all duration-200 active:scale-95 md:hover:-translate-y-1 md:hover:shadow-lg ${cardStyle}`}>
                                   {statusIndicator}
-                                  
-                                  {/* Day Number */}
                                   <span className={`text-sm md:text-lg font-bold font-mono mb-auto ${isToday ? 'text-cyan-600 dark:text-cyan-400' : dateStr > todayStr ? 'text-slate-300 dark:text-slate-700' : 'text-slate-700 dark:text-slate-300'}`}>
                                       {day}
                                   </span>
-
                                   {entry ? (
                                       <div className="w-full space-y-1.5 mt-1">
                                           <div className="grid grid-cols-2 gap-1">
@@ -405,8 +384,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                                   <span className="text-[10px] md:text-xs font-bold font-mono">{entry.ph}</span>
                                               </div>
                                           </div>
-                                          
-                                          {/* Metadata Indicators */}
                                           <div className="flex gap-1 justify-end opacity-60">
                                               {entry.photoUrl && <Image size={10} className="text-cyan-500" />}
                                               {entry.medidaCorretiva && <FileText size={10} className="text-amber-500" />}
@@ -423,38 +400,15 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                           );
                       })}
                   </div>
-                  
-                  {/* LEGEND */}
-                  <div className="mt-6 md:mt-8 flex flex-wrap justify-center gap-4 md:gap-6 text-[9px] md:text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-800 pt-4 md:pt-6">
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 md:w-4 md:h-4 rounded bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 flex items-center justify-center text-emerald-500">
-                                <CheckCircle2 size={10} />
-                            </div>
-                            <span>Realizado (OK)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 md:w-4 md:h-4 rounded bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 flex items-center justify-center text-red-500">
-                                <AlertTriangle size={10} />
-                            </div>
-                            <span>Irregular / Pendente (Atraso)</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 md:w-4 md:h-4 rounded border-2 border-cyan-500 flex items-center justify-center">
-                                <div className="w-1 md:w-1.5 h-1 md:h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
-                            </div>
-                            <span>Hoje</span>
-                        </div>
-                  </div>
               </>
             )}
         </div>
 
-        {/* --- MODAL REDESIGN --- */}
+        {/* MODAL REDESIGN */}
         {isModalOpen && (
             <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4">
                 <div className="bg-white dark:bg-[#111114] w-full max-w-md h-[90vh] sm:h-auto rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
                     
-                    {/* Modal Header */}
                     <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
                         <div>
                             <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-widest mb-1">
@@ -468,8 +422,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                        
-                        {/* 1. Readings Section - Styled as Cards */}
+                        {/* 1. Readings Section - Styled as Cards with Inputs */}
                         <div className="grid grid-cols-2 gap-4">
                             {/* CLORO INPUT */}
                             <div className={`p-4 rounded-2xl border-2 transition-all ${getStatusInfo(Number(form.cl), settings.cloroMin, settings.cloroMax).bg}`}>
@@ -480,7 +433,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center gap-3">
-                                    {/* MUDANÇA: Input substituindo display estático para permitir digitação */}
                                     <input 
                                         type="text"
                                         inputMode="decimal"
@@ -488,7 +440,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                         onChange={(e) => handleManualChange('cl', e.target.value)}
                                         className="text-4xl font-black text-slate-800 dark:text-white font-mono tracking-tighter bg-transparent outline-none text-center w-full focus:underline decoration-2 underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
                                     />
-                                    
                                     <div className="flex items-center gap-2 w-full">
                                         <button onClick={() => adjustValue('cl', -0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Minus size={16}/></button>
                                         <button onClick={() => adjustValue('cl', 0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Plus size={16}/></button>
@@ -505,7 +456,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                     </span>
                                 </div>
                                 <div className="flex flex-col items-center gap-3">
-                                    {/* MUDANÇA: Input substituindo display estático para permitir digitação */}
                                     <input 
                                         type="text"
                                         inputMode="decimal"
@@ -513,7 +463,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                         onChange={(e) => handleManualChange('ph', e.target.value)}
                                         className="text-4xl font-black text-slate-800 dark:text-white font-mono tracking-tighter bg-transparent outline-none text-center w-full focus:underline decoration-2 underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
                                     />
-                                    
                                     <div className="flex items-center gap-2 w-full">
                                         <button onClick={() => adjustValue('ph', -0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Minus size={16}/></button>
                                         <button onClick={() => adjustValue('ph', 0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Plus size={16}/></button>
@@ -533,21 +482,15 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                 className="hidden"
                                 onChange={handleFileChange}
                             />
-                            
                             {form.photoUrl ? (
                                 <div className="relative group rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 h-40">
                                     <img src={form.photoUrl} alt="Registro" className="w-full h-full object-cover" />
                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button 
-                                            onClick={removePhoto}
-                                            className="p-3 bg-red-500 text-white rounded-xl shadow-lg hover:scale-110 transition-transform"
-                                        >
+                                        <button onClick={removePhoto} className="p-3 bg-red-500 text-white rounded-xl shadow-lg hover:scale-110 transition-transform">
                                             <Trash2 size={20} />
                                         </button>
                                     </div>
-                                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-[10px] font-bold text-white uppercase backdrop-blur-sm">
-                                        Imagem Anexada
-                                    </div>
+                                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-[10px] font-bold text-white uppercase backdrop-blur-sm">Imagem Anexada</div>
                                 </div>
                             ) : (
                                 <button 
@@ -556,15 +499,9 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                     className="w-full h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-cyan-500 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 transition-all gap-2"
                                 >
                                     {isUploading ? (
-                                        <>
-                                            <Loader2 size={24} className="animate-spin" />
-                                            <span className="text-[10px] font-bold uppercase">Processando...</span>
-                                        </>
+                                        <><Loader2 size={24} className="animate-spin" /><span className="text-[10px] font-bold uppercase">Processando...</span></>
                                     ) : (
-                                        <>
-                                            <Camera size={24} />
-                                            <span className="text-[10px] font-bold uppercase">Adicionar Foto</span>
-                                        </>
+                                        <><Camera size={24} /><span className="text-[10px] font-bold uppercase">Adicionar Foto</span></>
                                     )}
                                 </button>
                             )}

@@ -248,7 +248,7 @@ export const notificationService = {
                     type: isCritical ? 'ERROR' : 'WARNING',
                     read: false,
                     timestamp: new Date(),
-                    link: '/module/hydrosys/reservatorios', // Link principal
+                    link: `/module/hydrosys/reservatorios?sede=${sedeId}`, // URL filtrada
                     moduleSource: 'hydrosys'
                 });
             } else {

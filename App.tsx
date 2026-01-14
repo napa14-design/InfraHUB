@@ -1,4 +1,5 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+
+import React, { useState, useEffect, Suspense, lazy, Component, ReactNode } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
@@ -10,14 +11,14 @@ import { Instructions } from './supabase_setup';
 
 // --- ERROR BOUNDARY FOR LAZY LOADING ---
 interface ErrorBoundaryProps {
-  children?: React.ReactNode;
+  children?: ReactNode;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
@@ -123,6 +124,9 @@ const AuthObserver = () => {
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // State to hold the redirect target (PWA support)
+  const [redirectPath, setRedirectPath] = useState<string>('/');
 
   useEffect(() => {
     const initApp = async () => {
@@ -140,6 +144,15 @@ const App: React.FC = () => {
         if (currentUser) {
             setUser(currentUser);
         }
+        
+        // PWA Mode Detection: Check URL for ?mode=cloro
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'cloro') {
+            setRedirectPath('/module/hydrosys/cloro');
+            // If already logged in, we can technically navigate there via Router later,
+            // but the <Navigate> component below handles the initial load redirection.
+        }
+
         setLoading(false);
     };
 
@@ -160,6 +173,8 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setUser(null);
+    // Optional: Reset redirect path on logout so next login is standard unless PWA is re-opened
+    // setRedirectPath('/'); 
   };
 
   if (loading) {
@@ -179,7 +194,9 @@ const App: React.FC = () => {
                 <Route 
                   path="/login" 
                   element={
-                    user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+                    // HERE IS THE MAGIC: If user logs in (or is already logged in), 
+                    // redirect to the detected PWA path instead of just "/"
+                    user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
                   } 
                 />
 

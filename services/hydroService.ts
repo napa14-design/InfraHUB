@@ -377,7 +377,7 @@ export const hydroService = {
             validadeFiltroMeses: 6,
             validadeLimpezaCaixa: 6,
             validadeLimpezaCisterna: 6,
-            validadeLimpezaPoco: 6,
+            validadeLimpezaPoco: 12, // UPDATED DEFAULT
             cloroMin: 1.0,
             cloroMax: 3.0,
             phMin: 7.4,

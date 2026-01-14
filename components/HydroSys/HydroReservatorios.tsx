@@ -6,7 +6,7 @@ import {
   Download, Activity, Filter, Settings, FileText, Calendar, Lock, RotateCw, Building2,
   AlertCircle, CheckCircle2, FileJson, Loader2, Save, Ruler, Gauge, Clock, ClipboardList, AlertTriangle
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings, Sede, LogEntry, FichaPoco } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
@@ -76,6 +76,7 @@ const INITIAL_FICHA: FichaPoco = {
 
 export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>('pocos');
   
   // Data
@@ -106,6 +107,19 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const isAdmin = user.role === UserRole.ADMIN;
 
   useEffect(() => { refreshData(); loadSedes(); }, [user]);
+
+  // Efeito para capturar filtro da URL (ao clicar em notificação)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const sedeParam = params.get('sede');
+    if (sedeParam) {
+        if (isAdmin) {
+            setSelectedSedeFilter(sedeParam);
+        } else {
+            setFilterText(sedeParam);
+        }
+    }
+  }, [location.search, isAdmin]);
 
   const loadSedes = () => {
       const allSedes = orgService.getSedes();
@@ -158,13 +172,17 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const handleSaveFicha = async () => {
       if (!editItem) return;
 
-      // Calcular Data de Validade baseada no término da limpeza (12 meses conforme PDF)
+      // Calcular Data de Validade baseada no término da limpeza e na CONFIGURAÇÃO
       let nextLimpeza = editItem.proximaLimpeza;
       let statusLimpeza = editItem.situacaoLimpeza;
 
       if (fichaData.terminoLimpeza) {
           const end = new Date(fichaData.terminoLimpeza);
-          end.setFullYear(end.getFullYear() + 1); // Validade 12 meses (PDF)
+          
+          // --- MUDANÇA: Usa a configuração ou 12 meses como fallback ---
+          const mesesValidade = settings?.validadeLimpezaPoco || 12; 
+          end.setMonth(end.getMonth() + mesesValidade);
+          
           nextLimpeza = end.toISOString().split('T')[0];
           statusLimpeza = getComputedStatus(nextLimpeza);
       }
@@ -523,38 +541,35 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                             </div>
 
-                            {/* SECTION: CHECKLIST & NOTES */}
+                            {/* SECTION: CHECKLIST & OBS */}
                             <div className={activeFichaTab === 'CHECKLIST' ? 'block space-y-6' : 'hidden'}>
                                 {/* EPIs */}
-                                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
-                                    <h4 className="text-[10px] font-black uppercase text-slate-400 mb-3">EPIs Obrigatórios</h4>
+                                <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">EPIs Utilizados</h3>
                                     <div className="flex flex-wrap gap-4">
                                         {EPI_LIST.map(epi => (
-                                            <label key={epi} className="flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-                                                <input type="checkbox" checked={fichaData.checklist.epis.includes(epi)} onChange={() => toggleCheck('epis', epi)} className="accent-blue-600 rounded" />
-                                                <span className="text-xs font-medium">{epi}</span>
+                                            <label key={epi} className="flex items-center gap-2 cursor-pointer bg-slate-50 dark:bg-slate-950 px-3 py-2 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-blue-500 transition-colors">
+                                                <input type="checkbox" checked={fichaData.checklist.epis.includes(epi)} onChange={() => toggleCheck('epis', epi)} className="w-4 h-4 rounded border-slate-300 accent-blue-600" />
+                                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{epi}</span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Days Steps */}
-                                <div className="grid grid-cols-1 gap-4">
+                                {/* Steps */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     {[
-                                        { title: '1º Dia - Desmontagem e Aplicação Química', list: STEPS_DIA_1, key: 'dia1' },
-                                        { title: '2º Dia - Movimentação e Limpeza', list: STEPS_DIA_2, key: 'dia2' },
-                                        { title: '3º Dia - Montagem e Finalização', list: STEPS_DIA_3, key: 'dia3' }
-                                    ].map((block, i) => (
-                                        <div key={block.key} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
-                                            <h4 className="text-xs font-black uppercase text-blue-600 mb-3">{block.title}</h4>
-                                            <div className="space-y-2">
-                                                {block.list.map(step => (
-                                                    <label key={step} className="flex items-start gap-3 cursor-pointer group">
-                                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors mt-0.5 ${fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step) ? 'bg-blue-600 border-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'}`}>
-                                                            {fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step) && <CheckCircle2 size={14}/>}
-                                                        </div>
-                                                        <input type="checkbox" className="hidden" checked={fichaData.checklist[block.key as keyof typeof fichaData.checklist].includes(step)} onChange={() => toggleCheck(block.key as any, step)} />
-                                                        <span className="text-xs text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">{step}</span>
+                                        { title: 'Dia 1: Retirada', steps: STEPS_DIA_1, key: 'dia1' },
+                                        { title: 'Dia 2: Limpeza', steps: STEPS_DIA_2, key: 'dia2' },
+                                        { title: 'Dia 3: Montagem', steps: STEPS_DIA_3, key: 'dia3' }
+                                    ].map((day, dIdx) => (
+                                        <div key={day.key} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                            <h3 className="text-xs font-black text-blue-600 uppercase tracking-widest mb-4">{day.title}</h3>
+                                            <div className="space-y-3">
+                                                {day.steps.map(step => (
+                                                    <label key={step} className="flex items-start gap-2 cursor-pointer group">
+                                                        <input type="checkbox" checked={(fichaData.checklist as any)[day.key].includes(step)} onChange={() => toggleCheck(day.key as any, step)} className="mt-0.5 w-4 h-4 rounded border-slate-300 accent-blue-600 shrink-0" />
+                                                        <span className="text-[11px] text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors leading-tight">{step}</span>
                                                     </label>
                                                 ))}
                                             </div>
@@ -562,34 +577,37 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                     ))}
                                 </div>
 
-                                {/* Necessities */}
-                                <div className="bg-amber-50/50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/30">
-                                    <h4 className="text-xs font-black uppercase text-amber-600 mb-3 flex items-center gap-2"><AlertTriangle size={14}/> Necessidades Identificadas</h4>
-                                    <div className="space-y-2">
+                                {/* Necessidades */}
+                                <div className="bg-red-50/50 dark:bg-red-900/10 p-5 rounded-2xl border border-red-100 dark:border-red-900/30">
+                                    <h3 className="text-xs font-black text-red-600 uppercase tracking-widest mb-4 flex items-center gap-2"><AlertTriangle size={14}/> Necessidades Identificadas</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         {NECESSITIES_LIST.map(nec => (
-                                            <label key={nec} className="flex items-start gap-3 cursor-pointer">
-                                                <input type="checkbox" className="accent-amber-600 mt-0.5" checked={fichaData.necessidades.includes(nec)} onChange={() => toggleNecessidade(nec)} />
+                                            <label key={nec} className="flex items-center gap-2 cursor-pointer">
+                                                <input type="checkbox" checked={fichaData.necessidades.includes(nec)} onChange={() => toggleNecessidade(nec)} className="w-4 h-4 rounded border-red-300 accent-red-600" />
                                                 <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{nec}</span>
                                             </label>
                                         ))}
                                     </div>
-                                    <textarea 
-                                        className="w-full mt-4 p-3 bg-white dark:bg-slate-950 border border-amber-200 dark:border-amber-900/50 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500/50" 
-                                        rows={3} 
-                                        placeholder="Observações adicionais e cálculos..." 
+                                </div>
+
+                                {/* Obs */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Observações Gerais</h3>
+                                    <textarea className="w-full p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm outline-none focus:border-blue-500 resize-none h-32" 
+                                        placeholder="Digite aqui..." 
                                         value={fichaData.observacoes} 
                                         onChange={e => updateFicha('observacoes', e.target.value)}
-                                    />
+                                    ></textarea>
                                 </div>
                             </div>
                         </div>
 
                         {/* Footer Actions */}
                         <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex justify-between items-center shrink-0">
-                            <div className="text-xs text-slate-400 font-mono hidden md:block">Validade Automática: 12 Meses</div>
+                            <div className="text-xs text-slate-400 font-mono hidden md:block">Ultima atualização: {new Date().toLocaleDateString()}</div>
                             <div className="flex gap-3 w-full md:w-auto">
-                                <button onClick={() => setIsFichaOpen(false)} className="flex-1 md:flex-none px-6 py-3 rounded-xl font-bold text-xs uppercase bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 transition-colors">Cancelar</button>
-                                <button onClick={handleSaveFicha} className="flex-1 md:flex-none px-8 py-3 rounded-xl font-black text-xs uppercase bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2">
+                                <button onClick={() => setIsFichaOpen(false)} className="flex-1 md:flex-none px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-500 uppercase text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button onClick={handleSaveFicha} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all">
                                     <Save size={16} /> Salvar Ficha
                                 </button>
                             </div>
@@ -598,66 +616,44 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             )}
 
-            {/* MODAL GENÉRICO (CAIXAS/CISTERNAS) */}
+            {/* --- GENERIC MODAL (CISTERNA/CAIXA) --- */}
             {isModalOpen && editItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg p-0 border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col animate-in zoom-in-95">
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
-                            <div>
-                                <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-wider text-lg">
-                                    {editItem.local}
-                                </h3>
-                                <p className="text-xs font-mono text-slate-500">Unidade: {editItem.sedeId}</p>
-                            </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} className="text-slate-500"/></button>
+                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Editar Reservatório</h3>
+                            <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-500"/></button>
                         </div>
-
-                        <div className="p-6 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade</label><input className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.capacidade || ''} onChange={e => setEditItem({...editItem, capacidade: e.target.value})} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Células</label><input type="number" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} /></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-800">
-                                <div className="col-span-2 text-[10px] font-black uppercase text-emerald-600">Cronograma Semestral</div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização 1º Sem</label><input type="date" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Realização 2º Sem</label><input type="date" className="w-full p-2 border rounded-lg text-sm font-mono bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
-                            </div>
-                            <div className="space-y-1 pt-2">
-                                <label className="text-[10px] font-bold text-slate-500 uppercase">Status Operacional</label>
-                                <select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-mono uppercase" value={editItem.situacaoLimpeza} onChange={e => setEditItem({...editItem, situacaoLimpeza: e.target.value})}>
-                                    <option value="PENDENTE">PENDENTE</option>
-                                    <option value="DENTRO DO PRAZO">DENTRO DO PRAZO</option>
-                                    <option value="FORA DO PRAZO">FORA DO PRAZO</option>
-                                    <option value="DESATIVADO">DESATIVADO</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-black/20">
-                            <button onClick={handleSaveGeneric} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-lg uppercase tracking-widest font-mono text-sm transition-all">Salvar Alterações</button>
+                        <div className="space-y-4">
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.capacidade || ''} onChange={e => setEditItem({...editItem, capacidade: e.target.value})} /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Células</label><input type="number" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 1º Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 2º Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
+                            <div className="pt-4"><button onClick={handleSaveGeneric} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Salvar Alterações</button></div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* HISTORY MODAL (SIMPLIFIED FOR BREVITY) */}
+            {/* --- HISTORY MODAL --- */}
             {isHistoryOpen && historyItem && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh]">
+                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
-                            <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Rastreabilidade</h3>
-                            <button onClick={() => setIsHistoryOpen(false)}><X size={20}/></button>
+                            <div><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase">Histórico</h3><p className="text-xs text-slate-500">{historyItem.local}</p></div>
+                            <button onClick={() => setIsHistoryOpen(false)}><X size={20} className="text-slate-500"/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
-                            {loadingHistory ? <div className="text-center"><Loader2 className="animate-spin inline"/></div> : (
-                                <div className="space-y-4">
-                                    {historyLogs.length === 0 ? <p className="text-center text-slate-400 text-xs">Sem histórico.</p> : historyLogs.map((l, i) => (
-                                        <div key={i} className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
-                                            <div className="flex justify-between text-[10px] uppercase font-bold text-slate-500 mb-1">
-                                                <span>{new Date(l.timestamp).toLocaleDateString()}</span>
-                                                <span>{l.userName}</span>
+                            {loadingHistory ? <div className="text-center py-10"><Loader2 className="animate-spin mx-auto text-cyan-500" /></div> : historyLogs.length === 0 ? <div className="text-center text-slate-400 py-10 text-xs font-mono uppercase">Sem registros recentes.</div> : (
+                                <div className="space-y-6 border-l-2 border-slate-100 dark:border-slate-800 ml-3 pl-6">
+                                    {historyLogs.map((log, idx) => (
+                                        <div key={idx} className="relative">
+                                            <div className="absolute -left-[31px] top-1 w-4 h-4 rounded-full bg-cyan-100 border-4 border-white dark:border-[#111114]"></div>
+                                            <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{new Date(log.timestamp).toLocaleDateString()}</p>
+                                            <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.userName}</p>
+                                                <p className="text-xs text-slate-500 font-mono mt-1">{log.details}</p>
                                             </div>
-                                            <p className="text-xs">{l.details}</p>
                                         </div>
                                     ))}
                                 </div>
