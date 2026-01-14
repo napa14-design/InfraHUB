@@ -10,6 +10,7 @@ import { CommandPalette } from './CommandPalette';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
 import { FirstLoginSetup } from './FirstLoginSetup';
+import { PWAInstallPrompt } from './Shared/PWAInstallPrompt';
 import { 
   LogOut, 
   Menu, 
@@ -324,6 +325,10 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
           </nav>
           
           <div className="p-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex flex-col gap-2">
+             
+             {/* PWA INSTALL BUTTON */}
+             <PWAInstallPrompt collapsed={isCollapsed} />
+
              {!isCollapsed && (
                 <div className={`px-3 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-2 mb-1 border ${isMockData ? 'bg-amber-50 dark:bg-amber-900/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-900/30' : 'bg-emerald-50 dark:bg-emerald-900/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/30'}`}>
                     {isMockData ? <WifiOff size={12}/> : <Wifi size={12}/>}

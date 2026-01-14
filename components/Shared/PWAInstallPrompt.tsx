@@ -1,14 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { Download, Share } from 'lucide-react';
+import { Download, Share, Smartphone } from 'lucide-react';
 
-export const PWAInstallPrompt: React.FC = () => {
+interface Props {
+    collapsed?: boolean;
+}
+
+export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false }) => {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Verifica se já está instalado
+    // Verifica se já está instalado (Standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches) {
       setIsStandalone(true);
     }
@@ -20,12 +24,11 @@ export const PWAInstallPrompt: React.FC = () => {
 
     // Captura o evento de instalação
     const handler = (e: Event) => {
-      // IMPORTANTE: Não chamamos e.preventDefault() aqui.
-      // Isso permite que o Android mostre o "Mini-infobar" automaticamente
-      // baseado nas heurísticas do navegador (frequência de uso, etc).
-      // Apenas salvamos o evento caso o usuário queira clicar no botão manual depois.
+      // CRITICO: Previne o comportamento padrão (mini-infobar no Android)
+      // para garantir que o botão customizado funcione e apareça quando quisermos.
+      e.preventDefault();
       setDeferredPrompt(e);
-      console.log("PWA Install Event captured (Native prompt allowed)");
+      console.log("PWA Install Event captured & stashed");
     };
 
     window.addEventListener('beforeinstallprompt', handler);
@@ -36,34 +39,51 @@ export const PWAInstallPrompt: React.FC = () => {
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
+    // Mostra o prompt nativo
     deferredPrompt.prompt();
+    
+    // Aguarda a escolha do usuário
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
+      console.log('User accepted the install prompt');
       setDeferredPrompt(null);
     }
   };
 
+  // Se já estiver instalado, não mostra nada
   if (isStandalone) return null;
 
-  // Android / Chrome Desktop - Botão de Backup
-  // (O Android deve mostrar o banner automático, mas mantemos o botão caso o usuário feche o banner)
+  // Android / Chrome Desktop / Edge
   if (deferredPrompt) {
+    if (collapsed) {
+        return (
+            <button 
+                onClick={handleInstallClick}
+                className="w-9 h-9 flex items-center justify-center rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-all shadow-lg animate-pulse"
+                title="Instalar Aplicativo"
+            >
+                <Download size={18} />
+            </button>
+        );
+    }
+
     return (
       <button 
         onClick={handleInstallClick}
-        className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg transition-all animate-pulse"
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-brand-600 to-cyan-600 hover:from-brand-700 hover:to-cyan-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg transition-all mb-2 animate-in fade-in slide-in-from-bottom-2"
       >
         <Download size={16} /> Instalar App
       </button>
     );
   }
 
-  // iOS Instructions (iOS não suporta instalação automática nem via botão)
-  if (isIOS && !isStandalone) {
+  // iOS Instructions (Apenas mostra se não estiver colapsado, pois ocupa espaço)
+  if (isIOS && !isStandalone && !collapsed) {
       return (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg text-[10px] font-mono border border-slate-200 dark:border-slate-700">
-            <Share size={12} /> <span>Adicione à Tela de Início</span>
+        <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg text-[10px] font-mono border border-slate-200 dark:border-slate-700 mb-2">
+            <Share size={12} /> 
+            <span>Para instalar: Compartilhar {'>'} Tela de Início</span>
         </div>
       );
   }
