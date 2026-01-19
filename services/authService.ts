@@ -413,8 +413,8 @@ export const authService = {
       return { success: true };
   },
 
-  // NEW FUNCTION: Admin Reset Password
-  // Sets is_first_login = TRUE so the user is forced to change the generated password on next login.
+  // NEW FUNCTION: Admin Reset Password (Production Ready via Edge Function)
+  // Calls 'admin-reset-password' Edge Function to bypass client-side restrictions
   adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{success: boolean, error?: string}> => {
       const currentUser = authService.getCurrentUser();
       
@@ -422,25 +422,35 @@ export const authService = {
           // Mock Mode: Update directly
           const u = MOCK_USERS.find(u => u.id === targetUserId);
           if (u) {
-              u.isFirstLogin = true; // Force flag
+              u.isFirstLogin = true; 
           }
           return { success: true };
       } else {
-          // Supabase Mode:
-          // 1. We update the profile to Force First Login next time
-          await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
+          // Supabase Mode: Try Edge Function first
+          try {
+              const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                  body: { userId: targetUserId, newPassword: newPassword }
+              });
 
-          // 2. We CANNOT update another user's auth password via Client SDK securely.
-          // In a real prod environment, this must be an Edge Function.
-          // For this specific 'No-Code/Low-Code' dashboard context, we assume the backend/edge function exists
-          // OR we accept that in pure client-mode we can't change the actual auth password of another user.
-          console.warn("ADMIN RESET: Updating Profile Flag to TRUE. Auth Password change requires Backend/Edge Function.");
-          
-          if (currentUser) {
-              logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha e forçou novo setup');
+              if (error) {
+                  console.error("Edge Function Failed:", error);
+                  // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
+                  await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
+                  return { 
+                      success: false, 
+                      error: "FALHA: É necessário configurar a Edge Function 'admin-reset-password' no Supabase para alterar a senha real." 
+                  };
+              }
+
+              if (currentUser) {
+                  logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha via Edge Function');
+              }
+              return { success: true };
+
+          } catch (e) {
+              console.error("Invoke Error:", e);
+              return { success: false, error: "Erro de conexão com o servidor de funções." };
           }
-          
-          return { success: true };
       }
   },
 
