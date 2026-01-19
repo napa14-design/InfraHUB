@@ -1,5 +1,5 @@
-import React, { useState, useEffect, Suspense, lazy, Component, ReactNode } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, Suspense, lazy, ReactNode } from 'react';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
@@ -17,7 +17,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
@@ -120,9 +120,34 @@ const AuthObserver = () => {
   return null;
 };
 
+// Componente para lidar com redirecionamento PWA (Modo Cloro)
+const PWANavigator = ({ user }: { user: User | null }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    // Só executa se tiver usuário e ainda não tiver verificado nesta sessão do componente
+    if (user && !checked) {
+       const params = new URLSearchParams(window.location.search);
+       const mode = params.get('mode');
+       
+       if (mode === 'cloro') {
+           console.log("[PWA] Redirecting to Cloro Module");
+           // Navega para o módulo e remove o query param da história para não ficar preso
+           navigate('/module/hydrosys/cloro', { replace: true });
+       }
+       setChecked(true);
+    }
+  }, [user, checked, navigate]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirectPath, setRedirectPath] = useState<string>('/');
 
   useEffect(() => {
     const initApp = async () => {
@@ -140,6 +165,13 @@ const App: React.FC = () => {
         if (currentUser) {
             setUser(currentUser);
         }
+        
+        // PWA Initial Detection for Login Redirect
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'cloro') {
+            setRedirectPath('/module/hydrosys/cloro');
+        }
+
         setLoading(false);
     };
 
@@ -171,6 +203,7 @@ const App: React.FC = () => {
       <ToastProvider>
         <Router>
           <AuthObserver />
+          <PWANavigator user={user} />
           <ErrorBoundary>
             <Suspense fallback={<PageLoader />}>
               <Routes>
@@ -179,7 +212,8 @@ const App: React.FC = () => {
                 <Route 
                   path="/login" 
                   element={
-                    user ? <Navigate to="/" replace /> : <Login onLogin={handleLogin} />
+                    // Se o usuário logar, usa o redirectPath definido no useEffect inicial
+                    user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
                   } 
                 />
 

@@ -9,17 +9,17 @@ export const SCHEMA_SQL = `
 -- ====================================================================
 
 -- 1. Adicionar colunas individuais para cada tipo de reservatório
--- Se elas não existirem, serão criadas com valores padrão seguros.
-
 ALTER TABLE hydro_settings 
 ADD COLUMN IF NOT EXISTS validade_limpeza_poco INTEGER DEFAULT 12,
 ADD COLUMN IF NOT EXISTS validade_limpeza_caixa INTEGER DEFAULT 6,
 ADD COLUMN IF NOT EXISTS validade_limpeza_cisterna INTEGER DEFAULT 6;
 
--- 2. Atualizar a linha de configuração padrão (id='default')
--- Garante que o Poço Artesiano tenha 12 meses e os demais 6 meses.
--- Usamos ON CONFLICT para criar a linha se a tabela estiver vazia.
+-- 2. Adicionar coluna JSONB para armazenar a Ficha Técnica completa do Poço
+-- Isso permite salvar dados complexos (checklist, materiais, dados da bomba)
+ALTER TABLE hydro_reservatorios
+ADD COLUMN IF NOT EXISTS dados_ficha JSONB;
 
+-- 3. Atualizar a linha de configuração padrão (id='default')
 INSERT INTO hydro_settings (id, validade_limpeza_poco, validade_limpeza_caixa, validade_limpeza_cisterna, cloro_min, cloro_max, ph_min, ph_max)
 VALUES ('default', 12, 6, 6, 1.0, 3.0, 7.4, 7.6)
 ON CONFLICT (id) DO UPDATE 
@@ -28,7 +28,7 @@ SET
     validade_limpeza_caixa = EXCLUDED.validade_limpeza_caixa,
     validade_limpeza_cisterna = EXCLUDED.validade_limpeza_cisterna;
 
--- 3. Verificação final
+-- 4. Verificação final
 SELECT * FROM hydro_settings;
 `;
 
@@ -50,7 +50,7 @@ export const Instructions = () => {
             </div>
             <h1 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Atualização de Estrutura</h1>
             <p className="text-slate-500 dark:text-slate-400 text-sm max-w-md">
-              Execute o script abaixo no Editor SQL do Supabase para adicionar suporte a validades diferenciadas por tipo de reservatório.
+              Execute o script abaixo no Editor SQL do Supabase para adicionar suporte a validades diferenciadas e armazenamento da Ficha Técnica.
             </p>
         </div>
 

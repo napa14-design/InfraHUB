@@ -3,6 +3,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js'; 
 import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
+import { logService } from './logService';
 
 const SESSION_KEY = 'nexus_auth_user';
 
@@ -88,6 +89,10 @@ export const authService = {
                     sedeIds: profileData.sede_ids || [],
                   };
                   localStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
+                  
+                  // LOG LOGIN ACTION
+                  logService.logAction(appUser, 'AUTH', 'LOGIN', 'Sistema', 'Login via Supabase realizado com sucesso.');
+                  
                   return { user: appUser };
               }
           }
@@ -108,6 +113,10 @@ export const authService = {
 
           console.log("[Auth] Mock user found.");
           localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
+          
+          // LOG LOGIN ACTION
+          logService.logAction(mockUser, 'AUTH', 'LOGIN', 'Sistema', 'Login (Mock Mode) realizado com sucesso.');
+
           return { user: mockUser };
       }
 
@@ -125,6 +134,10 @@ export const authService = {
   },
 
   logout: async () => {
+    const user = authService.getCurrentUser();
+    if (user) {
+        logService.logAction(user, 'AUTH', 'LOGIN', 'Sistema', 'Logout realizado.');
+    }
     if (isSupabaseConfigured()) await supabase.auth.signOut();
     localStorage.removeItem(SESSION_KEY);
   },
@@ -191,6 +204,8 @@ export const authService = {
          return { error: "A senha deve ter no mínimo 6 caracteres." };
      }
 
+     const currentUser = authService.getCurrentUser();
+
      if (isSupabaseConfigured()) {
          try {
              // Accessing properties safely from the initialized client
@@ -255,6 +270,10 @@ export const authService = {
                      return { error: "Erro ao salvar perfil do usuário no banco de dados." };
                  }
 
+                 if (currentUser) {
+                     logService.logAction(currentUser, 'ADMIN', 'CREATE', `Usuário ${userData.email}`, `Criou conta para ${userData.name} (${userData.role})`);
+                 }
+
                  return { 
                     id: tempId, 
                     email: userData.email, 
@@ -281,6 +300,10 @@ export const authService = {
          isFirstLogin: true
      });
 
+     if (currentUser) {
+         logService.logAction(currentUser, 'ADMIN', 'CREATE', `Usuário ${userData.email}`, `Criou conta (Mock) para ${userData.name}`);
+     }
+
      return { 
          id: tempId, 
          email: userData.email, 
@@ -289,6 +312,8 @@ export const authService = {
   },
 
   updateUser: async (id: string, updates: Partial<User>): Promise<User | null> => {
+    const currentUser = authService.getCurrentUser();
+    
     if (isSupabaseConfigured()) {
         const dbUpdates: any = {};
         if (updates.name) dbUpdates.name = updates.name;
@@ -300,10 +325,13 @@ export const authService = {
         if (updates.isFirstLogin !== undefined) dbUpdates.is_first_login = updates.isFirstLogin;
 
         await supabase.from('profiles').update(dbUpdates).eq('id', id);
+        
+        if (currentUser) {
+            logService.logAction(currentUser, 'ADMIN', 'UPDATE', `Usuário ID ${id}`, `Atualizou dados: ${Object.keys(updates).join(', ')}`);
+        }
     }
     
     // Update local storage if self
-    const currentUser = authService.getCurrentUser();
     if (currentUser && currentUser.id === id) {
        const merged = { ...currentUser, ...updates };
        // If I updated my own status to inactive, logout immediately on next refresh/check
@@ -318,11 +346,19 @@ export const authService = {
   },
 
   deleteUser: async (id: string) => {
+    const currentUser = authService.getCurrentUser();
+    
     if (isSupabaseConfigured()) {
         await supabase.from('profiles').delete().eq('id', id);
+        // Note: Auth user deletion is restricted via client SDK. Usually handled by Edge Function or Admin API.
+        // We delete the profile which effectively removes access from the app logic.
     } else {
         const idx = MOCK_USERS.findIndex(u => u.id === id);
         if (idx > -1) MOCK_USERS.splice(idx, 1);
+    }
+
+    if (currentUser) {
+        logService.logAction(currentUser, 'ADMIN', 'DELETE', `Usuário ID ${id}`, 'Removeu conta do sistema');
     }
   },
 
@@ -338,7 +374,14 @@ export const authService = {
   changePassword: async (userId: string, newPassword: string): Promise<boolean> => {
       if (isSupabaseConfigured()) {
           const { error } = await supabase.auth.updateUser({ password: newPassword });
-          return !error;
+          if (!error) {
+              const currentUser = authService.getCurrentUser();
+              if (currentUser) {
+                  logService.logAction(currentUser, 'AUTH', 'UPDATE', 'Senha', 'Alterou a própria senha');
+              }
+              return true;
+          }
+          return false;
       }
       return true;
   },
@@ -381,6 +424,7 @@ export const authService = {
       if (currentUser) {
           currentUser.isFirstLogin = false;
           localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+          logService.logAction(currentUser, 'AUTH', 'UPDATE', 'Primeiro Acesso', 'Definiu senha e ativou a conta');
       }
 
       return { success: true };

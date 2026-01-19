@@ -2,6 +2,8 @@
 import { Organization, Region, Sede, Local } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_ORGS, MOCK_REGIONS, MOCK_SEDES, MOCK_LOCAIS } from '../constants';
+import { logService } from './logService';
+import { authService } from './authService';
 
 // Cache em memória
 let cache = {
@@ -12,6 +14,8 @@ let cache = {
 };
 
 let usingMocks = false;
+
+const getCurrentUser = () => authService.getCurrentUser();
 
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
@@ -104,15 +108,22 @@ export const orgService = {
         const payload = { id: item.id, name: item.name, logo_url: item.logoUrl };
         await supabase.from('organizations').upsert(payload);
     }
-    // Update Cache
     const idx = cache.orgs.findIndex(x => x.id === item.id);
+    const action = idx >= 0 ? 'UPDATE' : 'CREATE';
     if (idx >= 0) cache.orgs[idx] = item; else cache.orgs.push(item);
+    
+    const u = getCurrentUser();
+    if(u) logService.logAction(u, 'ADMIN', action, `Organização ${item.name}`, 'Estrutura Organizacional');
+    
     return { data: item, error: null };
   },
   
   deleteOrg: async (id: string) => {
+    const u = getCurrentUser();
+    const item = cache.orgs.find(x => x.id === id);
     if (isSupabaseConfigured()) await supabase.from('organizations').delete().eq('id', id);
     cache.orgs = cache.orgs.filter(x => x.id !== id);
+    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `Organização ${item.name}`, 'Estrutura Organizacional');
   },
 
   saveRegion: async (item: Region) => {
@@ -121,13 +132,21 @@ export const orgService = {
         await supabase.from('regions').upsert(payload);
     }
     const idx = cache.regions.findIndex(x => x.id === item.id);
+    const action = idx >= 0 ? 'UPDATE' : 'CREATE';
     if (idx >= 0) cache.regions[idx] = item; else cache.regions.push(item);
+    
+    const u = getCurrentUser();
+    if(u) logService.logAction(u, 'ADMIN', action, `Região ${item.name}`, 'Estrutura Organizacional');
+
     return { data: item, error: null };
   },
   
   deleteRegion: async (id: string) => {
+    const u = getCurrentUser();
+    const item = cache.regions.find(x => x.id === id);
     if (isSupabaseConfigured()) await supabase.from('regions').delete().eq('id', id);
     cache.regions = cache.regions.filter(x => x.id !== id);
+    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `Região ${item.name}`, 'Estrutura Organizacional');
   },
 
   saveSede: async (item: Sede) => {
@@ -136,13 +155,21 @@ export const orgService = {
         await supabase.from('sedes').upsert(payload);
     }
     const idx = cache.sedes.findIndex(x => x.id === item.id);
+    const action = idx >= 0 ? 'UPDATE' : 'CREATE';
     if (idx >= 0) cache.sedes[idx] = item; else cache.sedes.push(item);
+    
+    const u = getCurrentUser();
+    if(u) logService.logAction(u, 'ADMIN', action, `Sede ${item.name}`, 'Estrutura Organizacional');
+
     return { data: item, error: null };
   },
   
   deleteSede: async (id: string) => {
+    const u = getCurrentUser();
+    const item = cache.sedes.find(x => x.id === id);
     if (isSupabaseConfigured()) await supabase.from('sedes').delete().eq('id', id);
     cache.sedes = cache.sedes.filter(x => x.id !== id);
+    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `Sede ${item.name}`, 'Estrutura Organizacional');
   },
 
   saveLocal: async (item: Local) => {
@@ -151,12 +178,20 @@ export const orgService = {
         await supabase.from('locais').upsert(payload);
     }
     const idx = cache.locais.findIndex(x => x.id === item.id);
+    const action = idx >= 0 ? 'UPDATE' : 'CREATE';
     if (idx >= 0) cache.locais[idx] = item; else cache.locais.push(item);
+    
+    const u = getCurrentUser();
+    if(u) logService.logAction(u, 'ADMIN', action, `Local ${item.name}`, `Tipo: ${item.tipo}`);
+
     return { data: item, error: null };
   },
   
   deleteLocal: async (id: string) => {
+    const u = getCurrentUser();
+    const item = cache.locais.find(x => x.id === id);
     if (isSupabaseConfigured()) await supabase.from('locais').delete().eq('id', id);
     cache.locais = cache.locais.filter(x => x.id !== id);
+    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `Local ${item.name}`, 'Estrutura Organizacional');
   }
 };

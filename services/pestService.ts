@@ -238,11 +238,23 @@ export const pestService = {
     },
 
     delete: async (id: string) => {
+        const u = authService.getCurrentUser();
+        
         if (isSupabaseConfigured()) {
+            // First get the item to log what was deleted
+            const { data } = await supabase.from('pest_control_entries').select('*').eq('id', id).single();
             await supabase.from('pest_control_entries').delete().eq('id', id);
+            
+            if(u && data) {
+                logService.logAction(u, 'PESTCONTROL', 'DELETE', `${data.target}`, `ID: ${id}`);
+            }
         } else {
             const idx = MOCK_PEST_ENTRIES.findIndex(e => e.id === id);
-            if (idx >= 0) MOCK_PEST_ENTRIES.splice(idx, 1);
+            if (idx >= 0) {
+                const item = MOCK_PEST_ENTRIES[idx];
+                MOCK_PEST_ENTRIES.splice(idx, 1);
+                if(u) logService.logAction(u, 'PESTCONTROL', 'DELETE', `${item.target}`, `ID: ${id}`);
+            }
         }
         await notificationService.resolveAlert(id);
         notificationService.notifyRefresh();

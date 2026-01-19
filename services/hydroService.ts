@@ -324,7 +324,20 @@ export const hydroService = {
     }
     const u = getCurrentUserForLog();
     if(u) {
-        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`);
+        let details = `Poço ${item.local}`;
+        
+        // Se tiver Ficha Técnica, cria um resumo rico para o log (Histórico Legível)
+        if (item.dadosFicha) {
+            details = `FICHA TÉCNICA - LIMPEZA REALIZADA\n` +
+                      `Data Término: ${item.dadosFicha.terminoLimpeza}\n` +
+                      `Bomba: ${item.dadosFicha.marcaBomba} ${item.dadosFicha.modeloBomba} (${item.dadosFicha.potenciaBomba}cv)\n` +
+                      `Profundidade Bomba: ${item.dadosFicha.profundidadeBomba}m\n` +
+                      `Pré-Limpeza: N.E ${item.dadosFicha.preLimpeza.nivelEstatico}m / Vazão ${item.dadosFicha.preLimpeza.vazao}\n` +
+                      `Pós-Limpeza: N.E ${item.dadosFicha.posLimpeza.nivelEstatico}m / Vazão ${item.dadosFicha.posLimpeza.vazao}\n` +
+                      `Obs: ${item.dadosFicha.observacoes}`;
+        }
+
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`, details);
         if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();

@@ -396,7 +396,8 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                             <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{new Date(log.timestamp).toLocaleDateString()}</p>
                                             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.userName}</p>
-                                                <p className="text-xs text-slate-500 font-mono mt-1">{log.details}</p>
+                                                {/* Ensure whitespace is preserved for the rich text details */}
+                                                <p className="text-xs text-slate-500 font-mono mt-1 whitespace-pre-wrap">{log.details}</p>
                                             </div>
                                         </div>
                                     ))}

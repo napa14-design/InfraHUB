@@ -12,6 +12,7 @@ import { orgService } from '../../services/orgService';
 import { useToast } from '../Shared/ToastContext';
 
 type ConfigTab = 'GLOBAL' | 'LISTS' | 'SEDES';
+type DeleteTarget = { type: 'PEST' | 'TECH', id: string } | null;
 
 export const PestControlConfig: React.FC<{ user: User }> = () => {
   const navigate = useNavigate();
@@ -31,6 +32,10 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
   const [newPest, setNewPest] = useState('');
   const [newTech, setNewTech] = useState('');
   const [newTechSede, setNewTechSede] = useState(''); // New state for Tech Location
+
+  // Modal State
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget>(null);
 
   useEffect(() => {
       const load = async () => {
@@ -68,18 +73,32 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
       }
   };
 
-  const removePest = (p: string) => {
-      if(confirm(`Remover "${p}" da lista? Isso não apaga registros passados.`)) {
-        const newGlobals = { ...settings.globalFrequencies };
-        delete newGlobals[p]; // Limpa o ciclo também
-        
-        setSettings({
-            ...settings,
-            pestTypes: settings.pestTypes.filter(x => x !== p),
-            globalFrequencies: newGlobals
-        });
-        addToast(`${p} removida.`, "info");
+  const requestDelete = (type: 'PEST' | 'TECH', id: string) => {
+      setDeleteTarget({ type, id });
+      setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+      if (!deleteTarget) return;
+
+      if (deleteTarget.type === 'PEST') {
+          const p = deleteTarget.id;
+          const newGlobals = { ...settings.globalFrequencies };
+          delete newGlobals[p]; // Limpa o ciclo também
+          
+          setSettings({
+              ...settings,
+              pestTypes: settings.pestTypes.filter(x => x !== p),
+              globalFrequencies: newGlobals
+          });
+          addToast(`${p} removida da lista.`, "info");
+      } else {
+          const name = deleteTarget.id;
+          setSettings({ ...settings, technicians: settings.technicians.filter(x => x.name !== name) });
+          addToast("Técnico removido.", "info");
       }
+      setDeleteModalOpen(false);
+      setDeleteTarget(null);
   };
 
   const addTech = () => {
@@ -98,12 +117,6 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
           setNewTech('');
           setNewTechSede('');
           addToast("Técnico adicionado com sucesso.", "success");
-      }
-  };
-
-  const removeTech = (name: string) => {
-      if(confirm(`Remover técnico "${name}"?`)) {
-        setSettings({ ...settings, technicians: settings.technicians.filter(x => x.name !== name) });
       }
   };
 
@@ -145,7 +158,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
             <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-[#0A0A0C] dark:via-[#0D0D10] dark:to-[#0A0A0C]" />
        </div>
 
-       <div className="max-w-5xl mx-auto space-y-8">
+       <div className="max-w-5xl mx-auto space-y-8 pb-20">
            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <button onClick={() => navigate('/module/pestcontrol')} className="flex items-center text-slate-500 hover:text-amber-600 transition-colors text-xs font-mono uppercase tracking-widest mb-2">
@@ -213,7 +226,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                                 {settings.pestTypes.map(p => (
                                     <div key={p} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl group">
                                         <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{p}</span>
-                                        <button onClick={() => removePest(p)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
+                                        <button onClick={() => requestDelete('PEST', p)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
                                     </div>
                                 ))}
                             </div>
@@ -251,7 +264,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                                                 {t.sedeId ? <><Building2 size={10}/> {t.sedeId}</> : <><Globe size={10}/> Global</>}
                                             </span>
                                         </div>
-                                        <button onClick={() => removeTech(t.name)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
+                                        <button onClick={() => requestDelete('TECH', t.name)} className="text-red-400 opacity-0 group-hover:opacity-100 hover:text-red-600 transition-all"><Trash2 size={16}/></button>
                                     </div>
                                 ))}
                             </div>
@@ -314,6 +327,40 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                 </p>
            </div>
        </div>
+
+       {/* DELETE MODAL */}
+       {deleteModalOpen && deleteTarget && (
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+               <div className="bg-white dark:bg-[#111114] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative overflow-hidden rounded-3xl animate-in zoom-in-95 shadow-2xl">
+                   <div className="absolute top-0 left-0 w-full h-1.5 bg-red-600"></div>
+                   <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-6 rounded-full border border-red-100 dark:border-red-800">
+                       <AlertCircle size={32} />
+                   </div>
+                   
+                   <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Confirmar Exclusão</h3>
+                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                       Tem certeza que deseja remover<br/>
+                       <strong className="text-slate-900 dark:text-white">{deleteTarget.id}</strong><br/>
+                       da lista de {deleteTarget.type === 'PEST' ? 'pragas' : 'técnicos'}?
+                   </p>
+
+                   <div className="grid grid-cols-2 gap-3">
+                       <button 
+                         onClick={() => setDeleteModalOpen(false)}
+                         className="py-3.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold text-xs uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors rounded-xl"
+                       >
+                           Cancelar
+                       </button>
+                       <button 
+                         onClick={confirmDelete}
+                         className="py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase transition-colors rounded-xl shadow-lg shadow-red-500/20"
+                       >
+                           Confirmar
+                       </button>
+                   </div>
+               </div>
+           </div>
+       )}
     </div>
   );
 };
