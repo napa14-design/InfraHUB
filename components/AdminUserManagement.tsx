@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe, Lock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
@@ -28,6 +28,11 @@ export const AdminUserManagement: React.FC = () => {
   // Delete Modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+
+  // Reset Password Modal
+  const [resetModalOpen, setResetModalOpen] = useState(false);
+  const [userToReset, setUserToReset] = useState<User | null>(null);
+  const [newGeneratedPassword, setNewGeneratedPassword] = useState<string | null>(null);
 
   // Form State
   const initialFormState: Partial<User> = {
@@ -147,6 +152,40 @@ export const AdminUserManagement: React.FC = () => {
       setUserToDelete(null);
       addToast("Usuário removido com sucesso.", "success");
     }
+  };
+
+  // --- RESET PASSWORD LOGIC ---
+  const handleResetPassword = (user: User) => {
+      if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
+          addToast("Você não tem permissão para resetar Administradores.", "error");
+          return;
+      }
+      setUserToReset(user);
+      setNewGeneratedPassword(null);
+      setResetModalOpen(true);
+  };
+
+  const confirmResetPassword = async () => {
+      if (userToReset) {
+          // Generate a random 8-char password
+          const randomPass = Math.random().toString(36).slice(-8).toUpperCase();
+          
+          // Call Service
+          const result = await authService.adminResetPassword(userToReset.id, randomPass);
+          
+          if (result.success) {
+              setNewGeneratedPassword(randomPass);
+              // Do NOT close modal yet, show the password
+          } else {
+              addToast("Erro ao resetar senha. Verifique conexão.", "error");
+          }
+      }
+  };
+
+  const closeResetModal = () => {
+      setResetModalOpen(false);
+      setUserToReset(null);
+      setNewGeneratedPassword(null);
   };
 
   const validateForm = () => {
@@ -429,6 +468,9 @@ export const AdminUserManagement: React.FC = () => {
                         </button>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => handleResetPassword(user)} className="text-amber-500 hover:text-amber-600 disabled:opacity-30" title="Resetar Senha (Admin)" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}>
+                            <Lock size={16} />
+                        </button>
                         <button onClick={() => handleStartEdit(user)} className="text-brand-600 hover:text-brand-400 disabled:opacity-30" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}>
                             <Edit2 size={16} />
                         </button>
@@ -607,7 +649,7 @@ export const AdminUserManagement: React.FC = () => {
                                                         {availableSedes.map(sede => (
                                                             <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer transition-colors">
                                                                 <input 
-                                                                    type="checkbox"
+                                                                    type="checkbox" 
                                                                     checked={formData.sedeIds?.includes(sede.id)}
                                                                     onChange={() => toggleSedeSelection(sede.id)}
                                                                     className="w-4 h-4 rounded-none border border-slate-500 bg-transparent text-brand-600 focus:ring-0 checked:bg-brand-500"
@@ -673,6 +715,54 @@ export const AdminUserManagement: React.FC = () => {
                 </div>
             </div>
         </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {resetModalOpen && userToReset && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+              <div className="bg-white dark:bg-[#0C0C0E] w-full max-w-md border border-amber-200 dark:border-amber-900/50 shadow-2xl relative p-8 text-center">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>
+                  
+                  {newGeneratedPassword ? (
+                      <div className="animate-in zoom-in-95">
+                          <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-500 flex items-center justify-center mx-auto mb-6">
+                              <Check size={32} />
+                          </div>
+                          <h3 className="text-xl font-mono font-bold text-emerald-600 dark:text-emerald-500 mb-2 uppercase">Senha Redefinida</h3>
+                          <p className="text-xs text-slate-500 mb-6">Copie a nova senha temporária para o funcionário.</p>
+                          
+                          <div className="bg-slate-100 dark:bg-black p-4 mb-6 flex items-center justify-between border border-emerald-500/30">
+                              <code className="text-2xl font-mono font-bold text-slate-800 dark:text-white tracking-[0.2em]">{newGeneratedPassword}</code>
+                              <button onClick={() => { navigator.clipboard.writeText(newGeneratedPassword); addToast("Senha copiada!", "success"); }} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-emerald-600">
+                                  <Copy size={20} />
+                              </button>
+                          </div>
+                          <button onClick={closeResetModal} className="w-full py-3 bg-emerald-600 text-white font-mono font-bold uppercase tracking-wider hover:bg-emerald-700">
+                              Concluir
+                          </button>
+                      </div>
+                  ) : (
+                      <div>
+                          <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 flex items-center justify-center mx-auto mb-6">
+                              <Key size={32} />
+                          </div>
+                          <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">Resetar Senha</h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-8">
+                              Você está gerando uma nova senha para <strong>{userToReset.name}</strong>.<br/>
+                              A senha anterior será invalidada imediatamente.
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                              <button onClick={closeResetModal} className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase">
+                                  Cancelar
+                              </button>
+                              <button onClick={confirmResetPassword} className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs font-bold transition-colors uppercase">
+                                  Gerar Nova Senha
+                              </button>
+                          </div>
+                      </div>
+                  )}
+              </div>
+          </div>
       )}
     </div>
   );

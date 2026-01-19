@@ -74,6 +74,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
+      setError('');
       
       if (!validateEmail(email)) {
           setError('Por favor, insira um e-mail válido para recuperação.');
@@ -81,9 +82,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       setIsLoading(true);
-      await authService.resetPasswordRequest(email);
+      const result = await authService.resetPasswordRequest(email);
       setIsLoading(false);
-      setIsResetSent(true); // Show success view instead of closing
+
+      if (result.success) {
+          setIsResetSent(true); // Show success view instead of closing
+      } else {
+          setError(result.message || 'Erro ao solicitar recuperação.');
+      }
   };
 
   const closeForgotModal = () => {
@@ -536,7 +542,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             placeholder="usuario@empresa.com"
                             />
                         </div>
-                        {error && <p className="text-xs text-red-500 font-mono">{error}</p>}
+                        {error && <p className="text-xs text-red-500 font-mono p-2 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20 rounded">{error}</p>}
                         <button
                           type="submit"
                           disabled={isLoading}

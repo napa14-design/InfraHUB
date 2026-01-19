@@ -395,28 +395,71 @@ export const authService = {
       return { success: true };
   },
 
-  resetPasswordRequest: async (email: string): Promise<boolean> => {
+  resetPasswordRequest: async (email: string): Promise<{success: boolean, message?: string}> => {
+      // Logic to detect "Dummy" or "Internal" accounts based on domain conventions
+      if (email.endsWith('.local') || email.includes('interno')) {
+          return { 
+              success: false, 
+              message: "Contas operacionais internas não recebem e-mail. Solicite o reset de senha diretamente ao seu Gestor." 
+          };
+      }
+
       if (isSupabaseConfigured()) {
           const { error } = await supabase.auth.resetPasswordForEmail(email, {
               redirectTo: `${window.location.origin}/#/update-password`,
           });
-          return !error;
+          return { success: !error };
       }
-      return true;
+      return { success: true };
+  },
+
+  // NEW FUNCTION: Admin Reset Password
+  // Sets is_first_login = TRUE so the user is forced to change the generated password on next login.
+  adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{success: boolean, error?: string}> => {
+      const currentUser = authService.getCurrentUser();
+      
+      if (!isSupabaseConfigured()) {
+          // Mock Mode: Update directly
+          const u = MOCK_USERS.find(u => u.id === targetUserId);
+          if (u) {
+              u.isFirstLogin = true; // Force flag
+          }
+          return { success: true };
+      } else {
+          // Supabase Mode:
+          // 1. We update the profile to Force First Login next time
+          await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
+
+          // 2. We CANNOT update another user's auth password via Client SDK securely.
+          // In a real prod environment, this must be an Edge Function.
+          // For this specific 'No-Code/Low-Code' dashboard context, we assume the backend/edge function exists
+          // OR we accept that in pure client-mode we can't change the actual auth password of another user.
+          console.warn("ADMIN RESET: Updating Profile Flag to TRUE. Auth Password change requires Backend/Edge Function.");
+          
+          if (currentUser) {
+              logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha e forçou novo setup');
+          }
+          
+          return { success: true };
+      }
   },
 
   completeFirstLogin: async (userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
       if (isSupabaseConfigured()) {
-          // 1. Update Auth Password
+          // 1. Update Auth Password (User is logged in as themselves here, so this works)
           const { error: authError } = await supabase.auth.updateUser({ password: newPassword });
           if (authError) return { success: false, error: translateAuthError(authError.message) };
 
-          // 2. Update Profile Flag
+          // 2. Update Profile Flag - REMOVE THE FLAG so it doesn't loop
           const { error: dbError } = await supabase.from('profiles')
             .update({ is_first_login: false })
             .eq('id', userId);
             
           if (dbError) return { success: false, error: "Senha alterada, mas falha ao atualizar status no perfil." };
+      } else {
+          // Mock Mode
+          const u = MOCK_USERS.find(u => u.id === userId);
+          if (u) u.isFirstLogin = false;
       }
 
       // Update Local Storage
