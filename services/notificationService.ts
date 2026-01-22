@@ -184,22 +184,44 @@ export const notificationService = {
         const allReservatorios = [...pocos, ...cist, ...caixas];
         
         // Mapa de problemas por Sede
-        // Ex: { 'DT': { resCrit: 2, resWarn: 1, filtCrit: 0, filtWarn: 5 } }
-        type SedeIssues = { resCrit: number, resWarn: number, filtCrit: number, filtWarn: number };
+        // Detalhado por Tipo para mensagem clara
+        type SedeIssues = { 
+            pocoCrit: number, pocoWarn: number,
+            cistCrit: number, cistWarn: number,
+            caixaCrit: number, caixaWarn: number,
+            filtCrit: number, filtWarn: number 
+        };
         const issuesMap: Record<string, SedeIssues> = {};
 
         // Helper para inicializar map
         const getIssueObj = (sedeId: string) => {
-            if (!issuesMap[sedeId]) issuesMap[sedeId] = { resCrit: 0, resWarn: 0, filtCrit: 0, filtWarn: 0 };
+            if (!issuesMap[sedeId]) {
+                issuesMap[sedeId] = { 
+                    pocoCrit: 0, pocoWarn: 0,
+                    cistCrit: 0, cistWarn: 0,
+                    caixaCrit: 0, caixaWarn: 0,
+                    filtCrit: 0, filtWarn: 0 
+                };
+            }
             return issuesMap[sedeId];
         };
 
-        // Processar Reservatórios
+        // Processar Reservatórios por Tipo
         if (resRule && resRule.enabled) {
             allReservatorios.forEach(item => {
                 const days = getDiffDays(item.proximaLimpeza);
-                if (days <= resRule.criticalDays) getIssueObj(item.sedeId).resCrit++;
-                else if (days <= resRule.warningDays) getIssueObj(item.sedeId).resWarn++;
+                const obj = getIssueObj(item.sedeId);
+                const tipo = item.tipo; // POCO, CISTERNA, CAIXA
+
+                if (days <= resRule.criticalDays) {
+                    if (tipo === 'POCO') obj.pocoCrit++;
+                    else if (tipo === 'CISTERNA') obj.cistCrit++;
+                    else if (tipo === 'CAIXA') obj.caixaCrit++;
+                } else if (days <= resRule.warningDays) {
+                    if (tipo === 'POCO') obj.pocoWarn++;
+                    else if (tipo === 'CISTERNA') obj.cistWarn++;
+                    else if (tipo === 'CAIXA') obj.caixaWarn++;
+                }
             });
         }
 
@@ -220,25 +242,30 @@ export const notificationService = {
             });
         }
 
-        // GERAR NOTIFICAÇÕES AGRUPADAS
+        // GERAR NOTIFICAÇÕES AGRUPADAS DETALHADAS
         for (const [sedeId, counts] of Object.entries(issuesMap)) {
-            const totalCrit = counts.resCrit + counts.filtCrit;
-            const totalWarn = counts.resWarn + counts.filtWarn;
+            const totalCrit = counts.pocoCrit + counts.cistCrit + counts.caixaCrit + counts.filtCrit;
+            const totalWarn = counts.pocoWarn + counts.cistWarn + counts.caixaWarn + counts.filtWarn;
 
             if (totalCrit > 0 || totalWarn > 0) {
-                // Constroi mensagem resumida
+                // Constroi mensagem detalhada
                 let parts = [];
-                if (counts.resCrit > 0) parts.push(`${counts.resCrit} Res. Vencidos`);
-                if (counts.resWarn > 0) parts.push(`${counts.resWarn} Res. Próximos`);
-                if (counts.filtCrit > 0) parts.push(`${counts.filtCrit} Filtros Vencidos`);
-                if (counts.filtWarn > 0) parts.push(`${counts.filtWarn} Filtros Próximos`);
+                
+                // Críticos
+                if (counts.pocoCrit > 0) parts.push(`${counts.pocoCrit} Poço(s) Venc.`);
+                if (counts.cistCrit > 0) parts.push(`${counts.cistCrit} Cisterna(s) Venc.`);
+                if (counts.caixaCrit > 0) parts.push(`${counts.caixaCrit} Caixa(s) Venc.`);
+                if (counts.filtCrit > 0) parts.push(`${counts.filtCrit} Filtros Venc.`);
+
+                // Warnings
+                if (counts.pocoWarn > 0) parts.push(`${counts.pocoWarn} Poço(s) Próx.`);
+                if (counts.cistWarn > 0) parts.push(`${counts.cistWarn} Cisterna(s) Próx.`);
+                if (counts.caixaWarn > 0) parts.push(`${counts.caixaWarn} Caixa(s) Próx.`);
+                if (counts.filtWarn > 0) parts.push(`${counts.filtWarn} Filtros Próx.`);
 
                 const message = parts.join(', ') + '.';
                 const isCritical = totalCrit > 0;
 
-                // ID estático baseado na sede e no dia para não duplicar no mesmo dia,
-                // mas permitir que reapareça se não resolvido no dia seguinte.
-                // Ou melhor: ID fixo por sede/tipo para que o UPSERT atualize a contagem.
                 const notifId = `hydro-agg-${sedeId}`;
 
                 await notificationService.add({
@@ -251,10 +278,6 @@ export const notificationService = {
                     link: `/module/hydrosys/reservatorios?sede=${sedeId}`, // URL filtrada
                     moduleSource: 'hydrosys'
                 });
-            } else {
-                // Se não tem problemas, tentamos "limpar" a notificação antiga se existir (auto-resolve)
-                // Isso exigiria uma lógica de delete ou update read=true se count == 0.
-                // Por enquanto, deixamos manual ou via resolveAlert.
             }
         }
     }
