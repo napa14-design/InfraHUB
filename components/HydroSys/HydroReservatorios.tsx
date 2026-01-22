@@ -1,19 +1,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Droplet, Edit, X, Search, ArrowLeft,
+  Droplet, X, Search, ArrowLeft,
   Waves, Box, History, User as UserIcon,
   RotateCw, Building2,
   FileJson, Loader2, Activity, ClipboardList
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { User, HydroPoco, HydroCisterna, HydroCaixa, UserRole, HydroSettings, Sede, LogEntry, FichaPoco } from '../../types';
+import { User, UserRole, Sede, LogEntry, FichaPoco } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
 import { EmptyState } from '../Shared/EmptyState';
 import { ReservoirFichaModal } from './ReservoirFichaModal';
 import { useToast } from '../Shared/ToastContext';
+import { useConfirmation } from '../Shared/ConfirmationContext';
+import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 
@@ -37,7 +39,6 @@ const getComputedStatus = (dateStr?: string) => {
     return 'DENTRO DO PRAZO';
 };
 
-// Data Structures for Initial State
 const MATERIALS_LIST = ['CANO', 'LUVAS', 'CORDA', 'ELETRODO', 'QUADRO DE COMANDO', 'REFIL FILTRO'];
 const INITIAL_FICHA: FichaPoco = {
     inicioLimpeza: '', terminoLimpeza: '', supervisor: '', coordenador: '', bombeiro: '',
@@ -54,18 +55,17 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { addToast } = useToast();
+  const { confirm } = useConfirmation(); // Using global confirmation
+  
+  // Custom Hook for Data
+  const { pocos, cisternas, caixas, settings, loading, refresh } = useHydroData(user);
+
   const [activeTab, setActiveTab] = useState<Tab>('pocos');
   
-  // Data
-  const [pocos, setPocos] = useState<HydroPoco[]>([]);
-  const [cisternas, setCisternas] = useState<HydroCisterna[]>([]);
-  const [caixas, setCaixas] = useState<HydroCaixa[]>([]);
-  
-  // Filters & Settings
+  // Filters
   const [filterText, setFilterText] = useState('');
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
-  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false); // Generic Edit
@@ -82,7 +82,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
   const isAdmin = user.role === UserRole.ADMIN;
 
-  useEffect(() => { refreshData(); loadSedes(); }, [user]);
+  useEffect(() => {
+      loadSedes();
+  }, [user]);
 
   // Efeito para capturar filtro da URL (ao clicar em notificação)
   useEffect(() => {
@@ -102,13 +104,6 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       setAvailableSedes(user.role === UserRole.ADMIN ? allSedes : allSedes.filter(s => (user.sedeIds || []).includes(s.id)));
   };
 
-  const refreshData = async () => {
-    setPocos(await hydroService.getPocos(user));
-    setCisternas(await hydroService.getCisternas(user));
-    setCaixas(await hydroService.getCaixas(user));
-    setSettings(await hydroService.getSettings());
-  };
-
   // --- ACTIONS ---
 
   const handleEdit = (item: any) => { 
@@ -119,12 +114,10 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           if (item.dadosFicha) {
               setFichaData(item.dadosFicha);
           } else {
-              // Pre-fill what we can from flat structure
               setFichaData({
                   ...INITIAL_FICHA,
                   supervisor: item.responsavel || '',
                   patrimonioBomba: item.referenciaBomba || '',
-                  // Tenta preservar materiais se já editou antes mas não salvou estrutura completa
                   materiais: INITIAL_FICHA.materiais
               });
           }
@@ -135,54 +128,66 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   };
   
   const handleSaveGeneric = async () => {
-      // Recalcula status
-      if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
-      
-      if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
-      else await hydroService.saveCaixa(editItem);
-      
-      await refreshData();
-      setIsModalOpen(false);
-      addToast("Reservatório atualizado com sucesso.", "success");
+      confirm({
+          title: "Salvar Alterações?",
+          message: "Deseja confirmar a atualização dos dados deste reservatório?",
+          type: "info",
+          confirmLabel: "Salvar",
+          onConfirm: async () => {
+              if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
+              
+              if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
+              else await hydroService.saveCaixa(editItem);
+              
+              await refresh();
+              setIsModalOpen(false);
+              addToast("Reservatório atualizado com sucesso.", "success");
+          }
+      });
   };
 
   const handleSaveFicha = async () => {
       if (!editItem) return;
 
-      // Calcular Data de Validade baseada no término da limpeza e na CONFIGURAÇÃO
-      let nextLimpeza = editItem.proximaLimpeza;
-      let statusLimpeza = editItem.situacaoLimpeza;
-      let feedbackMsg = "Ficha técnica salva com sucesso.";
+      confirm({
+          title: "Finalizar Ficha Técnica",
+          message: "Isso atualizará o status do poço e calculará a próxima data de limpeza automaticamente.",
+          type: "warning",
+          confirmLabel: "Confirmar e Salvar",
+          onConfirm: async () => {
+                // Calcular Data de Validade
+                let nextLimpeza = editItem.proximaLimpeza;
+                let statusLimpeza = editItem.situacaoLimpeza;
+                let feedbackMsg = "Ficha técnica salva com sucesso.";
 
-      if (fichaData.terminoLimpeza) {
-          const end = new Date(fichaData.terminoLimpeza);
-          
-          // --- MUDANÇA: Usa a configuração ou 12 meses como fallback ---
-          const mesesValidade = settings?.validadeLimpezaPoco || 12; 
-          end.setMonth(end.getMonth() + mesesValidade);
-          
-          nextLimpeza = end.toISOString().split('T')[0];
-          statusLimpeza = getComputedStatus(nextLimpeza);
-          
-          const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
-          feedbackMsg = `Ficha salva! Próxima limpeza agendada para ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
-      }
+                if (fichaData.terminoLimpeza) {
+                    const end = new Date(fichaData.terminoLimpeza);
+                    const mesesValidade = settings?.validadeLimpezaPoco || 12; 
+                    end.setMonth(end.getMonth() + mesesValidade);
+                    
+                    nextLimpeza = end.toISOString().split('T')[0];
+                    statusLimpeza = getComputedStatus(nextLimpeza);
+                    
+                    const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
+                    feedbackMsg = `Ficha salva! Próxima limpeza: ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
+                }
 
-      // Update basic fields from Ficha
-      const updatedPoco = {
-          ...editItem,
-          responsavel: fichaData.supervisor || editItem.responsavel,
-          referenciaBomba: fichaData.patrimonioBomba || editItem.referenciaBomba,
-          dataUltimaLimpeza: fichaData.terminoLimpeza || editItem.dataUltimaLimpeza,
-          proximaLimpeza: nextLimpeza,
-          situacaoLimpeza: statusLimpeza,
-          dadosFicha: fichaData // Armazena a estrutura completa
-      };
+                const updatedPoco = {
+                    ...editItem,
+                    responsavel: fichaData.supervisor || editItem.responsavel,
+                    referenciaBomba: fichaData.patrimonioBomba || editItem.referenciaBomba,
+                    dataUltimaLimpeza: fichaData.terminoLimpeza || editItem.dataUltimaLimpeza,
+                    proximaLimpeza: nextLimpeza,
+                    situacaoLimpeza: statusLimpeza,
+                    dadosFicha: fichaData
+                };
 
-      await hydroService.savePoco(updatedPoco);
-      await refreshData();
-      setIsFichaOpen(false);
-      addToast(feedbackMsg, "success");
+                await hydroService.savePoco(updatedPoco);
+                await refresh();
+                setIsFichaOpen(false);
+                addToast(feedbackMsg, "success");
+          }
+      });
   };
 
   // --- HISTORY ---
@@ -261,7 +266,12 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
             </div>
 
             {/* List */}
-            {data.length === 0 ? (
+            {loading ? (
+               <div className="py-20 text-center text-slate-400 flex flex-col items-center">
+                   <Loader2 size={32} className="animate-spin mb-2" />
+                   <span className="text-xs font-mono uppercase tracking-widest">Carregando dados...</span>
+               </div>
+            ) : data.length === 0 ? (
                 <EmptyState icon={Droplet} title="Nenhum registro" description="Não encontramos itens com os filtros atuais." />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -404,7 +414,6 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                             <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{new Date(log.timestamp).toLocaleDateString()}</p>
                                             <div className="bg-slate-50 dark:bg-slate-900 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                                                 <p className="text-xs font-bold text-slate-700 dark:text-slate-300">{log.userName}</p>
-                                                {/* Ensure whitespace is preserved for the rich text details */}
                                                 <p className="text-xs text-slate-500 font-mono mt-1 whitespace-pre-wrap">{log.details}</p>
                                             </div>
                                         </div>

@@ -2,9 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-    ArrowLeft, ShieldAlert, Plus, Calendar, Filter, 
-    Search, CheckCircle2, AlertTriangle, Clock, 
-    Edit2, Trash2, Save, X, Check, User as UserIcon, 
+    ShieldAlert, Plus, Calendar, Search, 
+    CheckCircle2, Edit2, Trash2, Save, X, Check, User as UserIcon, 
     Bug, Beaker, ClipboardList, History, CalendarCheck, AlertCircle, MapPin, Camera, Loader2, Image
 } from 'lucide-react';
 import { User, PestControlEntry, UserRole, Sede, PestControlSettings } from '../../types';
@@ -12,6 +11,8 @@ import { pestService } from '../../services/pestService';
 import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
 import { Breadcrumbs } from '../Shared/Breadcrumbs';
+import { useConfirmation } from '../Shared/ConfirmationContext'; // New import
+import { PestExecutionCard } from './PestExecutionCard'; // New import
 
 // Helper de Data Robusto (Ignora Fuso Horário para comparação de dias puros)
 const getDaysDiff = (dateStr: string) => {
@@ -26,6 +27,7 @@ const getDaysDiff = (dateStr: string) => {
 
 export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const { confirm } = useConfirmation(); // Hook usage
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [entries, setEntries] = useState<PestControlEntry[]>([]);
@@ -40,8 +42,6 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<PestControlEntry | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
   const [editingItem, setEditingItem] = useState<Partial<PestControlEntry>>({});
@@ -132,24 +132,23 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
 
   const requestDelete = (item: PestControlEntry, e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
-      setItemToDelete(item);
-      setIsDeleteModalOpen(true);
-  };
-
-  const confirmDelete = async () => {
-      if(itemToDelete) {
-          try {
-            setEntries(prev => prev.filter(i => i.id !== itemToDelete.id));
-            await pestService.delete(itemToDelete.id);
-            await refreshData();
-          } catch (e) {
-            console.error("Delete failed", e);
-            alert("Erro ao excluir.");
-            await refreshData();
-          } finally {
-            setIsDeleteModalOpen(false); setItemToDelete(null);
+      confirm({
+          title: "Confirmar Exclusão",
+          message: `Você está prestes a remover o agendamento de ${item.target}. Esta ação não pode ser desfeita.`,
+          type: "danger",
+          confirmLabel: "Excluir",
+          onConfirm: async () => {
+              try {
+                setEntries(prev => prev.filter(i => i.id !== item.id));
+                await pestService.delete(item.id);
+                await refreshData();
+              } catch (e) {
+                console.error("Delete failed", e);
+                alert("Erro ao excluir.");
+                await refreshData();
+              }
           }
-      }
+      });
   };
 
   const handleViewHistory = (item: PestControlEntry) => {
@@ -215,17 +214,9 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       }).length
   };
 
-  const renderStatusPill = (status: string, diff: number) => {
-      if (status === 'REALIZADO') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"><CheckCircle2 size={12}/> Concluído</span>;
-      if (status === 'ATRASADO') return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-red-500/10 text-red-600 border border-red-500/20 animate-pulse"><AlertTriangle size={12}/> Atrasado ({Math.abs(diff)}d)</span>;
-      return <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase bg-amber-500/10 text-amber-600 border border-amber-500/20"><Clock size={12}/> Aguardando</span>;
-  };
-
   // Filter technicians based on Sede in editing mode
   const filteredTechnicians = settings?.technicians.filter(t => {
-      // Always show global techs (no sedeId)
       if (!t.sedeId) return true;
-      // If editingItem has a sedeId, allow matching techs
       if (editingItem.sedeId && t.sedeId === editingItem.sedeId) return true;
       return false;
   }) || [];
@@ -319,78 +310,17 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                </div>
            ) : (
                <div className="grid grid-cols-1 gap-4">
-                   {filteredEntries.map(entry => {
-                       const dynamicStatus = getDynamicStatus(entry);
-                       const diff = getDaysDiff(entry.scheduledDate);
-                       
-                       // Define Border Color
-                       let borderColor = 'border-l-slate-300 dark:border-l-slate-700';
-                       if (dynamicStatus === 'ATRASADO') borderColor = 'border-l-red-500';
-                       else if (dynamicStatus === 'REALIZADO') borderColor = 'border-l-emerald-500';
-                       else borderColor = 'border-l-amber-500';
-
-                       return (
-                           <div key={entry.id} className={`bg-white dark:bg-[#16161a] rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 border-l-[6px] ${borderColor} hover:shadow-md transition-all group relative overflow-hidden`}>
-                               
-                               <div className="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
-                                   {/* Info Block */}
-                                   <div className="flex items-start gap-4 flex-1">
-                                       {/* Date Box */}
-                                       <div className="flex-shrink-0 flex flex-col items-center justify-center w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800">
-                                           <span className="text-xs font-bold text-slate-400 uppercase">{new Date(entry.scheduledDate).toLocaleString('pt-BR', { month: 'short' }).replace('.', '')}</span>
-                                           <span className="text-2xl font-black text-slate-800 dark:text-white font-mono">{new Date(entry.scheduledDate).getDate()}</span>
-                                       </div>
-                                       
-                                       <div className="space-y-1">
-                                           <div className="flex flex-wrap items-center gap-2">
-                                               <span className="text-[10px] font-black bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500 uppercase tracking-wide border border-slate-200 dark:border-slate-700">{entry.sedeId}</span>
-                                               {renderStatusPill(dynamicStatus, diff)}
-                                           </div>
-                                           <h3 className="font-bold text-slate-800 dark:text-white text-lg flex items-center gap-2 group-hover:text-amber-600 transition-colors">
-                                               {entry.target}
-                                           </h3>
-                                           <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
-                                               <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded"><UserIcon size={12}/> {entry.technician}</span>
-                                               <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded"><Calendar size={12}/> {entry.frequency}</span>
-                                               {entry.photoUrl && <span className="flex items-center gap-1 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 px-2 py-1 rounded"><Image size={12}/> Foto Anexada</span>}
-                                           </div>
-                                       </div>
-                                   </div>
-
-                                   {/* Actions Block */}
-                                   <div className="flex items-center gap-2 w-full md:w-auto justify-end border-t md:border-t-0 border-slate-100 dark:border-slate-800 pt-4 md:pt-0">
-                                       <button onClick={() => handleViewHistory(entry)} className="p-2.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors" title="Histórico">
-                                           <History size={20}/>
-                                       </button>
-                                       
-                                       {canEdit && (
-                                           <>
-                                               <button onClick={() => handleEdit(entry)} className="p-2.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-colors" title="Editar">
-                                                   <Edit2 size={20}/>
-                                               </button>
-                                               {dynamicStatus !== 'REALIZADO' && (
-                                                   <button onClick={() => handleComplete(entry)} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-colors shadow-lg shadow-emerald-500/20" title="Concluir Serviço">
-                                                       <Check size={16} /> Baixa
-                                                   </button>
-                                               )}
-                                               <button onClick={(e) => requestDelete(entry, e)} className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors" title="Excluir">
-                                                   <Trash2 size={20}/>
-                                               </button>
-                                           </>
-                                       )}
-                                   </div>
-                               </div>
-                               
-                               {/* Footer Details (Methods) */}
-                               {(entry.method || entry.product) && (
-                                   <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                       {entry.method && <span className="flex items-center gap-1.5"><Beaker size={12} className="text-purple-500"/> <strong className="text-slate-700 dark:text-slate-300">MET:</strong> {entry.method}</span>}
-                                       {entry.product && <span className="flex items-center gap-1.5"><Bug size={12} className="text-amber-500"/> <strong className="text-slate-700 dark:text-slate-300">PROD:</strong> {entry.product}</span>}
-                                   </div>
-                               )}
-                           </div>
-                       );
-                   })}
+                   {filteredEntries.map(entry => (
+                       <PestExecutionCard 
+                           key={entry.id} 
+                           entry={entry} 
+                           canEdit={canEdit}
+                           onEdit={handleEdit}
+                           onComplete={handleComplete}
+                           onDelete={requestDelete}
+                           onHistory={handleViewHistory}
+                       />
+                   ))}
                </div>
            )}
        </div>
@@ -596,38 +526,6 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                ))}
                            </div>
                        )}
-                   </div>
-               </div>
-           </div>
-       )}
-
-       {/* DELETE CONFIRMATION MODAL */}
-       {isDeleteModalOpen && itemToDelete && (
-           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-               <div className="bg-white dark:bg-[#111114] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative overflow-hidden rounded-3xl animate-in zoom-in-95 shadow-2xl">
-                   <div className="absolute top-0 left-0 w-full h-1.5 bg-red-600"></div>
-                   <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-6 rounded-full border border-red-100 dark:border-red-800">
-                       <AlertCircle size={32} />
-                   </div>
-                   
-                   <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Confirmar Exclusão</h3>
-                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
-                       Você está prestes a remover o agendamento de <br/><strong className="text-slate-900 dark:text-white">{itemToDelete.target}</strong>. <br/>Esta ação não pode ser desfeita.
-                   </p>
-
-                   <div className="grid grid-cols-2 gap-3">
-                       <button 
-                         onClick={() => setIsDeleteModalOpen(false)}
-                         className="py-3.5 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-bold text-xs uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors rounded-xl"
-                       >
-                           Cancelar
-                       </button>
-                       <button 
-                         onClick={confirmDelete}
-                         className="py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase transition-colors rounded-xl shadow-lg shadow-red-500/20"
-                       >
-                           Confirmar
-                       </button>
                    </div>
                </div>
            </div>

@@ -1,60 +1,22 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { TestTube, ChevronLeft, ChevronRight, X, Save, Droplets, AlertTriangle, Clock, CheckCircle2, User as UserIcon, Building2, ArrowLeft, Info, Camera, Image, Trash2, Loader2, FileText, Check, Plus, Minus, Calendar } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { TestTube, ChevronLeft, ChevronRight, Droplets, AlertTriangle, Clock, CheckCircle2, Building2, Image, FileText } from 'lucide-react';
 import { User, HydroCloroEntry, HydroSettings, Sede, UserRole } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { Breadcrumbs } from '../Shared/Breadcrumbs';
-
-// Função utilitária para compressão de imagem via Canvas
-const compressImage = async (file: File, maxWidth = 1024, quality = 0.6): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.readAsDataURL(file);
-        reader.onload = (event) => {
-            const img = document.createElement('img');
-            img.src = event.target?.result as string;
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                let width = img.width;
-                let height = img.height;
-
-                // Redimensionar mantendo proporção
-                if (width > maxWidth) {
-                    height = Math.round((height * maxWidth) / width);
-                    width = maxWidth;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0, width, height);
-
-                // Converter para JPEG comprimido
-                canvas.toBlob(
-                    (blob) => {
-                        if (blob) resolve(blob);
-                        else reject(new Error("Falha na compressão do Canvas."));
-                    },
-                    'image/jpeg',
-                    quality // 0.6 = 60% qualidade (bom balanço tamanho/qualidade)
-                );
-            };
-            img.onerror = (err) => reject(err);
-        };
-        reader.onerror = (err) => reject(err);
-    });
-};
+import { CloroEntryModal } from './CloroEntryModal';
+import { getMonthName, toIsoDate } from '../../utils/formatters';
 
 export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
-  const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
   const [entries, setEntries] = useState<HydroCloroEntry[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDateStr, setSelectedDateStr] = useState('');
+  const [modalData, setModalData] = useState<Partial<HydroCloroEntry>>({});
+
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   const [selectedSedeId, setSelectedSedeId] = useState<string>('');
   const [settings, setSettings] = useState<HydroSettings>({
@@ -68,17 +30,8 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     phMin: 7.4,
     phMax: 7.6
   });
-  const [form, setForm] = useState<Partial<HydroCloroEntry>>({ cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' });
-  
-  // Inputs manuais (strings) para permitir digitação fluida com vírgula
-  const [clInput, setClInput] = useState('0');
-  const [phInput, setPhInput] = useState('0');
 
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    const load = async () => {
+  const load = async () => {
       setEntries(await hydroService.getCloro(user));
       setSettings(await hydroService.getSettings());
       const allSedes = orgService.getSedes();
@@ -89,15 +42,14 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
           userSedes = allSedes.filter(s => user.sedeIds.includes(s.id));
       }
       setAvailableSedes(userSedes);
-      if (userSedes.length > 0) setSelectedSedeId(userSedes[0].id);
-    };
-    load();
-  }, [user]);
+      if (userSedes.length > 0 && !selectedSedeId) setSelectedSedeId(userSedes[0].id);
+  };
 
-  const monthName = currentDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-  const todayStr = new Date().toISOString().split('T')[0];
+  useEffect(() => { load(); }, [user]);
+
   const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  
   const getEntry = (date: string) => (!selectedSedeId) ? undefined : entries.find(e => e.date === date && e.sedeId === selectedSedeId);
   const isSafe = (val: number, min: number, max: number) => val >= min && val <= max;
 
@@ -105,116 +57,19 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
     if (!selectedSedeId) { alert("Selecione uma sede primeiro."); return; }
     const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     setSelectedDateStr(dateStr);
+    
     const entry = getEntry(dateStr);
-    
-    // Set form state
-    const newForm = entry || { id: undefined, cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' };
-    setForm(newForm);
-    
-    // Sync manual inputs (converting dots to commas for display)
-    setClInput(newForm.cl !== undefined ? newForm.cl.toString().replace('.', ',') : '0');
-    setPhInput(newForm.ph !== undefined ? newForm.ph.toString().replace('.', ',') : '0');
-    
+    setModalData(entry || { cl: 0, ph: 0, medidaCorretiva: '', responsavel: user.name, photoUrl: '' });
     setIsModalOpen(true);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      setIsUploading(true);
-      try {
-          // If replacing, clean up old blob if it exists (simple check for blob protocol)
-          if (form.photoUrl && form.photoUrl.startsWith('blob:')) {
-              URL.revokeObjectURL(form.photoUrl);
-          }
-
-          const compressedBlob = await compressImage(file, 1000, 0.6);
-          const url = await hydroService.uploadPhoto(compressedBlob);
-          if (url) setForm(prev => ({ ...prev, photoUrl: url }));
-          else alert("Erro no upload da imagem. Verifique a conexão.");
-      } catch (err) {
-          console.error("Erro upload/compressão:", err);
-          alert("Erro ao processar imagem.");
-      } finally {
-          setIsUploading(false);
-      }
-  };
-
-  const removePhoto = () => {
-      if (form.photoUrl && form.photoUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(form.photoUrl);
-      }
-      setForm(prev => ({ ...prev, photoUrl: '' }));
-      if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleSave = async () => {
-    if (!selectedDateStr || !selectedSedeId) return;
-    
-    setIsSaving(true);
-    try {
-        await hydroService.saveCloro({
-            id: form.id || `cl-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-            sedeId: selectedSedeId,
-            date: selectedDateStr,
-            cl: Number(Number(form.cl).toFixed(1)),
-            ph: Number(Number(form.ph).toFixed(1)),
-            medidaCorretiva: form.medidaCorretiva,
-            responsavel: form.responsavel || user.name,
-            photoUrl: form.photoUrl
-        });
-        
-        setEntries(await hydroService.getCloro(user));
-        setIsModalOpen(false);
-    } catch (error: any) {
-        console.error("Save error:", error);
-        const msg = error.message || JSON.stringify(error, null, 2);
-        alert(`Erro ao salvar no banco de dados:\n${msg}`);
-    } finally {
-        setIsSaving(false);
-    }
-  };
-
-  const adjustValue = (field: 'cl' | 'ph', delta: number) => {
-      const current = Number(form[field] || 0);
-      const newValue = Math.max(0, parseFloat((current + delta).toFixed(1)));
-      
-      setForm(prev => ({ ...prev, [field]: newValue }));
-      
-      // Update string inputs to match
-      const strVal = newValue.toString().replace('.', ',');
-      if (field === 'cl') setClInput(strVal);
-      else setPhInput(strVal);
-  };
-
-  const handleManualChange = (field: 'cl' | 'ph', value: string) => {
-      // Regex: permite digitos, e apenas uma vírgula ou ponto
-      if (!/^\d*[.,]?\d*$/.test(value)) return;
-
-      if (field === 'cl') setClInput(value);
-      else setPhInput(value);
-
-      // Convert to number for internal logic (status color, etc)
-      // Replace comma with dot for parsing
-      const numericVal = parseFloat(value.replace(',', '.'));
-      
-      if (!isNaN(numericVal)) {
-          setForm(prev => ({ ...prev, [field]: numericVal }));
-      } else {
-          // If empty string or just "," set to 0 internally but keep string empty/partial
-          if (value === '') setForm(prev => ({ ...prev, [field]: 0 }));
-      }
-  };
-
-  const getStatusInfo = (val: number, min: number, max: number) => {
-      if (val < min) return { text: 'BAIXO', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' };
-      if (val > max) return { text: 'ALTO', color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' };
-      return { text: 'IDEAL', color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' };
+  const handleSaveSuccess = async () => {
+      await load(); // Reload data to reflect changes
   };
 
   const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+  const todayStr = toIsoDate(new Date());
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
@@ -223,7 +78,6 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
       <div className="fixed inset-0 -z-10 pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-[#0A0A0C] dark:via-[#0D0D10] dark:to-[#0A0A0C]" />
         <div className="absolute inset-0 opacity-[0.05] dark:opacity-[0.03] text-slate-400 dark:text-cyan-500" style={{ backgroundImage: `linear-gradient(currentColor 1px, transparent 1px), linear-gradient(90deg, currentColor 1px, transparent 1px)`, backgroundSize: '80px 80px' }} />
-        <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.015] text-slate-400 dark:text-cyan-500" style={{ backgroundImage: `linear-gradient(currentColor 0.5px, transparent 0.5px), linear-gradient(90deg, currentColor 0.5px, transparent 0.5px)`, backgroundSize: '16px 16px' }} />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] opacity-30 dark:opacity-20" style={{ background: 'radial-gradient(ellipse at top, rgba(6, 182, 212, 0.3) 0%, transparent 70%)' }} />
       </div>
 
@@ -324,7 +178,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
         <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl p-4 md:p-8 relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-500 delay-200">
             <div className="flex items-center justify-between mb-6 md:mb-8 relative z-10">
                 <button onClick={handlePrevMonth} className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronLeft size={18} /></button>
-                <h2 className="text-lg md:text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight font-mono">{monthName}</h2>
+                <h2 className="text-lg md:text-2xl font-black capitalize text-slate-800 dark:text-white tracking-tight font-mono">{getMonthName(currentDate)}</h2>
                 <button onClick={handleNextMonth} className="h-8 w-8 md:h-10 md:w-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-cyan-50 dark:hover:bg-slate-700 transition-colors"><ChevronRight size={18} /></button>
             </div>
 
@@ -412,138 +266,17 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             )}
         </div>
 
-        {/* MODAL REDESIGN */}
-        {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4">
-                <div className="bg-white dark:bg-[#111114] w-full max-w-md h-[90vh] sm:h-auto rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
-                    
-                    <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
-                        <div>
-                            <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-widest mb-1">
-                                <Calendar size={12}/> {selectedDateStr.split('-').reverse().join('/')}
-                            </div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Registro de Análise</h3>
-                        </div>
-                        <button onClick={() => setIsModalOpen(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
-                            <X size={20} />
-                        </button>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                        {/* 1. Readings Section - Styled as Cards with Inputs */}
-                        <div className="grid grid-cols-2 gap-4">
-                            {/* CLORO INPUT */}
-                            <div className={`p-4 rounded-2xl border-2 transition-all ${getStatusInfo(Number(form.cl), settings.cloroMin, settings.cloroMax).bg}`}>
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-[10px] font-black uppercase text-slate-500">Cloro (ppm)</span>
-                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase bg-white/50 dark:bg-black/20 ${getStatusInfo(Number(form.cl), settings.cloroMin, settings.cloroMax).color}`}>
-                                        {getStatusInfo(Number(form.cl), settings.cloroMin, settings.cloroMax).text}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center gap-3">
-                                    <input 
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={clInput}
-                                        onChange={(e) => handleManualChange('cl', e.target.value)}
-                                        className="text-4xl font-black text-slate-800 dark:text-white font-mono tracking-tighter bg-transparent outline-none text-center w-full focus:underline decoration-2 underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
-                                    />
-                                    <div className="flex items-center gap-2 w-full">
-                                        <button onClick={() => adjustValue('cl', -0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Minus size={16}/></button>
-                                        <button onClick={() => adjustValue('cl', 0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Plus size={16}/></button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* pH INPUT */}
-                            <div className={`p-4 rounded-2xl border-2 transition-all ${getStatusInfo(Number(form.ph), settings.phMin, settings.phMax).bg}`}>
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-[10px] font-black uppercase text-slate-500">pH</span>
-                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase bg-white/50 dark:bg-black/20 ${getStatusInfo(Number(form.ph), settings.phMin, settings.phMax).color}`}>
-                                        {getStatusInfo(Number(form.ph), settings.phMin, settings.phMax).text}
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center gap-3">
-                                    <input 
-                                        type="text"
-                                        inputMode="decimal"
-                                        value={phInput}
-                                        onChange={(e) => handleManualChange('ph', e.target.value)}
-                                        className="text-4xl font-black text-slate-800 dark:text-white font-mono tracking-tighter bg-transparent outline-none text-center w-full focus:underline decoration-2 underline-offset-4 decoration-slate-300 dark:decoration-slate-700"
-                                    />
-                                    <div className="flex items-center gap-2 w-full">
-                                        <button onClick={() => adjustValue('ph', -0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Minus size={16}/></button>
-                                        <button onClick={() => adjustValue('ph', 0.1)} className="flex-1 h-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Plus size={16}/></button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. Photo Evidence */}
-                        <div className="space-y-3">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Evidência Fotográfica</label>
-                            <input 
-                                type="file" 
-                                accept="image/*" 
-                                capture="environment"
-                                ref={fileInputRef}
-                                className="hidden"
-                                onChange={handleFileChange}
-                            />
-                            {form.photoUrl ? (
-                                <div className="relative group rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 h-40">
-                                    <img src={form.photoUrl} alt="Registro" className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={removePhoto} className="p-3 bg-red-500 text-white rounded-xl shadow-lg hover:scale-110 transition-transform">
-                                            <Trash2 size={20} />
-                                        </button>
-                                    </div>
-                                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-[10px] font-bold text-white uppercase backdrop-blur-sm">Imagem Anexada</div>
-                                </div>
-                            ) : (
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isUploading}
-                                    className="w-full h-24 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-400 hover:border-cyan-500 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/10 transition-all gap-2"
-                                >
-                                    {isUploading ? (
-                                        <><Loader2 size={24} className="animate-spin" /><span className="text-[10px] font-bold uppercase">Processando...</span></>
-                                    ) : (
-                                        <><Camera size={24} /><span className="text-[10px] font-bold uppercase">Adicionar Foto</span></>
-                                    )}
-                                </button>
-                            )}
-                        </div>
-
-                        {/* 3. Details */}
-                        <div className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável Técnico</label>
-                                <div className="relative">
-                                    <UserIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-cyan-500 transition-colors" value={form.responsavel} onChange={e => setForm({...form, responsavel: e.target.value})} placeholder="Nome do operador" />
-                                </div>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações / Correções</label>
-                                <textarea className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-cyan-500 transition-colors resize-none" rows={2} value={form.medidaCorretiva} onChange={e => setForm({...form, medidaCorretiva: e.target.value})} placeholder="Opcional..." />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-black/20">
-                        <button 
-                            onClick={handleSave} 
-                            disabled={isSaving}
-                            className={`w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-lg shadow-cyan-500/20 uppercase tracking-widest font-mono text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed`}
-                        >
-                            {isSaving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                            {isSaving ? 'Salvando...' : 'Registrar Coleta'}
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )}
+        {/* MODAL (Now Externalized) */}
+        <CloroEntryModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            data={modalData}
+            dateStr={selectedDateStr}
+            sedeId={selectedSedeId}
+            settings={settings}
+            currentUser={user}
+            onSaveSuccess={handleSaveSuccess}
+        />
       </div>
     </div>
   );

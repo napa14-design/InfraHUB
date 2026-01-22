@@ -5,7 +5,8 @@ import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
-import { ToastProvider } from './components/Shared/ToastContext'; // Import ToastProvider
+import { ToastProvider } from './components/Shared/ToastContext';
+import { ConfirmationProvider } from './components/Shared/ConfirmationContext'; // Import ConfirmationProvider
 import { Instructions } from './supabase_setup';
 
 // --- ERROR BOUNDARY FOR LAZY LOADING ---
@@ -17,7 +18,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
@@ -201,72 +202,74 @@ const App: React.FC = () => {
   return (
     <ThemeProvider>
       <ToastProvider>
-        <Router>
-          <AuthObserver />
-          <PWANavigator user={user} />
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/setup" element={<Instructions />} />
-                
-                <Route 
-                  path="/login" 
-                  element={
-                    // Se o usuário logar, usa o redirectPath definido no useEffect inicial
-                    user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
-                  } 
-                />
+        <ConfirmationProvider>
+          <Router>
+            <AuthObserver />
+            <PWANavigator user={user} />
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
+                  <Route path="/setup" element={<Instructions />} />
+                  
+                  <Route 
+                    path="/login" 
+                    element={
+                      // Se o usuário logar, usa o redirectPath definido no useEffect inicial
+                      user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
+                    } 
+                  />
 
-                <Route path="/update-password" element={<UpdatePassword />} />
+                  <Route path="/update-password" element={<UpdatePassword />} />
 
-                <Route
-                  path="*"
-                  element={
-                    user ? (
-                      <Layout user={user} onLogout={handleLogout}>
-                        <ErrorBoundary>
-                          <Suspense fallback={<PageLoader />}>
-                            <Routes>
-                              <Route path="/" element={<Dashboard user={user} />} />
-                              
-                              {/* Admin Routes */}
-                              <Route path="/admin/users" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AdminUserManagement /> : <Navigate to="/" replace />} />
-                              <Route path="/admin/modules" element={user.role === UserRole.ADMIN ? <AdminModuleManagement /> : <Navigate to="/" replace />} />
-                              <Route path="/admin/org" element={user.role === UserRole.ADMIN ? <AdminOrgManagement /> : <Navigate to="/" replace />} />
-                              <Route path="/admin/notifications" element={user.role === UserRole.ADMIN ? <AdminNotificationConfig /> : <Navigate to="/" replace />} />
-                              <Route path="/admin/logs" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AuditLogs /> : <Navigate to="/" replace />} />
+                  <Route
+                    path="*"
+                    element={
+                      user ? (
+                        <Layout user={user} onLogout={handleLogout}>
+                          <ErrorBoundary>
+                            <Suspense fallback={<PageLoader />}>
+                              <Routes>
+                                <Route path="/" element={<Dashboard user={user} />} />
+                                
+                                {/* Admin Routes */}
+                                <Route path="/admin/users" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AdminUserManagement /> : <Navigate to="/" replace />} />
+                                <Route path="/admin/modules" element={user.role === UserRole.ADMIN ? <AdminModuleManagement /> : <Navigate to="/" replace />} />
+                                <Route path="/admin/org" element={user.role === UserRole.ADMIN ? <AdminOrgManagement /> : <Navigate to="/" replace />} />
+                                <Route path="/admin/notifications" element={user.role === UserRole.ADMIN ? <AdminNotificationConfig /> : <Navigate to="/" replace />} />
+                                <Route path="/admin/logs" element={(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) ? <AuditLogs /> : <Navigate to="/" replace />} />
 
-                              {/* HydroSys Routes */}
-                              <Route path="/module/hydrosys" element={<HydroSysDashboard user={user} />} />
-                              <Route path="/module/hydrosys/certificados" element={<HydroCertificados user={user} />} />
-                              <Route path="/module/hydrosys/cloro" element={<HydroCloro user={user} />} />
-                              <Route path="/module/hydrosys/filtros" element={<HydroFiltros user={user} />} />
-                              <Route path="/module/hydrosys/reservatorios" element={<HydroReservatorios user={user} />} />
-                              <Route path="/module/hydrosys/config" element={user.role === UserRole.ADMIN ? <HydroConfig user={user} /> : <Navigate to="/module/hydrosys" replace />} />
-                              <Route path="/module/hydrosys/analytics" element={user.role === UserRole.ADMIN ? <HydroSysAnalytics user={user} /> : <Navigate to="/module/hydrosys" replace />} />
+                                {/* HydroSys Routes */}
+                                <Route path="/module/hydrosys" element={<HydroSysDashboard user={user} />} />
+                                <Route path="/module/hydrosys/certificados" element={<HydroCertificados user={user} />} />
+                                <Route path="/module/hydrosys/cloro" element={<HydroCloro user={user} />} />
+                                <Route path="/module/hydrosys/filtros" element={<HydroFiltros user={user} />} />
+                                <Route path="/module/hydrosys/reservatorios" element={<HydroReservatorios user={user} />} />
+                                <Route path="/module/hydrosys/config" element={user.role === UserRole.ADMIN ? <HydroConfig user={user} /> : <Navigate to="/module/hydrosys" replace />} />
+                                <Route path="/module/hydrosys/analytics" element={user.role === UserRole.ADMIN ? <HydroSysAnalytics user={user} /> : <Navigate to="/module/hydrosys" replace />} />
 
-                              {/* Pest Control Routes */}
-                              <Route path="/module/pestcontrol" element={<PestControlDashboard user={user} />} />
-                              <Route path="/module/pestcontrol/execution" element={<PestControlExecution user={user} />} />
-                              <Route path="/module/pestcontrol/help" element={<PestControlHelp user={user} />} />
-                              <Route path="/module/pestcontrol/config" element={user.role === UserRole.ADMIN ? <PestControlConfig user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
-                              <Route path="/module/pestcontrol/analytics" element={user.role === UserRole.ADMIN ? <PestControlAnalytics user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
-                              
-                              <Route path="/module/:id" element={<ModuleView />} />
-                              <Route path="*" element={<Navigate to="/" replace />} />
-                            </Routes>
-                          </Suspense>
-                        </ErrorBoundary>
-                      </Layout>
-                    ) : (
-                      <Navigate to="/login" replace />
-                    )
-                  }
-                />
-              </Routes>
-            </Suspense>
-          </ErrorBoundary>
-        </Router>
+                                {/* Pest Control Routes */}
+                                <Route path="/module/pestcontrol" element={<PestControlDashboard user={user} />} />
+                                <Route path="/module/pestcontrol/execution" element={<PestControlExecution user={user} />} />
+                                <Route path="/module/pestcontrol/help" element={<PestControlHelp user={user} />} />
+                                <Route path="/module/pestcontrol/config" element={user.role === UserRole.ADMIN ? <PestControlConfig user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
+                                <Route path="/module/pestcontrol/analytics" element={user.role === UserRole.ADMIN ? <PestControlAnalytics user={user} /> : <Navigate to="/module/pestcontrol" replace />} />
+                                
+                                <Route path="/module/:id" element={<ModuleView />} />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                              </Routes>
+                            </Suspense>
+                          </ErrorBoundary>
+                        </Layout>
+                      ) : (
+                        <Navigate to="/login" replace />
+                      )
+                    }
+                  />
+                </Routes>
+              </Suspense>
+            </ErrorBoundary>
+          </Router>
+        </ConfirmationProvider>
       </ToastProvider>
     </ThemeProvider>
   );
