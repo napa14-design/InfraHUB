@@ -41,9 +41,9 @@ export const CriticalAlertBanner: React.FC<Props> = ({ onViewCritical }) => {
           </div>
         </div>
 
-        {/* Scrolling Ticker Text - SLOWED DOWN to 45s */}
+        {/* Scrolling Ticker Text - SLOWED DOWN to 90s */}
         <div className="flex-1 overflow-hidden relative h-6 mx-4">
-             <div className="absolute whitespace-nowrap animate-[marquee_45s_linear_infinite] flex gap-16 items-center h-full">
+             <div className="absolute whitespace-nowrap animate-[marquee_90s_linear_infinite] flex gap-16 items-center h-full">
                  {criticalNotifs.map((notif, idx) => (
                      <span key={notif.id} className="flex items-center gap-2 font-medium text-sm">
                          <span className="font-bold text-red-100">PENDENTE:</span> 
