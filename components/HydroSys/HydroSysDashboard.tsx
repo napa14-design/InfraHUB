@@ -1,12 +1,11 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, Lock, ChevronRight, Activity, AlertTriangle, Gauge, Thermometer, Waves, FileDown, Calendar, Download, X } from 'lucide-react';
 import { User, UserRole, HydroCertificado, HydroFiltro } from '../../types';
-import { HYDROSYS_SUBMODULES } from '../constants';
+import { HYDROSYS_SUBMODULES } from '../../constants';
 import { orgService } from '../../services/orgService';
 import { hydroService } from '../../services/hydroService';
-import { exportToCSV } from '../utils/csvExport';
+import { exportToCSV } from '../../utils/csvExport';
 
 interface Props {
   user: User;
@@ -301,7 +300,6 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           </div>
         </div>
 
-        {/* Modal code remains same, omitted for brevity as no logic changed there */}
         {isReportModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 overflow-hidden">

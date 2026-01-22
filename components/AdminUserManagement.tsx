@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe, Lock, MoreVertical } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -70,8 +69,6 @@ export const AdminUserManagement: React.FC = () => {
     setSedes(orgService.getSedes());
   };
 
-  // ... (Keep existing handlers: handleStartNew, handleStartEdit, requestDelete, confirmDelete, etc.) ...
-  // Re-implementing them briefly to keep file complete/valid in the XML replacement
   const handleStartNew = async () => {
     await loadData();
     setIsEditing(false);
@@ -291,7 +288,20 @@ export const AdminUserManagement: React.FC = () => {
   );
 
   const availableRegions = regions.filter(r => !formData.organizationId || r.organizationId === formData.organizationId);
-  const availableSedes = sedes.filter(s => !formData.regionId || s.regionId === formData.regionId);
+  
+  // FIX: Ensure sedes are filtered by selected organization if region is not selected yet
+  const availableSedes = sedes.filter(s => {
+      if (formData.regionId) {
+          return s.regionId === formData.regionId;
+      }
+      if (formData.organizationId) {
+          // If no region selected, show all sedes for this organization
+          // We find regions belonging to this org first
+          const orgRegionIds = regions.filter(r => r.organizationId === formData.organizationId).map(r => r.id);
+          return orgRegionIds.includes(s.regionId);
+      }
+      return false; 
+  });
 
   // --- RENDER HELPERS ---
   const UserStatusBadge = ({ status }: { status: string }) => (
@@ -478,18 +488,9 @@ export const AdminUserManagement: React.FC = () => {
           })}
       </div>
 
-      {/* Modals remain essentially the same, utilizing global state and style... 
-          For brevity in this update, assuming the existing modal code structure persists 
-          since the visual change requested was for the list rendering logic. 
-          The previous code block contained the modals and logic which are preserved above.
-      */}
-      {/* ... (Existing Modals: User Form, Delete Confirmation, Reset Password) ... */}
-      {/* Re-including modal code block to ensure the file is complete */}
-      
       {isModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-[#0C0C0E] w-full max-w-xl border border-slate-200 dark:border-slate-700 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto">
-                  {/* ... Modal Content Same as Before ... */}
                   <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                       <div className="flex items-center gap-3">
                           <Terminal className="text-brand-600 dark:text-brand-500" size={20} />
@@ -523,7 +524,7 @@ export const AdminUserManagement: React.FC = () => {
                           {formData.role !== UserRole.ADMIN && (
                               <>
                                 <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">REGIÃO</label><select className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" value={formData.regionId} onChange={e => setFormData({...formData, regionId: e.target.value, sedeIds: []})} disabled={!formData.organizationId}><option value="">SELECIONE...</option>{availableRegions.map(reg => <option key={reg.id} value={reg.id}>{reg.name.toUpperCase()}</option>)}</select></div>
-                                <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase mb-2 block">UNIDADES (MULTI)</label>{formData.regionId ? <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">{availableSedes.length > 0 ? <div className="space-y-1">{availableSedes.map(sede => <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer"><input type="checkbox" checked={formData.sedeIds?.includes(sede.id)} onChange={() => toggleSedeSelection(sede.id)} className="w-4 h-4" /><div className="flex-1 text-xs font-mono text-slate-700 dark:text-slate-300 uppercase">{sede.name}</div></label>)}</div> : <p className="text-xs text-slate-500 text-center">NENHUM DADO</p>}</div> : <div className="p-3 text-center border border-dashed border-slate-300 text-slate-500 text-xs font-mono uppercase">AGUARDANDO REGIÃO...</div>}</div>
+                                <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase mb-2 block">UNIDADES (MULTI)</label>{formData.organizationId ? <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">{availableSedes.length > 0 ? <div className="space-y-1">{availableSedes.map(sede => <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer"><input type="checkbox" checked={formData.sedeIds?.includes(sede.id)} onChange={() => toggleSedeSelection(sede.id)} className="w-4 h-4" /><div className="flex-1 text-xs font-mono text-slate-700 dark:text-slate-300 uppercase">{sede.name}</div></label>)}</div> : <p className="text-xs text-slate-500 text-center">NENHUM DADO</p>}</div> : <div className="p-3 text-center border border-dashed border-slate-300 text-slate-500 text-xs font-mono uppercase">AGUARDANDO ORG...</div>}</div>
                               </>
                           )}
                           <div className="pt-4 flex gap-3 border-t border-slate-200 dark:border-slate-800 mt-2"><button type="button" onClick={closeAndReset} className="flex-1 py-3 text-slate-500 font-mono text-xs uppercase hover:bg-slate-100 transition-colors">CANCELAR</button><button type="submit" className="flex-1 py-3 bg-brand-600 text-white font-mono font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">{isEditing ? <Save size={14}/> : <Plus size={14}/>}<span>{isEditing ? 'SALVAR' : 'CRIAR'}</span></button></div>
@@ -533,7 +534,6 @@ export const AdminUserManagement: React.FC = () => {
           </div>
       )}
       
-      {/* Delete & Reset Password Modals same as before... (omitted for brevity but assume present in final file) */}
       {deleteModalOpen && userToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-white dark:bg-[#0C0C0E] border border-red-200 dark:border-red-900/50 w-full max-w-sm p-8 text-center relative overflow-hidden">
