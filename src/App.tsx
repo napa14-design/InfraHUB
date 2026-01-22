@@ -6,7 +6,7 @@ import { orgService } from './services/orgService';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
 import { ToastProvider } from './components/Shared/ToastContext';
-import { ConfirmationProvider } from './components/Shared/ConfirmationContext';
+import { ConfirmationProvider } from './components/Shared/ConfirmationContext'; // Import ConfirmationProvider
 import { Instructions } from './supabase_setup';
 
 // --- ERROR BOUNDARY FOR LAZY LOADING ---
