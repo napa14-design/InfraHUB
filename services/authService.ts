@@ -433,7 +433,13 @@ export const authService = {
               });
 
               if (error) {
-                  throw error; // Throw detailed error to be caught below
+                  console.error("Edge Function Failed:", error);
+                  // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
+                  await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
+                  return { 
+                      success: false, 
+                      error: "FALHA: É necessário configurar a Edge Function 'admin-reset-password' no Supabase para alterar a senha real." 
+                  };
               }
 
               if (currentUser) {
@@ -441,19 +447,9 @@ export const authService = {
               }
               return { success: true };
 
-          } catch (e: any) {
+          } catch (e) {
               console.error("Invoke Error:", e);
-              // Check for common connection errors
-              if (e.message && (e.message.includes('Failed to send') || e.message.includes('fetch'))) {
-                  return { 
-                      success: false, 
-                      error: "ERRO DE CONEXÃO: Verifique se a Edge Function 'admin-reset-password' foi deployada corretamente no painel do Supabase. Consulte o Setup." 
-                  };
-              }
-              return { 
-                  success: false, 
-                  error: `Erro na Edge Function: ${e.message || 'Desconhecido'}` 
-              };
+              return { success: false, error: "Erro de conexão com o servidor de funções." };
           }
       }
   },

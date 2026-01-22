@@ -169,6 +169,7 @@ export const notificationService = {
     // ==========================================
     // 2. HYDROSYS AGREGADO (Reservatórios e Filtros)
     // ==========================================
+    // Lógica para agrupar alertas por SEDE e evitar poluição (spam)
     const resRule = rules.find(r => r.id === 'rule_res');
     const filtroRule = rules.find(r => r.id === 'rule_filtros');
 
@@ -180,84 +181,101 @@ export const notificationService = {
             hydroService.getFiltros(user)
         ]);
 
+        const allReservatorios = [...pocos, ...cist, ...caixas];
+        
+        // Mapa de problemas por Sede
+        // Detalhado por Tipo para mensagem clara
         type SedeIssues = { 
             pocoCrit: number, pocoWarn: number,
             cistCrit: number, cistWarn: number,
             caixaCrit: number, caixaWarn: number,
-            filtroCrit: number, filtroWarn: number
+            filtCrit: number, filtWarn: number 
         };
+        const issuesMap: Record<string, SedeIssues> = {};
 
-        const issuesMap = new Map<string, SedeIssues>();
-
-        const getSedeIssue = (id: string) => {
-            if (!issuesMap.has(id)) {
-                issuesMap.set(id, { 
-                    pocoCrit: 0, pocoWarn: 0, 
-                    cistCrit: 0, cistWarn: 0, 
+        // Helper para inicializar map
+        const getIssueObj = (sedeId: string) => {
+            if (!issuesMap[sedeId]) {
+                issuesMap[sedeId] = { 
+                    pocoCrit: 0, pocoWarn: 0,
+                    cistCrit: 0, cistWarn: 0,
                     caixaCrit: 0, caixaWarn: 0,
-                    filtroCrit: 0, filtroWarn: 0
-                });
+                    filtCrit: 0, filtWarn: 0 
+                };
             }
-            return issuesMap.get(id)!;
+            return issuesMap[sedeId];
         };
 
-        // Check Reservoirs
+        // Processar Reservatórios por Tipo
         if (resRule && resRule.enabled) {
-            pocos.forEach(p => {
-                const days = getDiffDays(p.proximaLimpeza);
-                const s = getSedeIssue(p.sedeId);
-                if (days <= resRule.criticalDays) s.pocoCrit++;
-                else if (days <= resRule.warningDays) s.pocoWarn++;
-            });
-            cist.forEach(c => {
-                const days = getDiffDays(c.proximaLimpeza);
-                const s = getSedeIssue(c.sedeId);
-                if (days <= resRule.criticalDays) s.cistCrit++;
-                else if (days <= resRule.warningDays) s.cistWarn++;
-            });
-            caixas.forEach(c => {
-                const days = getDiffDays(c.proximaLimpeza);
-                const s = getSedeIssue(c.sedeId);
-                if (days <= resRule.criticalDays) s.caixaCrit++;
-                else if (days <= resRule.warningDays) s.caixaWarn++;
+            allReservatorios.forEach(item => {
+                const days = getDiffDays(item.proximaLimpeza);
+                const obj = getIssueObj(item.sedeId);
+                const tipo = item.tipo; // POCO, CISTERNA, CAIXA
+
+                if (days <= resRule.criticalDays) {
+                    if (tipo === 'POCO') obj.pocoCrit++;
+                    else if (tipo === 'CISTERNA') obj.cistCrit++;
+                    else if (tipo === 'CAIXA') obj.caixaCrit++;
+                } else if (days <= resRule.warningDays) {
+                    if (tipo === 'POCO') obj.pocoWarn++;
+                    else if (tipo === 'CISTERNA') obj.cistWarn++;
+                    else if (tipo === 'CAIXA') obj.caixaWarn++;
+                }
             });
         }
 
-        // Check Filtros
+        // Processar Filtros
         if (filtroRule && filtroRule.enabled) {
-            filtros.forEach(f => {
-                const days = getDiffDays(f.proximaTroca);
-                const s = getSedeIssue(f.sedeId);
-                if (days <= filtroRule.criticalDays) s.filtroCrit++;
-                else if (days <= filtroRule.warningDays) s.filtroWarn++;
+            // Deduplicate filtros (mesma lógica do dashboard)
+            const uniqueFiltros = Array.from(filtros.reduce((map, item) => {
+                const key = `${item.sedeId}-${item.patrimonio}`; 
+                const existing = map.get(key);
+                if (!existing || new Date(item.dataTroca) > new Date(existing.dataTroca)) map.set(key, item);
+                return map;
+            }, new Map<string, any>()).values());
+
+            uniqueFiltros.forEach(item => {
+                const days = getDiffDays(item.proximaTroca);
+                if (days <= filtroRule.criticalDays) getIssueObj(item.sedeId).filtCrit++;
+                else if (days <= filtroRule.warningDays) getIssueObj(item.sedeId).filtWarn++;
             });
         }
 
-        // Generate Notifications for HydroSys Aggregated
-        for (const [sedeId, issues] of issuesMap.entries()) {
-            const totalCrit = issues.pocoCrit + issues.cistCrit + issues.caixaCrit + issues.filtroCrit;
-            const totalWarn = issues.pocoWarn + issues.cistWarn + issues.caixaWarn + issues.filtroWarn;
+        // GERAR NOTIFICAÇÕES AGRUPADAS DETALHADAS
+        for (const [sedeId, counts] of Object.entries(issuesMap)) {
+            const totalCrit = counts.pocoCrit + counts.cistCrit + counts.caixaCrit + counts.filtCrit;
+            const totalWarn = counts.pocoWarn + counts.cistWarn + counts.caixaWarn + counts.filtWarn;
 
-            if (totalCrit > 0) {
+            if (totalCrit > 0 || totalWarn > 0) {
+                // Constroi mensagem detalhada
+                let parts = [];
+                
+                // Críticos
+                if (counts.pocoCrit > 0) parts.push(`${counts.pocoCrit} Poço(s) Venc.`);
+                if (counts.cistCrit > 0) parts.push(`${counts.cistCrit} Cisterna(s) Venc.`);
+                if (counts.caixaCrit > 0) parts.push(`${counts.caixaCrit} Caixa(s) Venc.`);
+                if (counts.filtCrit > 0) parts.push(`${counts.filtCrit} Filtros Venc.`);
+
+                // Warnings
+                if (counts.pocoWarn > 0) parts.push(`${counts.pocoWarn} Poço(s) Próx.`);
+                if (counts.cistWarn > 0) parts.push(`${counts.cistWarn} Cisterna(s) Próx.`);
+                if (counts.caixaWarn > 0) parts.push(`${counts.caixaWarn} Caixa(s) Próx.`);
+                if (counts.filtWarn > 0) parts.push(`${counts.filtWarn} Filtros Próx.`);
+
+                const message = parts.join(', ') + '.';
+                const isCritical = totalCrit > 0;
+
+                const notifId = `hydro-agg-${sedeId}`;
+
                 await notificationService.add({
-                    id: `hydro-crit-${sedeId}-${today.toISOString().split('T')[0]}`,
-                    title: `Ação Necessária: ${sedeId}`,
-                    message: `Existem ${totalCrit} itens vencidos ou críticos nesta unidade (Limpeza/Filtros).`,
-                    type: 'ERROR',
+                    id: notifId,
+                    title: isCritical ? `Atenção Crítica: ${sedeId}` : `Manutenção Prevista: ${sedeId}`,
+                    message: message,
+                    type: isCritical ? 'ERROR' : 'WARNING',
                     read: false,
                     timestamp: new Date(),
-                    link: `/module/hydrosys?sede=${sedeId}`,
-                    moduleSource: 'hydrosys'
-                });
-            } else if (totalWarn > 0) {
-                await notificationService.add({
-                    id: `hydro-warn-${sedeId}-${today.toISOString().split('T')[0]}`,
-                    title: `Atenção: ${sedeId}`,
-                    message: `Existem ${totalWarn} manutenções programadas para breve.`,
-                    type: 'WARNING',
-                    read: false,
-                    timestamp: new Date(),
-                    link: `/module/hydrosys?sede=${sedeId}`,
+                    link: `/module/hydrosys/reservatorios?sede=${sedeId}`, // URL filtrada
                     moduleSource: 'hydrosys'
                 });
             }
@@ -265,51 +283,52 @@ export const notificationService = {
     }
 
     // ==========================================
-    // 3. PEST CONTROL
+    // 3. PEST CONTROL (Individual com lógica de pragas)
     // ==========================================
     const pestEntries = await pestService.getAll(user);
-    // Filter pending/delayed
-    const activePest = pestEntries.filter(p => p.status !== 'REALIZADO');
+    
+    const rodentRule = rules.find(r => r.id === 'rule_pest_rodents');
+    const insectRule = rules.find(r => r.id === 'rule_pest_insects');
+    const vectorRule = rules.find(r => r.id === 'rule_pest_vector');
+    const generalRule = rules.find(r => r.id === 'rule_pest_general') || rules.find(r => r.id === 'rule_pest'); 
 
-    for (const entry of activePest) {
-        // Match specific rules or fallback
-        let rule = rules.find(r => r.id === 'rule_pest_general'); // Default
+    for (const entry of pestEntries) {
+        if (entry.status === 'REALIZADO' || entry.performedDate) continue; 
+
+        let activeRule = generalRule;
         const targetLower = entry.target.toLowerCase();
         
-        if (targetLower.includes('rato') || targetLower.includes('roedor')) {
-            rule = rules.find(r => r.id === 'rule_pest_rodents') || rule;
-        } else if (targetLower.includes('barata') || targetLower.includes('inseto') || targetLower.includes('escorpi')) {
-            rule = rules.find(r => r.id === 'rule_pest_insects') || rule;
-        } else if (targetLower.includes('mosquito') || targetLower.includes('muriçoca') || targetLower.includes('fumacê')) {
-            rule = rules.find(r => r.id === 'rule_pest_vector') || rule;
-        }
+        if (targetLower.includes('rato') || targetLower.includes('roedor')) activeRule = rodentRule;
+        else if (targetLower.includes('mosquito') || targetLower.includes('muriçoca') || targetLower.includes('vetor')) activeRule = vectorRule;
+        else if (targetLower.includes('barata') || targetLower.includes('formiga') || targetLower.includes('escorpião')) activeRule = insectRule;
 
-        if (rule && rule.enabled) {
-            const days = getDiffDays(entry.scheduledDate);
-            
-            if (days < 0) {
-                 await notificationService.add({
-                    id: `pest-crit-${entry.id}`,
-                    title: 'Serviço Atrasado',
-                    message: `${entry.item} (${entry.target}) em ${entry.sedeId} estava agendado para ${new Date(entry.scheduledDate).toLocaleDateString()}.`,
-                    type: 'ERROR',
-                    read: false,
-                    timestamp: new Date(),
-                    link: '/module/pestcontrol/execution',
-                    moduleSource: 'pestcontrol'
-                });
-            } else if (days <= rule.warningDays) {
-                await notificationService.add({
-                    id: `pest-warn-${entry.id}`,
-                    title: 'Serviço Agendado',
-                    message: `${entry.item} (${entry.target}) em ${entry.sedeId} previsto para ${days === 0 ? 'HOJE' : `daqui a ${days} dias`}.`,
-                    type: 'WARNING',
-                    read: false,
-                    timestamp: new Date(),
-                    link: '/module/pestcontrol/execution',
-                    moduleSource: 'pestcontrol'
-                });
-            }
+        if (!activeRule || !activeRule.enabled) continue;
+
+        const days = getDiffDays(entry.scheduledDate);
+        const link = '/module/pestcontrol/execution';
+        
+        if (days < 0) {
+            await notificationService.add({
+                id: `pest-crit-${entry.id}`,
+                title: 'Dedetização Atrasada',
+                message: `Serviço de ${entry.target} em ${entry.sedeId} está atrasado (${Math.abs(days)} dias).`,
+                type: 'ERROR',
+                read: false,
+                timestamp: new Date(),
+                link,
+                moduleSource: 'pestcontrol'
+            });
+        } else if (days <= activeRule.warningDays) {
+            await notificationService.add({
+                id: `pest-warn-${entry.id}`,
+                title: 'Dedetização Próxima',
+                message: `Serviço de ${entry.target} em ${entry.sedeId} agendado para ${days === 0 ? 'hoje' : 'daqui a ' + days + ' dias'}.`,
+                type: 'WARNING',
+                read: false,
+                timestamp: new Date(),
+                link,
+                moduleSource: 'pestcontrol'
+            });
         }
     }
   }
