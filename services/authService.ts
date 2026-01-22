@@ -428,23 +428,25 @@ export const authService = {
       } else {
           // Supabase Mode: Try Edge Function first
           try {
+              
+                          console.log('[ADMIN_RESET_PASSWORD] Attempting invoke:', { userId: targetUserId, passwordLength: newPassword.length });
               const { data, error } = await supabase.functions.invoke('admin-reset-password', {
                   body: { userId: targetUserId, newPassword: newPassword }
               });
 
               if (error) {
-                  console.error("Edge Function Failed:", error);
-                  // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
+console.error('[ADMIN_RESET_PASSWORD] Edge Function Error:', { error: error?.message, code: error?.name, userId: targetUserId });                  // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
                   await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
                   return { 
                       success: false, 
-                      error: "FALHA: É necessário configurar a Edge Function 'admin-reset-password' no Supabase para alterar a senha real." 
-                  };
+error: `Erro ao resetar senha: ${error?.message || 'Erro desconhecido'}. Verifique se a Edge Function 'admin-reset-password' está deployed no Supabase.`                  };
               }
 
               if (currentUser) {
                   logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha via Edge Function');
               }
+                          console.log('[ADMIN_RESET_PASSWORD] Success - Password reset completed for user:', targetUserId);
+              
               return { success: true };
 
           } catch (e) {
