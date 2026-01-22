@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   ClipboardList, X, Clock, User as UserIcon, Settings, 
-  Ruler, Gauge, AlertTriangle, Save 
+  Ruler, Gauge, AlertTriangle, Save, ArrowRight, ArrowLeft, AlertCircle 
 } from 'lucide-react';
 import { FichaPoco } from '../../types';
 
@@ -46,15 +46,21 @@ interface Props {
 export const ReservoirFichaModal: React.FC<Props> = ({ 
     isOpen, onClose, editItem, fichaData, setFichaData, onSave 
 }) => {
-    const [activeFichaTab, setActiveFichaTab] = React.useState<'GERAL' | 'DADOS' | 'CHECKLIST'>('GERAL');
+    const [activeFichaTab, setActiveFichaTab] = useState<'GERAL' | 'DADOS' | 'CHECKLIST'>('GERAL');
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     if (!isOpen || !editItem) return null;
 
     // Helper functions
-    const updateFicha = (field: keyof FichaPoco, value: any) => setFichaData(prev => ({ ...prev, [field]: value }));
+    const updateFicha = (field: keyof FichaPoco, value: any) => {
+        setErrorMsg(null); // Clear error on change
+        setFichaData(prev => ({ ...prev, [field]: value }));
+    };
+    
     const updateNestedFicha = (section: 'preLimpeza' | 'posLimpeza', field: string, value: string) => {
         setFichaData(prev => ({ ...prev, [section]: { ...prev[section], [field]: value } }));
     };
+    
     const toggleCheck = (listName: keyof typeof fichaData.checklist, item: string) => {
         setFichaData(prev => {
             const list = prev.checklist[listName] as string[];
@@ -62,20 +68,65 @@ export const ReservoirFichaModal: React.FC<Props> = ({
             return { ...prev, checklist: { ...prev.checklist, [listName]: newList } };
         });
     };
+    
     const toggleNecessidade = (item: string) => {
         setFichaData(prev => ({
             ...prev,
             necessidades: prev.necessidades.includes(item) ? prev.necessidades.filter(i => i !== item) : [...prev.necessidades, item]
         }));
     };
+    
     const updateMaterial = (idx: number, field: 'situacao' | 'obs', value: string) => {
         const newMats = [...fichaData.materiais];
         newMats[idx] = { ...newMats[idx], [field]: value };
         setFichaData(prev => ({ ...prev, materiais: newMats }));
     };
 
+    // --- NAVIGATION & VALIDATION LOGIC ---
+    const validateStep = (step: 'GERAL' | 'DADOS'): boolean => {
+        setErrorMsg(null);
+        if (step === 'GERAL') {
+            if (!fichaData.inicioLimpeza || !fichaData.terminoLimpeza) {
+                setErrorMsg("As datas de início e término são obrigatórias.");
+                return false;
+            }
+            if (!fichaData.supervisor || !fichaData.bombeiro) {
+                setErrorMsg("Supervisor e Bombeiro são obrigatórios.");
+                return false;
+            }
+        }
+        if (step === 'DADOS') {
+            // Check basic pump data presence
+            if (!fichaData.potenciaBomba || !fichaData.marcaBomba) {
+                setErrorMsg("Informe a Potência e Marca da bomba para prosseguir.");
+                return false;
+            }
+        }
+        return true;
+    };
+
+    const handleNext = () => {
+        if (activeFichaTab === 'GERAL') {
+            if (validateStep('GERAL')) setActiveFichaTab('DADOS');
+        } else if (activeFichaTab === 'DADOS') {
+            if (validateStep('DADOS')) setActiveFichaTab('CHECKLIST');
+        }
+    };
+
+    const handleBack = () => {
+        setErrorMsg(null);
+        if (activeFichaTab === 'CHECKLIST') setActiveFichaTab('DADOS');
+        else if (activeFichaTab === 'DADOS') setActiveFichaTab('GERAL');
+    };
+
+    const handleFinalSave = () => {
+        // Final Validation (Optional Checklist Check)
+        // Just ensuring logic flow is clean
+        onSave();
+    };
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-2 md:p-4">
             <div className="bg-white dark:bg-[#111114] w-full max-w-5xl h-full md:h-auto md:max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-300">
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex justify-between items-center shrink-0">
@@ -89,15 +140,15 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="hidden md:flex bg-slate-200 dark:bg-slate-800 p-1 rounded-lg">
-                            {['GERAL', 'DADOS', 'CHECKLIST'].map(t => (
-                                <button 
+                        {/* Stepper Indicator */}
+                        <div className="hidden md:flex bg-slate-100 dark:bg-slate-900 p-1 rounded-lg">
+                            {['GERAL', 'DADOS', 'CHECKLIST'].map((t, idx) => (
+                                <div 
                                     key={t}
-                                    onClick={() => setActiveFichaTab(t as any)}
-                                    className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all ${activeFichaTab === t ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                    className={`px-4 py-1.5 rounded-md text-[10px] font-bold uppercase transition-all flex items-center gap-2 ${activeFichaTab === t ? 'bg-white dark:bg-slate-700 shadow text-slate-900 dark:text-white' : 'text-slate-400'}`}
                                 >
-                                    {t}
-                                </button>
+                                    <span className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-[8px]">{idx + 1}</span> {t}
+                                </div>
                             ))}
                         </div>
                         <button onClick={onClose} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full text-slate-500"><X size={20}/></button>
@@ -112,39 +163,40 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Dates */}
                             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Clock size={14}/> Cronograma</h3>
+                                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Clock size={14}/> Cronograma (Obrigatório)</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Início Limpeza</label><input type="date" className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.inicioLimpeza} onChange={e => updateFicha('inicioLimpeza', e.target.value)} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Término Limpeza</label><input type="date" className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.terminoLimpeza} onChange={e => updateFicha('terminoLimpeza', e.target.value)} /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Início Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.inicioLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.inicioLimpeza} onChange={e => updateFicha('inicioLimpeza', e.target.value)} /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Término Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.terminoLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.terminoLimpeza} onChange={e => updateFicha('terminoLimpeza', e.target.value)} /></div>
                                 </div>
                             </div>
                             {/* Team */}
                             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><UserIcon size={14}/> Equipe Responsável</h3>
                                 <div className="grid grid-cols-1 gap-3">
-                                    <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Supervisor:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.supervisor} onChange={e => updateFicha('supervisor', e.target.value)} /></div>
+                                    <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Supervisor*:</span><input className={`flex-1 p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm ${!fichaData.supervisor && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.supervisor} onChange={e => updateFicha('supervisor', e.target.value)} /></div>
                                     <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Coord.:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.coordenador} onChange={e => updateFicha('coordenador', e.target.value)} /></div>
-                                    <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Bombeiro:</span><input className="flex-1 p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.bombeiro} onChange={e => updateFicha('bombeiro', e.target.value)} /></div>
+                                    <div className="flex items-center gap-2"><span className="text-[10px] font-bold uppercase w-20 text-slate-500">Bombeiro*:</span><input className={`flex-1 p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm ${!fichaData.bombeiro && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.bombeiro} onChange={e => updateFicha('bombeiro', e.target.value)} /></div>
                                 </div>
-                            </div>
-                        </div>
-
-                        {/* Pump Data */}
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Settings size={14}/> Especificações da Bomba</h3>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Profundidade (m)</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.profundidadeBomba} onChange={e => updateFicha('profundidadeBomba', e.target.value)} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Potência (cv)</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.potenciaBomba} onChange={e => updateFicha('potenciaBomba', e.target.value)} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Nº Estágios</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.numEstagios} onChange={e => updateFicha('numEstagios', e.target.value)} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Patrimônio</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-bold text-blue-600" value={fichaData.patrimonioBomba} onChange={e => updateFicha('patrimonioBomba', e.target.value)} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Marca</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.marcaBomba} onChange={e => updateFicha('marcaBomba', e.target.value)} /></div>
-                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Modelo</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.modeloBomba} onChange={e => updateFicha('modeloBomba', e.target.value)} /></div>
                             </div>
                         </div>
                     </div>
 
-                    {/* SECTION: DADOS TÉCNICOS (PRE/POS) */}
+                    {/* SECTION: DADOS TÉCNICOS (BOMBA/PRE/POS) */}
                     <div className={activeFichaTab === 'DADOS' ? 'block space-y-6' : 'hidden'}>
+                        
+                        {/* Pump Data - Moved Here */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Settings size={14}/> Especificações da Bomba (Obrigatório)</h3>
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Marca *</label><input className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm ${!fichaData.marcaBomba && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.marcaBomba} onChange={e => updateFicha('marcaBomba', e.target.value)} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Potência (cv) *</label><input className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.potenciaBomba && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.potenciaBomba} onChange={e => updateFicha('potenciaBomba', e.target.value)} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Modelo</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm" value={fichaData.modeloBomba} onChange={e => updateFicha('modeloBomba', e.target.value)} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Profundidade (m)</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.profundidadeBomba} onChange={e => updateFicha('profundidadeBomba', e.target.value)} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Nº Estágios</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono" value={fichaData.numEstagios} onChange={e => updateFicha('numEstagios', e.target.value)} /></div>
+                                <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Patrimônio</label><input className="w-full p-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-mono font-bold text-blue-600" value={fichaData.patrimonioBomba} onChange={e => updateFicha('patrimonioBomba', e.target.value)} /></div>
+                            </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* PRE */}
                             <div className="bg-amber-50/50 dark:bg-amber-900/10 p-5 rounded-2xl border border-amber-100 dark:border-amber-900/30">
@@ -274,14 +326,36 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                     </div>
                 </div>
 
-                {/* Footer Actions */}
-                <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex justify-between items-center shrink-0">
-                    <div className="text-xs text-slate-400 font-mono hidden md:block">Ultima atualização: {new Date().toLocaleDateString()}</div>
+                {/* Footer Actions (Dynamic Wizard Buttons) */}
+                <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex flex-col md:flex-row justify-between items-center shrink-0 gap-4 md:gap-0">
+                    
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        {errorMsg && (
+                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold animate-pulse">
+                                <AlertCircle size={16} /> {errorMsg}
+                            </div>
+                        )}
+                        {!errorMsg && <div className="text-xs text-slate-400 font-mono hidden md:block">Ultima atualização: {new Date().toLocaleDateString()}</div>}
+                    </div>
+
                     <div className="flex gap-3 w-full md:w-auto">
                         <button onClick={onClose} className="flex-1 md:flex-none px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-500 uppercase text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
-                        <button onClick={onSave} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all">
-                            <Save size={16} /> Salvar Ficha
-                        </button>
+                        
+                        {activeFichaTab !== 'GERAL' && (
+                            <button onClick={handleBack} className="flex-1 md:flex-none px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-bold text-slate-700 dark:text-slate-200 uppercase text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2">
+                                <ArrowLeft size={16} /> Voltar
+                            </button>
+                        )}
+
+                        {activeFichaTab === 'CHECKLIST' ? (
+                            <button onClick={handleFinalSave} className="flex-1 md:flex-none px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-105">
+                                <Save size={16} /> Salvar Ficha
+                            </button>
+                        ) : (
+                            <button onClick={handleNext} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-105">
+                                Próximo <ArrowRight size={16} />
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>

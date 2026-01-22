@@ -12,7 +12,8 @@ import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
 import { EmptyState } from '../Shared/EmptyState';
-import { ReservoirFichaModal } from './ReservoirFichaModal'; // IMPORTED
+import { ReservoirFichaModal } from './ReservoirFichaModal';
+import { useToast } from '../Shared/ToastContext';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 
@@ -52,6 +53,7 @@ const INITIAL_FICHA: FichaPoco = {
 export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<Tab>('pocos');
   
   // Data
@@ -141,6 +143,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       
       await refreshData();
       setIsModalOpen(false);
+      addToast("Reservatório atualizado com sucesso.", "success");
   };
 
   const handleSaveFicha = async () => {
@@ -149,6 +152,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       // Calcular Data de Validade baseada no término da limpeza e na CONFIGURAÇÃO
       let nextLimpeza = editItem.proximaLimpeza;
       let statusLimpeza = editItem.situacaoLimpeza;
+      let feedbackMsg = "Ficha técnica salva com sucesso.";
 
       if (fichaData.terminoLimpeza) {
           const end = new Date(fichaData.terminoLimpeza);
@@ -159,6 +163,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           
           nextLimpeza = end.toISOString().split('T')[0];
           statusLimpeza = getComputedStatus(nextLimpeza);
+          
+          const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
+          feedbackMsg = `Ficha salva! Próxima limpeza agendada para ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
       }
 
       // Update basic fields from Ficha
@@ -175,6 +182,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       await hydroService.savePoco(updatedPoco);
       await refreshData();
       setIsFichaOpen(false);
+      addToast(feedbackMsg, "success");
   };
 
   // --- HISTORY ---
