@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe, Lock, MoreVertical } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Trash2, Edit2, Shield, X, User as UserIcon, Building, Key, Copy, Check, Save, Map, MapPin, AlertCircle, Terminal, MailWarning, Globe, Lock, MoreVertical, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
@@ -32,6 +32,7 @@ export const AdminUserManagement: React.FC = () => {
   const [resetModalOpen, setResetModalOpen] = useState(false);
   const [userToReset, setUserToReset] = useState<User | null>(null);
   const [newGeneratedPassword, setNewGeneratedPassword] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false); // Loading state for reset
 
   // Form State
   const initialFormState: Partial<User> = {
@@ -143,17 +144,21 @@ export const AdminUserManagement: React.FC = () => {
       }
       setUserToReset(user);
       setNewGeneratedPassword(null);
+      setIsResetting(false);
       setResetModalOpen(true);
   };
 
   const confirmResetPassword = async () => {
       if (userToReset) {
+          setIsResetting(true);
           const randomPass = Math.random().toString(36).slice(-8).toUpperCase();
           const result = await authService.adminResetPassword(userToReset.id, randomPass);
+          setIsResetting(false);
+          
           if (result.success) {
               setNewGeneratedPassword(randomPass);
           } else {
-              addToast("Erro ao resetar senha. Verifique conexão.", "error");
+              addToast(result.error || "Erro ao resetar senha. Verifique conexão.", "error");
           }
       }
   };
@@ -162,6 +167,7 @@ export const AdminUserManagement: React.FC = () => {
       setResetModalOpen(false);
       setUserToReset(null);
       setNewGeneratedPassword(null);
+      setIsResetting(false);
   };
 
   const validateForm = () => {
@@ -561,7 +567,16 @@ export const AdminUserManagement: React.FC = () => {
                           <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-500 flex items-center justify-center mx-auto mb-6"><Key size={32} /></div>
                           <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">Resetar Senha</h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mb-8">Gerar nova senha para <strong>{userToReset.name}</strong>?<br/>A senha anterior será invalidada.</p>
-                          <div className="grid grid-cols-2 gap-3"><button onClick={closeResetModal} className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 transition-colors uppercase">Cancelar</button><button onClick={confirmResetPassword} className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs font-bold transition-colors uppercase">Gerar Nova Senha</button></div>
+                          <div className="grid grid-cols-2 gap-3">
+                              <button onClick={closeResetModal} className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 transition-colors uppercase">Cancelar</button>
+                              <button 
+                                onClick={confirmResetPassword} 
+                                disabled={isResetting}
+                                className="py-3 bg-amber-600 hover:bg-amber-700 text-white font-mono text-xs font-bold transition-colors uppercase flex items-center justify-center gap-2"
+                              >
+                                {isResetting ? <Loader2 size={14} className="animate-spin" /> : 'Gerar Nova Senha'}
+                              </button>
+                          </div>
                       </div>
                   )}
               </div>

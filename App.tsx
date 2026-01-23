@@ -18,7 +18,7 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false };
@@ -77,8 +77,7 @@ const AdminNotificationConfig = lazyImport(() => import('./components/AdminNotif
 const AuditLogs = lazyImport(() => import('./components/AuditLogs'), 'AuditLogs');
 
 // HydroSys Components
-// CORREÇÃO: Caminho atualizado para a pasta HydroSys
-const HydroSysDashboard = lazyImport(() => import('./components/HydroSys/HydroSysDashboard'), 'HydroSysDashboard');
+const HydroSysDashboard = lazyImport(() => import('./components/HydroSysDashboard'), 'HydroSysDashboard');
 const HydroCertificados = lazyImport(() => import('./components/HydroSys/HydroCertificados'), 'HydroCertificados');
 const HydroCloro = lazyImport(() => import('./components/HydroSys/HydroCloro'), 'HydroCloro');
 const HydroFiltros = lazyImport(() => import('./components/HydroSys/HydroFiltros'), 'HydroFiltros');
