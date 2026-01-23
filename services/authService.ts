@@ -431,6 +431,7 @@ export const authService = {
               
                           console.log('[ADMIN_RESET_PASSWORD] Attempting invoke:', { userId: targetUserId, passwordLength: newPassword.length });
               const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                              headers: { 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}` },
                   body: { userId: targetUserId, newPassword: newPassword }
               });
 
