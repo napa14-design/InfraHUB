@@ -428,10 +428,9 @@ export const authService = {
       } else {
           // Supabase Mode: Try Edge Function first
           try {
-              const { data, error } = await supabase.functions.invoke('admin-reset-password', {
-                  body: { userId: targetUserId, newPassword: newPassword }
-              });
-
+const { data: result, error } = await supabase.functions.invoke('super-function', {
+        body: { action: 'admin_reset_password', userId: targetUserId, newPassword: newPassword }
+      });
               if (error) {
                   console.error("Edge Function Failed:", error);
                   // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
