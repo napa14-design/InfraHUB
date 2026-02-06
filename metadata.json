@@ -1,0 +1,5 @@
+{
+  "name": "InfraHub",
+  "description": "Hub centralizado de aplicações internas para gestáo corporativa com controle de acesso baseado em perfis.",
+  "requestFramePermissions": []
+}
