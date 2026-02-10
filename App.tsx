@@ -185,7 +185,7 @@ const App: React.FC = () => {
             logger.warn("Session check failed", e);
         }
 
-        await orgService.initialize();
+        const orgInit = orgService.initialize();
 
         const currentUser = await authService.refreshSessionUser();
         if (currentUser) {
@@ -194,6 +194,7 @@ const App: React.FC = () => {
             logger.log('[App] No user session found.');
         }
         setUser(currentUser);
+        orgInit.catch(() => undefined);
         
         // PWA Initial Detection for Login Redirect
         const params = new URLSearchParams(window.location.search);
@@ -216,6 +217,7 @@ const App: React.FC = () => {
       }
       const refreshed = await authService.refreshSessionUser();
       setUser(refreshed);
+      orgService.initialize().catch(() => undefined);
     });
 
     return () => {
@@ -225,7 +227,7 @@ const App: React.FC = () => {
 
   const handleLogin = async (userToSet: User) => {
     setUser(userToSet);
-    await orgService.initialize();
+    orgService.initialize().catch(() => undefined);
     return true;
   };
 

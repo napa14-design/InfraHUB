@@ -15,6 +15,8 @@ let cache = {
 };
 
 let usingMocks = false;
+let hasSupabaseData = false;
+let initPromise: Promise<void> | null = null;
 
 const getCurrentUser = () => authService.getCurrentUser();
 
@@ -33,7 +35,15 @@ const withTimeout = async <T>(promise: Promise<T>, ms = 8000): Promise<T> => {
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
   initialize: async () => {
+    if (initPromise) return initPromise;
+    initPromise = (async () => {
     usingMocks = false;
+    const hadData =
+      cache.orgs.length > 0 ||
+      cache.regions.length > 0 ||
+      cache.sedes.length > 0 ||
+      cache.locais.length > 0 ||
+      hasSupabaseData;
     try {
       if (!isSupabaseConfigured()) {
           logger.warn("Supabase not configured. Using Mock Data for OrgService.");
@@ -89,14 +99,26 @@ export const orgService = {
       }
 
       logger.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
+      hasSupabaseData = true;
 
     } catch (err) {
+      if (hadData) {
+        logger.warn("OrgService fallback: mantendo cache anterior por erro ou timeout.");
+        return;
+      }
       logger.log("Using Fallback Data for OrgService due to error or config.");
       usingMocks = true;
       cache.orgs = MOCK_ORGS;
       cache.regions = MOCK_REGIONS;
       cache.sedes = MOCK_SEDES;
       cache.locais = MOCK_LOCAIS;
+    }
+    })();
+
+    try {
+      await initPromise;
+    } finally {
+      initPromise = null;
     }
   },
 
