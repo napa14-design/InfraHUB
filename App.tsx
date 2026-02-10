@@ -172,6 +172,7 @@ const PWANavigator = ({ user }: { user: User | null }) => {
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [booting, setBooting] = useState(false);
   const [redirectPath, setRedirectPath] = useState<string>('/');
 
   useEffect(() => {
@@ -180,7 +181,7 @@ const App: React.FC = () => {
     if (cachedUser) {
         logger.log('[App] Cached user detected:', cachedUser.email);
         setUser(cachedUser);
-        orgService.initialize(cachedUser).catch(() => undefined);
+        setBooting(true);
     }
 
     // PWA Initial Detection for Login Redirect
@@ -198,13 +199,15 @@ const App: React.FC = () => {
             if (currentUser) {
                 logger.log('[App] User refreshed:', currentUser.email);
                 setUser(currentUser);
-                orgService.initialize(currentUser).catch(() => undefined);
+                await orgService.initialize(currentUser);
             } else if (!cachedUser) {
                 logger.log('[App] No user session found.');
                 setUser(null);
             }
         } catch (e) {
             logger.warn("Session refresh failed", e);
+        } finally {
+            if (cachedUser) setBooting(false);
         }
     };
 
@@ -231,8 +234,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogin = async (userToSet: User) => {
+    setBooting(true);
     setUser(userToSet);
-    orgService.initialize(userToSet).catch(() => undefined);
+    try {
+      await orgService.initialize(userToSet);
+    } finally {
+      setBooting(false);
+    }
     return true;
   };
 
@@ -270,7 +278,10 @@ const App: React.FC = () => {
                     path="*"
                     element={
                       user ? (
-                        <Layout user={user} onLogout={handleLogout}>
+                        booting ? (
+                          <PageLoader />
+                        ) : (
+                          <Layout user={user} onLogout={handleLogout}>
                           <ErrorBoundary>
                             <Suspense fallback={<PageLoader />}>
                               <Routes>
@@ -305,6 +316,7 @@ const App: React.FC = () => {
                             </Suspense>
                           </ErrorBoundary>
                         </Layout>
+                        )
                       ) : (
                         <Navigate to="/login" replace />
                       )
