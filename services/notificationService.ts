@@ -10,6 +10,9 @@ import { diffDaysFromToday } from '../utils/dateUtils';
 
 // Evento customizado para notificar a UI
 const NOTIFICATION_UPDATE_EVENT = 'nexus_notification_update';
+const STATUS_CHECK_MIN_INTERVAL_MS = 30000;
+let statusCheckInFlight: Promise<void> | null = null;
+let lastStatusCheck = 0;
 
 export const notificationService = {
   // Dispara o evento para o Layout recarregar
@@ -111,7 +114,11 @@ export const notificationService = {
   checkSystemStatus: async (user: User) => {
     // Operacionais não veem NOTIFICAÇÕES de sistema, apenas Gestores e Admins
     if (user.role === UserRole.OPERATIONAL) return;
+    const now = Date.now();
+    if (statusCheckInFlight) return statusCheckInFlight;
+    if (now - lastStatusCheck < STATUS_CHECK_MIN_INTERVAL_MS) return;
 
+    statusCheckInFlight = (async () => {
     const rules = await configService.getNotificationRules();
     const today = new Date();
     today.setHours(0,0,0,0);
@@ -326,6 +333,14 @@ export const notificationService = {
                 moduleSource: 'pestcontrol'
             });
         }
+    }
+    })();
+
+    try {
+      await statusCheckInFlight;
+    } finally {
+      statusCheckInFlight = null;
+      lastStatusCheck = Date.now();
     }
   }
 };

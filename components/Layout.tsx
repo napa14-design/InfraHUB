@@ -85,9 +85,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
   const unreadCount = notifications.filter(n => !n.read).length;
   const hasCritical = notifications.some(n => n.type === 'ERROR' && !n.read);
 
-  const fetchNotifications = async () => {
-      // 1. Run checks (Async)
-      await notificationService.checkSystemStatus(user);
+  const fetchNotifications = async (runCheck = false) => {
+      if (runCheck) {
+        // 1. Run checks (Async)
+        await notificationService.checkSystemStatus(user);
+      }
       // 2. Fetch recent (Async)
       const data = await notificationService.getAll();
       setNotifications(data);
@@ -114,17 +116,17 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         // Request Permission for Mobile Push / Desktop Notifications
         notificationService.requestPermission();
 
-        fetchNotifications();
+        fetchNotifications(true);
         
         // REAL-TIME LISTENER
         // This listens for events dispatched by notificationService.notifyRefresh()
         const unsubscribe = notificationService.onRefresh(() => {
-            fetchNotifications();
+            fetchNotifications(false);
         });
 
         // Polling every minute as backup
         const interval = setInterval(() => {
-          fetchNotifications();
+          fetchNotifications(true);
         }, 60000);
         
         return () => {
@@ -132,7 +134,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
             unsubscribe();
         };
     }
-  }, [user, canViewAlerts]);
+  }, [user.id, canViewAlerts]);
 
   const handleLogout = () => {
     authService.logout();
