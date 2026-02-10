@@ -221,7 +221,14 @@ export const hydroService = {
   getCertificados: async (user: User): Promise<HydroCertificado[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_certificados').select('*');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_certificados')
+            .select('id,sede_id,parceiro,status,semestre,validade_semestre,data_analise,validade,link_micro,link_fisico,empresa,agendamento,observacao');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapCertificadoFromDB);
         return filterByScope(mapped, user);
@@ -253,7 +260,14 @@ export const hydroService = {
   getCloro: async (user: User): Promise<HydroCloroEntry[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_cloro').select('*');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_cloro')
+            .select('id,sede_id,date,cl,ph,medida_corretiva,responsavel,photo_url');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapCloroFromDB);
         return filterByScope(mapped, user);
@@ -278,7 +292,14 @@ export const hydroService = {
   getFiltros: async (user: User): Promise<HydroFiltro[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_filtros').select('*');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_filtros')
+            .select('id,sede_id,patrimonio,bebedouro,local,data_troca,proxima_troca');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapFiltroFromDB);
         return filterByScope(mapped, user);
@@ -310,7 +331,15 @@ export const hydroService = {
   getPocos: async (user: User): Promise<HydroPoco[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'POCO');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_reservatorios')
+            .select('id,sede_id,tipo,local,responsavel,data_ultima_limpeza,proxima_limpeza,situacao_limpeza,bairro,referencia_bomba,ficha_operacional,dados_ficha,ultima_troca_filtro,proxima_troca_filtro,situacao_filtro,refil,num_celulas,capacidade,previsao_limpeza_1,data_limpeza_1,previsao_limpeza_2,data_limpeza_2')
+            .eq('tipo', 'POCO');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapReservatorioFromDB);
         return filterByScope(mapped as HydroPoco[], user);
@@ -348,7 +377,15 @@ export const hydroService = {
   getCisternas: async (user: User): Promise<HydroCisterna[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'CISTERNA');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_reservatorios')
+            .select('id,sede_id,tipo,local,responsavel,data_ultima_limpeza,proxima_limpeza,situacao_limpeza,bairro,referencia_bomba,ficha_operacional,dados_ficha,ultima_troca_filtro,proxima_troca_filtro,situacao_filtro,refil,num_celulas,capacidade,previsao_limpeza_1,data_limpeza_1,previsao_limpeza_2,data_limpeza_2')
+            .eq('tipo', 'CISTERNA');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapReservatorioFromDB);
         return filterByScope(mapped as HydroCisterna[], user);
@@ -370,7 +407,15 @@ export const hydroService = {
   getCaixas: async (user: User): Promise<HydroCaixa[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data, error } = await supabase.from('hydro_reservatorios').select('*').eq('tipo', 'CAIXA');
+        if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+            return [];
+        }
+        const query = supabase
+            .from('hydro_reservatorios')
+            .select('id,sede_id,tipo,local,responsavel,data_ultima_limpeza,proxima_limpeza,situacao_limpeza,bairro,referencia_bomba,ficha_operacional,dados_ficha,ultima_troca_filtro,proxima_troca_filtro,situacao_filtro,refil,num_celulas,capacidade,previsao_limpeza_1,data_limpeza_1,previsao_limpeza_2,data_limpeza_2')
+            .eq('tipo', 'CAIXA');
+        const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+        const { data, error } = await scopedQuery;
         if (error) throw error;
         const mapped = (data || []).map(mapReservatorioFromDB);
         return filterByScope(mapped as HydroCaixa[], user);
@@ -392,7 +437,10 @@ export const hydroService = {
   getSettings: async (): Promise<HydroSettings> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
-        const { data } = await supabase.from('hydro_settings').select('*').single();
+        const { data } = await supabase
+            .from('hydro_settings')
+            .select('validade_certificado_meses,validade_filtro_meses,validade_limpeza_caixa,validade_limpeza_cisterna,validade_limpeza_poco,validade_limpeza_meses,cloro_min,cloro_max,ph_min,ph_max')
+            .single();
         if (data) return mapSettingsFromDB(data);
         throw new Error("No settings");
     } catch (e) {

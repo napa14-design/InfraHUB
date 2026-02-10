@@ -98,7 +98,14 @@ export const pestService = {
     getAll: async (user: User): Promise<PestControlEntry[]> => {
         try {
             if (!isSupabaseConfigured()) throw new Error("Mock");
-            const { data, error } = await supabase.from('pest_control_entries').select('*');
+            if (user.role !== UserRole.ADMIN && (!user.sedeIds || user.sedeIds.length === 0)) {
+                return [];
+            }
+            const query = supabase
+                .from('pest_control_entries')
+                .select('id,sede_id,item,target,product,frequency,method,technician,scheduled_date,performed_date,observation,status,photo_url');
+            const scopedQuery = user.role === UserRole.ADMIN ? query : query.in('sede_id', user.sedeIds || []);
+            const { data, error } = await scopedQuery;
             if (error) throw error;
             const mapped = (data || []).map(mapEntryFromDB);
             if (user.role === UserRole.ADMIN) return mapped;
@@ -112,7 +119,10 @@ export const pestService = {
     getSettings: async (): Promise<PestControlSettings> => {
         try {
             if (!isSupabaseConfigured()) throw new Error("Mock");
-            const { data } = await supabase.from('pest_control_settings').select('*').single();
+            const { data } = await supabase
+                .from('pest_control_settings')
+                .select('pest_types,technicians_list,technicians,global_frequencies,sede_frequencies')
+                .single();
             if (data) {
                 // Mapeamento Inteligente
                 let techs: PestTechnician[] = [];
@@ -260,7 +270,7 @@ export const pestService = {
         
         if (isSupabaseConfigured()) {
             // First get the item to log what was deleted
-            const { data } = await supabase.from('pest_control_entries').select('*').eq('id', id).single();
+            const { data } = await supabase.from('pest_control_entries').select('target').eq('id', id).single();
             await supabase.from('pest_control_entries').delete().eq('id', id);
             
             if(u && data) {
