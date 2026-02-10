@@ -176,36 +176,39 @@ const App: React.FC = () => {
 
   useEffect(() => {
     logger.log('[App] Initializing...');
-    const initApp = async () => {
+    const cachedUser = authService.getCurrentUser();
+    if (cachedUser) {
+        logger.log('[App] Cached user detected:', cachedUser.email);
+        setUser(cachedUser);
+        orgService.initialize(cachedUser).catch(() => undefined);
+    }
+
+    // PWA Initial Detection for Login Redirect
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'cloro') {
+        setRedirectPath('/module/hydrosys/cloro');
+    }
+
+    // Render rápido com cache (evita espera longa em refresh)
+    setLoading(false);
+
+    const refresh = async () => {
         try {
-            if (isSupabaseConfigured()) {
-                await supabase.auth.getSession();
+            const currentUser = await authService.refreshSessionUser();
+            if (currentUser) {
+                logger.log('[App] User refreshed:', currentUser.email);
+                setUser(currentUser);
+                orgService.initialize(currentUser).catch(() => undefined);
+            } else if (!cachedUser) {
+                logger.log('[App] No user session found.');
+                setUser(null);
             }
         } catch (e) {
-            logger.warn("Session check failed", e);
+            logger.warn("Session refresh failed", e);
         }
-
-        const currentUser = await authService.refreshSessionUser();
-        if (currentUser) {
-            logger.log('[App] User found:', currentUser.email);
-        } else {
-            logger.log('[App] No user session found.');
-        }
-        setUser(currentUser);
-        if (currentUser) {
-            orgService.initialize(currentUser).catch(() => undefined);
-        }
-        
-        // PWA Initial Detection for Login Redirect
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('mode') === 'cloro') {
-            setRedirectPath('/module/hydrosys/cloro');
-        }
-
-        setLoading(false);
     };
 
-    initApp();
+    refresh();
   }, []);
 
   useEffect(() => {
