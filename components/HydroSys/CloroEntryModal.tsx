@@ -8,6 +8,7 @@ import { HydroCloroEntry, HydroSettings, User } from '../../types';
 import { compressImage } from '../../utils/imageUtils';
 import { hydroService } from '../../services/hydroService';
 import { formatDate } from '../../utils/formatters';
+import { logger } from '../../utils/logger';
 
 interface Props {
     isOpen: boolean;
@@ -93,7 +94,7 @@ export const CloroEntryModal: React.FC<Props> = ({
             if (url) setForm(prev => ({ ...prev, photoUrl: url }));
             else alert("Erro no upload da imagem.");
         } catch (err) {
-            console.error("Erro upload/compressão:", err);
+            logger.error("Erro upload/compressão:", err);
             alert("Erro ao processar imagem. Tente uma menor.");
         } finally {
             setIsUploading(false);

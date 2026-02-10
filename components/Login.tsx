@@ -5,9 +5,10 @@ import { authService } from '../services/authService';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
+import { User } from '../types';
 
 interface LoginProps {
-  onLogin: (email: string) => Promise<boolean>;
+  onLogin: (user: User) => Promise<boolean>;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -62,7 +63,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       if (result.user) {
-         await onLogin(result.user.email);
+         await onLogin(result.user);
       }
 
     } catch (err) {

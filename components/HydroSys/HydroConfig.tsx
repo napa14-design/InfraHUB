@@ -63,7 +63,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
 
     await hydroService.saveSettings(settings);
     setSaved(true);
-    addToast("CONFIGURAÇÕES atualizadas com sucesso.", "success");
+    addToast("Configurações atualizadas com sucesso.", "success");
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -122,7 +122,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                             <div>
                                 <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight font-mono">
-                                    CONFIGURAÇÕES
+                                    Configurações
                                 </h1>
                                 <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">
                                     Parâmetros e Automação.
@@ -163,7 +163,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                             onChange={(v: number) => setSettings({...settings, validadeFiltroMeses: v})} 
                         />
                         
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2">reservatórios (Limpeza)</div>
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-6 mb-2">Reservatórios (Limpeza)</div>
                         <CycleItem 
                             label="Caixa D'água" 
                             icon={Box}

@@ -5,6 +5,7 @@ import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS }
 import { logService } from './logService';
 import { authService } from './authService';
 import { notificationService } from './notificationService';
+import { logger } from '../utils/logger';
 
 // Cache em memória para Cloro quando offline/mock
 let MOCK_CLORO_CACHE: HydroCloroEntry[] = [];
@@ -206,7 +207,7 @@ export const hydroService = {
           });
       
       if (error) {
-          console.error("Erro upload:", error);
+          logger.error("Erro upload:", error);
           throw error;
       }
       
@@ -412,6 +413,6 @@ export const hydroService = {
   saveSettings: async (settings: HydroSettings) => {
     if (isSupabaseConfigured()) await supabase.from('hydro_settings').upsert(mapSettingsToDB(settings));
     const u = getCurrentUserForLog();
-    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `CONFIGURAÇÕES Gerais`, `Padrões Atualizados`);
+    if(u) logService.logAction(u, 'HYDROSYS', 'UPDATE', `Configurações Gerais`, `Padrões Atualizados`);
   }
 };

@@ -163,7 +163,7 @@ export const MOCK_RULES: NotificationRule[] = [
   {
     id: 'rule_res',
     moduleId: 'hydrosys',
-    name: 'Limpeza de reservatórios',
+    name: 'Limpeza de Reservatórios',
     description: 'Monitora datas de limpeza de Caixas e Cisternas.',
     warningDays: 30,
     criticalDays: 7,
@@ -206,7 +206,7 @@ export const INITIAL_MODULES: AppModule[] = [
   },
   {
     id: 'user-management',
-    title: 'Gestão de usuários',
+    title: 'Gestão de Usuários',
     description: 'Controle de acesso, criação e auditoria de contas.',
     iconName: 'Users',
     minRole: UserRole.ADMIN,
@@ -318,14 +318,14 @@ export const HYDROSYS_SUBMODULES = [
   },
   {
     id: 'hs-filtros',
-    title: 'manutenção de Filtros',
+    title: 'Manutenção de Filtros',
     description: 'Cronograma e troca de elementos filtrantes.',
     iconName: 'Filter',
     roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
   },
   {
     id: 'hs-limpeza',
-    title: 'Limpeza de reservatório',
+    title: 'Limpeza de Reservatórios',
     description: 'Agendamento e laudos de higienização.',
     iconName: 'Droplet',
     roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
@@ -357,7 +357,7 @@ export const PESTCONTROL_SUBMODULES = [
   },
   {
     id: 'pc-config',
-    title: 'Configuração',
+    title: 'Configurações',
     description: 'Regras e períodos de serviço.',
     iconName: 'Settings',
     roles: [UserRole.ADMIN]

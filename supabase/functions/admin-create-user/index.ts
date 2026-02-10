@@ -1,9 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-type ResetBody = {
-  userId?: string;
-  newPassword?: string;
+type CreateUserBody = {
+  user?: {
+    email?: string;
+    name?: string;
+    role?: string;
+    organizationId?: string | null;
+    regionId?: string | null;
+    sedeIds?: string[];
+  };
+  password?: string;
 };
 
 const allowedOrigins = (Deno.env.get("CORS_ORIGINS") || "")
@@ -92,59 +99,85 @@ serve(async (req) => {
 
     if (profile.role !== "ADMIN") {
       return new Response(
-        JSON.stringify({ error: "Only ADMIN can reset passwords" }),
+        JSON.stringify({ error: "Only ADMIN can create users" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const body = (await req.json().catch(() => ({}))) as ResetBody;
-    const userId = body.userId;
-    const newPassword = body.newPassword;
+    const body = (await req.json().catch(() => ({}))) as CreateUserBody;
+    const payload = body.user || {};
+    const email = payload.email || "";
+    const password = body.password || "";
+    const role = payload.role || "OPERATIONAL";
 
-    if (!userId || !newPassword) {
+    if (!email || !password) {
       return new Response(
-        JSON.stringify({ error: "Missing userId or newPassword" }),
+        JSON.stringify({ error: "Missing email or password" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    if (newPassword.length < 6) {
+    if (password.length < 6) {
       return new Response(
         JSON.stringify({ error: "Password must be at least 6 characters" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: newPassword },
-    );
+    const { data: created, error: createError } =
+      await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: false,
+        user_metadata: {
+          name: payload.name,
+          role,
+        },
+      });
 
-    if (updateError) {
+    if (createError || !created?.user) {
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: createError?.message || "Failed to create user" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const { error: profileUpdateError } = await supabaseAdmin
+    const userId = created.user.id;
+    const { error: profileInsertError } = await supabaseAdmin
       .from("profiles")
-      .update({ is_first_login: true })
-      .eq("id", userId);
+      .upsert({
+        id: userId,
+        email,
+        name: payload.name || "Novo usuário",
+        role,
+        organization_id: payload.organizationId || null,
+        region_id: payload.regionId || null,
+        sede_ids: payload.sedeIds || [],
+        status: "ACTIVE",
+        is_first_login: true,
+      })
+      .select()
+      .single();
 
-    if (profileUpdateError) {
+    if (profileInsertError) {
       return new Response(
-        JSON.stringify({
-          error: "Password updated, but failed to flag first login.",
-        }),
+        JSON.stringify({ error: "Failed to create profile" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    return new Response(JSON.stringify({ message: "Password updated" }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const emailConfirmationRequired = !created.user.email_confirmed_at;
+
+    return new Response(
+      JSON.stringify({
+        id: userId,
+        email,
+        warning: emailConfirmationRequired
+          ? "Este usuário requer confirmação de e-mail antes de logar."
+          : undefined,
+      }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
   } catch (error) {
     return new Response(
       JSON.stringify({ error: error?.message || "Unexpected error" }),

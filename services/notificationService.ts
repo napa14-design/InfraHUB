@@ -5,6 +5,8 @@ import { pestService } from './pestService';
 import { configService } from './configService';
 import { orgService } from './orgService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { logger } from '../utils/logger';
+import { diffDaysFromToday } from '../utils/dateUtils';
 
 // Evento customizado para notificar a UI
 const NOTIFICATION_UPDATE_EVENT = 'nexus_notification_update';
@@ -47,7 +49,7 @@ export const notificationService = {
             module_source: notification.moduleSource,
             timestamp: notification.timestamp.toISOString()
         });
-        if (error) console.error("Erro ao criar notificação", error);
+        if (error) logger.error("Erro ao criar notificação", error);
     }
     if (notification.type === 'ERROR' && !notification.read) {
         notificationService.sendBrowserNotification(notification);
@@ -103,7 +105,7 @@ export const notificationService = {
               window.focus();
               if (notification.link) window.location.href = `/#${notification.link}`;
           };
-      } catch (e) { console.error(e); }
+      } catch (e) { logger.error(e); }
   },
 
   checkSystemStatus: async (user: User) => {
@@ -114,13 +116,7 @@ export const notificationService = {
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    const getDiffDays = (dateStr: string) => {
-        if (!dateStr) return 999;
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const target = new Date(year, month - 1, day);
-        const diff = target.getTime() - today.getTime();
-        return Math.ceil(diff / (1000 * 60 * 60 * 24));
-    };
+    const getDiffDays = (dateStr: string) => diffDaysFromToday(dateStr);
 
     // ==========================================
     // 1. HYDROSYS CERTIFICADOS (Individual)

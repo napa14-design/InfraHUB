@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Filter, AlertTriangle, CheckCircle, Clock, RotateCw, X, Plus, Trash2, Building2, MapPin, History, ArrowLeft, Calendar, User as UserIcon, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroFiltro, UserRole, Sede, LogEntry } from '../../types';
+import { User, HydroFiltro, UserRole, Sede, LogEntry, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
@@ -12,6 +12,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const [data, setData] = useState<HydroFiltro[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   // Filters
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
@@ -36,9 +37,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const initialNewFilter: Partial<HydroFiltro> = { sedeId: '', patrimonio: '', local: '', dataTroca: '', bebedouro: 'Bebedouro' };
   const [newFilter, setNewFilter] = useState<Partial<HydroFiltro>>(initialNewFilter);
 
-  useEffect(() => { loadData(); loadSedes(); }, [user]);
+  useEffect(() => { loadData(); loadSedes(); loadSettings(); }, [user]);
 
   const loadData = async () => setData(await hydroService.getFiltros(user));
+  const loadSettings = async () => setSettings(await hydroService.getSettings());
   const loadSedes = () => {
       const allSedes = orgService.getSedes();
       setAvailableSedes(user.role === UserRole.ADMIN ? allSedes : allSedes.filter(s => (user.sedeIds || []).includes(s.id)));
@@ -46,6 +48,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
 
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
   const isAdmin = user.role === UserRole.ADMIN;
+  const filtroMonths = settings?.validadeFiltroMeses || 6;
   
   const getDaysRemaining = (dateStr: string) => {
     if (!dateStr) return 999;
@@ -61,7 +64,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const handleExchangeClick = (item: HydroFiltro) => {
     setSelectedItem(item);
     const today = new Date();
-    const next = new Date(); next.setMonth(next.getMonth() + 6);
+    const next = new Date(); next.setMonth(next.getMonth() + filtroMonths);
     setTodayDate(today.toISOString().split('T')[0]);
     setNextDate(next.toISOString().split('T')[0]);
     setIsExchangeModalOpen(true);
@@ -96,7 +99,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
 
   const confirmAdd = async () => {
       if (newFilter.sedeId && newFilter.patrimonio && newFilter.local && newFilter.dataTroca) {
-          const next = new Date(newFilter.dataTroca); next.setMonth(next.getMonth() + 6);
+          const next = new Date(newFilter.dataTroca); next.setMonth(next.getMonth() + filtroMonths);
           await hydroService.saveFiltro({
               id: Date.now().toString(),
               sedeId: newFilter.sedeId,
@@ -249,10 +252,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data Realização</label>
-                            <input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={todayDate} onChange={e => { setTodayDate(e.target.value); const n = new Date(e.target.value); n.setMonth(n.getMonth()+6); setNextDate(n.toISOString().split('T')[0]); }} />
+                        <input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={todayDate} onChange={e => { setTodayDate(e.target.value); const n = new Date(e.target.value); n.setMonth(n.getMonth() + filtroMonths); setNextDate(n.toISOString().split('T')[0]); }} />
                         </div>
                         <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20 rounded-2xl text-center">
-                            <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Nova Validade (+6 meses)</p>
+                            <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Nova Validade (+{filtroMonths} meses)</p>
                             <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">{new Date(nextDate).toLocaleDateString()}</p>
                         </div>
                         <button onClick={confirmExchange} className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20">CONFIRMAR TROCA</button>

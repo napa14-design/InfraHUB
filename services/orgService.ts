@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_ORGS, MOCK_REGIONS, MOCK_SEDES, MOCK_LOCAIS } from '../constants';
 import { logService } from './logService';
 import { authService } from './authService';
+import { logger } from '../utils/logger';
 
 // Cache em memória
 let cache = {
@@ -17,26 +18,38 @@ let usingMocks = false;
 
 const getCurrentUser = () => authService.getCurrentUser();
 
+const withTimeout = async <T>(promise: Promise<T>, ms = 8000): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('timeout')), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
   initialize: async () => {
     usingMocks = false;
     try {
       if (!isSupabaseConfigured()) {
-          console.warn("Supabase not configured. Using Mock Data for OrgService.");
+          logger.warn("Supabase not configured. Using Mock Data for OrgService.");
           throw new Error("Mock Mode");
       }
 
-      console.log("[OrgService] Fetching data...");
-      const [o, r, s, l] = await Promise.all([
+      logger.log("[OrgService] Fetching data...");
+      const [o, r, s, l] = await withTimeout(Promise.all([
         supabase.from('organizations').select('*'),
         supabase.from('regions').select('*'),
         supabase.from('sedes').select('*'),
         supabase.from('locais').select('*')
-      ]);
+      ]));
 
-      if (o.error) console.error("[OrgService] Error fetching Orgs:", o.error);
-      if (r.error) console.error("[OrgService] Error fetching Regions:", r.error);
+      if (o.error) logger.error("[OrgService] Error fetching Orgs:", o.error);
+      if (r.error) logger.error("[OrgService] Error fetching Regions:", r.error);
       
       if (o.error || r.error || s.error || l.error) throw new Error("Database error");
 
@@ -75,10 +88,10 @@ export const orgService = {
           }));
       }
 
-      console.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
+      logger.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
 
     } catch (err) {
-      console.log("Using Fallback Data for OrgService due to error or config.");
+      logger.log("Using Fallback Data for OrgService due to error or config.");
       usingMocks = true;
       cache.orgs = MOCK_ORGS;
       cache.regions = MOCK_REGIONS;

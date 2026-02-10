@@ -13,16 +13,12 @@ import { orgService } from '../../services/orgService';
 import { Breadcrumbs } from '../Shared/Breadcrumbs';
 import { useConfirmation } from '../Shared/ConfirmationContext'; // New import
 import { PestExecutionCard } from './PestExecutionCard'; // New import
+import { logger } from '../../utils/logger';
+import { diffDaysFromToday } from '../../utils/dateUtils';
 
 // Helper de Data Robusto (Ignora Fuso Horário para comparação de dias puros)
 const getDaysDiff = (dateStr: string) => {
-    if (!dateStr) return 0;
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const target = new Date(year, month - 1, day);
-    const diffTime = target.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDaysFromToday(dateStr);
 };
 
 export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
@@ -43,6 +39,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   
   const [editingItem, setEditingItem] = useState<Partial<PestControlEntry>>({});
   const [historyItems, setHistoryItems] = useState<PestControlEntry[]>([]);
@@ -63,6 +60,11 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       };
       init();
   }, [user]);
+
+  const closeModal = () => {
+      setIsModalOpen(false);
+      setIsCompleting(false);
+  };
 
   const refreshData = async () => {
       const [data, s] = await Promise.all([ pestService.getAll(user), pestService.getSettings() ]);
@@ -103,6 +105,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   }, [entries, search, selectedSedeId, statusFilter]);
 
   const handleAddNew = () => {
+      setIsCompleting(false);
       const defaultTechnician = settings?.technicians.find(t => !t.sedeId) || settings?.technicians[0];
       setEditingItem({
           id: Date.now().toString(),
@@ -121,11 +124,13 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleEdit = (item: PestControlEntry) => {
-      setEditingItem({...item, performedDate: undefined}); 
+      setIsCompleting(false);
+      setEditingItem({ ...item });
       setIsModalOpen(true);
   };
 
   const handleComplete = (item: PestControlEntry) => {
+      setIsCompleting(true);
       setEditingItem({ ...item, performedDate: new Date().toISOString().split('T')[0], status: 'REALIZADO' });
       setIsModalOpen(true);
   };
@@ -143,7 +148,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                 await pestService.delete(item.id);
                 await refreshData();
               } catch (e) {
-                console.error("Delete failed", e);
+                logger.error("Delete failed", e);
                 alert("Erro ao excluir.");
                 await refreshData();
               }
@@ -160,9 +165,12 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleSave = async () => {
-      if (editingItem.performedDate) {
+      if (isCompleting) {
+          if (!editingItem.performedDate) {
+              editingItem.performedDate = new Date().toISOString().split('T')[0];
+          }
           if (!editingItem.product || !editingItem.method) {
-              alert("Para concluir, é obrigatério informar Produto e método.");
+              alert("Para concluir, é obrigatório informar Produto e método.");
               return;
           }
           editingItem.status = 'REALIZADO';
@@ -171,11 +179,12 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
           await pestService.save(editingItem as PestControlEntry);
           await notificationService.markByLink('/module/pestcontrol/execution');
           await refreshData();
-          setIsModalOpen(false);
+          closeModal();
       } else {
-          alert("Preencha todos os campos obrigatérios.");
+          alert("Preencha todos os campos obrigatórios.");
       }
   };
+
 
   // UPLOAD HANDLER
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +200,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
               alert("Erro no upload da imagem.");
           }
       } catch (err) {
-          console.error(err);
+          logger.error(err);
           alert("Erro ao enviar imagem.");
       } finally {
           setIsUploading(false);
@@ -332,11 +341,11 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/80 dark:bg-black/40">
                        <div>
                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight text-xl">
-                               {editingItem.id && editingItem.performedDate ? 'Finalizar serviço' : editingItem.id ? 'Editar Agendamento' : 'Novo serviço'}
+                               {isCompleting ? 'Finalizar serviço' : editingItem.id ? (editingItem.status === 'REALIZADO' ? 'Editar Registro' : 'Editar Agendamento') : 'Novo serviço'}
                            </h3>
                            <p className="text-xs text-slate-500 font-medium mt-0.5">Preencha os dados técnicos da operação.</p>
                        </div>
-                       <button onClick={() => setIsModalOpen(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><X size={20} className="text-slate-500"/></button>
+                       <button onClick={closeModal} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><X size={20} className="text-slate-500"/></button>
                    </div>
                    
                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -393,7 +402,8 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                        </section>
 
                        {/* 3. Execução (Condicional) */}
-                       <div className={`transition-all duration-500 ${editingItem.performedDate !== undefined ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-4'}`}>
+                       {(isCompleting || editingItem.status === 'REALIZADO') && (
+                       <div className="transition-all duration-500 opacity-100 translate-y-0">
                            <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800 rounded-2xl space-y-5">
                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 border-b border-emerald-200 dark:border-emerald-800/50 pb-3">
                                    <CheckCircle2 size={18}/>
@@ -464,12 +474,13 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                </div>
                            </div>
                        </div>
+                       )}
                    </div>
 
                    <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex gap-3">
-                       <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">Cancelar</button>
+                       <button onClick={closeModal} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">Cancelar</button>
                        <button onClick={handleSave} className="flex-[2] py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl shadow-xl uppercase tracking-widest text-xs transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2">
-                           <Save size={18} /> {editingItem.performedDate ? 'Confirmar Execução' : 'Salvar Alterações'}
+                           <Save size={18} /> {isCompleting ? 'Confirmar Execução' : 'Salvar Alterações'}
                        </button>
                    </div>
                </div>
@@ -533,3 +544,4 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
+

@@ -1,6 +1,7 @@
 
 import { LogEntry, LogActionType, User } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { logger } from '../utils/logger';
 
 // Mock Data Storage
 const MOCK_LOGS: LogEntry[] = [
@@ -23,7 +24,7 @@ export const logService = {
                 if (error) {
                     // Gracefully handle missing table (Postgres code 42P01)
                     if (error.code === '42P01') {
-                        console.warn("Tabela 'audit_logs' não encontrada no Supabase. Usando dados mockados. Verifique 'Setup de Banco de Dados'.");
+                        logger.warn("Tabela 'audit_logs' não encontrada no Supabase. Usando dados mockados. Verifique 'Setup de Banco de Dados'.");
                         return MOCK_LOGS;
                     }
                     throw error;
@@ -43,7 +44,7 @@ export const logService = {
             }
             return [...MOCK_LOGS].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         } catch (e: any) {
-            console.error("Log fetch error:", e.message || e);
+            logger.error("Log fetch error:", e.message || e);
             return MOCK_LOGS;
         }
     },
@@ -84,7 +85,7 @@ export const logService = {
                 if (error) {
                     // Silent fail if table doesn't exist to avoid console noise during operations
                     if (error.code !== '42P01') {
-                        console.error("Failed to write log to DB:", error.message);
+                        logger.error("Failed to write log to DB:", error.message);
                     }
                 }
             } else {
@@ -93,7 +94,7 @@ export const logService = {
                 if (MOCK_LOGS.length > 200) MOCK_LOGS.pop();
             }
         } catch (e) {
-            console.error("Failed to write log", e);
+            logger.error("Failed to write log", e);
         }
     }
 };

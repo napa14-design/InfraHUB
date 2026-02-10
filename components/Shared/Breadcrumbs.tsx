@@ -10,15 +10,15 @@ const routeLabels: Record<string, string> = {
   'cloro': 'Cloro & pH',
   'certificados': 'Certificados',
   'filtros': 'Filtros',
-  'reservatorios': 'reservatórios',
+  'reservatorios': 'Reservatórios',
   'config': 'Configurações',
   'analytics': 'Analytics',
-  'execution': 'Ordens de serviço',
+  'execution': 'Ordens de Serviço',
   'help': 'Ajuda',
   'admin': 'Administração',
   'users': 'Usuários',
   'org': 'Estrutura',
-  'notifications': 'NOTIFICAÇÕES',
+  'notifications': 'Notificações',
   'logs': 'Auditoria'
 };
 

@@ -53,7 +53,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
   const handleSave = async () => {
       await pestService.saveSettings(settings);
       setSaved(true);
-      addToast("CONFIGURAÇÕES salvas com sucesso.", "success");
+      addToast("Configurações salvas com sucesso.", "success");
       setTimeout(() => setSaved(false), 2000);
   };
 

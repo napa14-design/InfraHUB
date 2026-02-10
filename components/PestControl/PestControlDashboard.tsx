@@ -6,42 +6,81 @@ import { User, UserRole, PestControlEntry } from '../../types';
 import { orgService } from '../../services/orgService';
 import { pestService } from '../../services/pestService';
 import { Breadcrumbs } from '../Shared/Breadcrumbs';
+import { diffDaysFromToday, isBeforeToday, isOnOrBefore, formatDateBR } from '../../utils/dateUtils';
 
 interface Props {
   user: User;
 }
 
+const COLOR_STYLES: Record<string, { border: string; icon: string; badge: string; glow: string }> = {
+    slate: {
+        border: 'border-slate-200 dark:border-white/5',
+        icon: 'bg-slate-50 dark:bg-white/[0.04] text-slate-600 dark:text-white/60',
+        badge: 'bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-white/50',
+        glow: 'bg-slate-500/10'
+    },
+    amber: {
+        border: 'border-amber-500/20 dark:border-amber-500/30',
+        icon: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+        badge: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300',
+        glow: 'bg-amber-500/10'
+    },
+    emerald: {
+        border: 'border-emerald-500/20 dark:border-emerald-500/30',
+        icon: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+        badge: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+        glow: 'bg-emerald-500/10'
+    },
+    red: {
+        border: 'border-rose-500/20 dark:border-rose-500/30',
+        icon: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
+        badge: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',
+        glow: 'bg-rose-500/10'
+    },
+    purple: {
+        border: 'border-purple-500/20 dark:border-purple-500/30',
+        icon: 'bg-purple-50 dark:bg-purple-900/10 text-purple-600 dark:text-purple-400',
+        badge: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300',
+        glow: 'bg-purple-500/10'
+    },
+    cyan: {
+        border: 'border-cyan-500/20 dark:border-cyan-500/30',
+        icon: 'bg-cyan-50 dark:bg-cyan-900/10 text-cyan-600 dark:text-cyan-400',
+        badge: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300',
+        glow: 'bg-cyan-500/10'
+    }
+};
+
 const getDynamicStatus = (entry: PestControlEntry) => {
     if (entry.status === 'REALIZADO') return 'REALIZADO';
-    const today = new Date();
-    today.setHours(0,0,0,0);
     if (!entry.scheduledDate) return 'PENDENTE';
-    const [year, month, day] = entry.scheduledDate.split('-').map(Number);
-    const target = new Date(year, month - 1, day);
-    if (target.getTime() < today.getTime()) return 'ATRASADO';
+    if (isBeforeToday(entry.scheduledDate)) return 'ATRASADO';
     return 'PENDENTE';
 };
 
-const KPICard = ({ label, value, icon: Icon, color, subtext, delay }: any) => (
+const KPICard = ({ label, value, icon: Icon, color, subtext, delay }: any) => {
+    const styles = COLOR_STYLES[color] || COLOR_STYLES.slate;
+    return (
     <div 
-        className={`relative overflow-hidden rounded-3xl p-6 bg-white dark:bg-[#16161a] border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/50 group animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards`}
+        className={`group relative overflow-hidden rounded-2xl bg-white dark:bg-[#111114]/80 border ${styles.border} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards`}
         style={{ animationDelay: delay }}
     >
-        <div className={`absolute top-0 right-0 w-24 h-24 bg-${color}-500/10 rounded-bl-[100px] -mr-4 -mt-4 transition-transform group-hover:scale-110 duration-500`}></div>
+        <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full ${styles.glow} transition-transform duration-500 group-hover:scale-110`}></div>
         <div className="relative z-10 flex flex-col h-full justify-between">
             <div className="flex justify-between items-start mb-4">
-                <div className={`p-3 rounded-2xl bg-${color}-50 dark:bg-${color}-500/10 text-${color}-600 dark:text-${color}-400`}>
-                    <Icon size={24} strokeWidth={1.5} />
+                <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${styles.icon}`}>
+                    <Icon size={20} strokeWidth={1.5} />
                 </div>
-                {subtext && <span className={`text-[10px] font-bold px-2 py-1 rounded-lg bg-${color}-100 dark:bg-${color}-900/30 text-${color}-700 dark:text-${color}-300 uppercase`}>{subtext}</span>}
+                {subtext && <span className={`text-[10px] font-bold px-2 py-1 rounded-lg ${styles.badge} uppercase`}>{subtext}</span>}
             </div>
             <div>
-                <h3 className="text-4xl font-black text-slate-800 dark:text-white mb-1 tracking-tight">{value}</h3>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+                <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-1 tracking-tight">{value}</h3>
+                <p className="text-[11px] font-mono uppercase tracking-widest text-slate-500 dark:text-white/40">{label}</p>
             </div>
         </div>
     </div>
-);
+    );
+};
 
 // Novo componente de visualização de dados
 const OverviewWidget = ({ total, completed, pending, delayed }: any) => {
@@ -93,14 +132,16 @@ const OverviewWidget = ({ total, completed, pending, delayed }: any) => {
     );
 };
 
-const ActionCard = ({ title, desc, icon: Icon, onClick, color, delay }: any) => (
+const ActionCard = ({ title, desc, icon: Icon, onClick, color, delay }: any) => {
+    const styles = COLOR_STYLES[color] || COLOR_STYLES.slate;
+    return (
     <button 
         onClick={onClick}
         className="group relative w-full text-left overflow-hidden rounded-3xl bg-gradient-to-br from-white to-slate-50 dark:from-[#16161a] dark:to-[#0f0f12] border border-slate-200 dark:border-slate-800 p-6 hover:border-amber-500/50 dark:hover:border-amber-500/50 transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-amber-500/10 animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards"
         style={{ animationDelay: delay }}
     >
         <div className="flex items-center gap-4 mb-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-${color}-50 dark:bg-${color}-900/10 text-${color}-600 dark:text-${color}-400 group-hover:scale-110 transition-transform duration-300`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${styles.icon} group-hover:scale-110 transition-transform duration-300`}>
                 <Icon size={24} />
             </div>
             <div className="flex-1">
@@ -112,7 +153,8 @@ const ActionCard = ({ title, desc, icon: Icon, onClick, color, delay }: any) => 
         </div>
         <p className="text-xs text-slate-500 dark:text-slate-400 font-mono leading-relaxed pl-1">{desc}</p>
     </button>
-);
+    );
+};
 
 export const PestControlDashboard: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
@@ -124,6 +166,9 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
       pending: 0,
       delayed: 0,
       completed: 0,
+      sla: 0,
+      next7: 0,
+      avgDelay: 0,
       status: 'REGULAR'
   });
   const [upcoming, setUpcoming] = useState<PestControlEntry[]>([]);
@@ -136,6 +181,10 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
           let pendingCount = 0;
           let delayedCount = 0;
           let completedCount = 0;
+          let completedOnTime = 0;
+          let next7Count = 0;
+          let delayDaysTotal = 0;
+          let delayDaysCount = 0;
           const futureList: PestControlEntry[] = [];
 
           entries.forEach(e => {
@@ -144,8 +193,18 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
               if (status === 'ATRASADO') delayedCount++;
               if (status === 'REALIZADO') completedCount++;
               
+              if (status === 'REALIZADO' && e.performedDate && e.scheduledDate) {
+                  if (isOnOrBefore(e.performedDate, e.scheduledDate)) completedOnTime++;
+              }
+              
               if (status !== 'REALIZADO') {
                   futureList.push({ ...e, status: status as any }); 
+                  const diff = diffDaysFromToday(e.scheduledDate);
+                  if (diff >= 0 && diff <= 7) next7Count++;
+                  if (diff < 0) {
+                      delayDaysTotal += Math.abs(diff);
+                      delayDaysCount += 1;
+                  }
               }
           });
           
@@ -156,6 +215,9 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
               pending: pendingCount,
               delayed: delayedCount,
               completed: completedCount,
+              sla: completedCount > 0 ? Math.round((completedOnTime / completedCount) * 100) : 0,
+              next7: next7Count,
+              avgDelay: delayDaysCount > 0 ? Math.round(delayDaysTotal / delayDaysCount) : 0,
               status: delayedCount > 0 ? 'CRÍTICO' : pendingCount > 0 ? 'PENDENTE' : 'REGULAR'
           });
           
@@ -209,11 +271,13 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
         />
 
         {/* KPI Grid - Updated to Requested Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
             <KPICard label="Total Agendamentos" value={stats.total} icon={Database} color="slate" delay="0ms" />
             <KPICard label="Pendentes" value={stats.pending} icon={Clock} color="amber" subtext="Dentro do Prazo" delay="100ms" />
             <KPICard label="Realizados" value={stats.completed} icon={CheckCircle2} color="emerald" delay="200ms" />
-            <KPICard label="Atrasados" value={stats.delayed} icon={AlertTriangle} color="red" subtext={stats.delayed > 0 ? "ação Imediata" : "Regular"} delay="300ms" />
+            <KPICard label="Atrasados" value={stats.delayed} icon={AlertTriangle} color="red" subtext={stats.delayed > 0 ? `Média ${stats.avgDelay}d` : "Regular"} delay="300ms" />
+            <KPICard label="SLA Dentro do Prazo" value={`${stats.sla}%`} icon={CalendarCheck} color="cyan" subtext="Dos realizados" delay="400ms" />
+            <KPICard label="Próximos 7 dias" value={stats.next7} icon={CalendarCheck} color="purple" subtext="Agendados" delay="500ms" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -246,7 +310,7 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
                             delay="600ms"
                         />
                         <ActionCard 
-                            title="CONFIGURAÇÕES" 
+                            title="Configurações" 
                             desc="Ajuste de ciclos, cadastro de pragas e regras de alerta." 
                             icon={Settings} 
                             onClick={() => navigate('/module/pestcontrol/config')}
@@ -290,7 +354,7 @@ export const PestControlDashboard: React.FC<Props> = ({ user }) => {
                                     <div className={`p-4 rounded-2xl border transition-all duration-300 cursor-pointer hover:-translate-y-1 hover:shadow-md ${isDelayed ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-800 hover:border-amber-200 dark:hover:border-amber-900/50'}`}>
                                         <div className="flex justify-between items-start mb-1">
                                             <span className={`text-[10px] font-black uppercase tracking-wider ${isDelayed ? 'text-red-500' : 'text-slate-400 group-hover:text-amber-500'}`}>
-                                                {new Date(item.scheduledDate).toLocaleDateString()}
+                                                {formatDateBR(item.scheduledDate)}
                                             </span>
                                             {isDelayed && <AlertTriangle size={12} className="text-red-500" />}
                                         </div>

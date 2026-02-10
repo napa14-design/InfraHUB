@@ -67,7 +67,7 @@ export const CommandPalette: React.FC = () => {
     // Admin Actions
     { 
       id: 'adm-users', 
-      label: 'Gerenciar usuários', 
+      label: 'Gerenciar Usuários', 
       icon: Users, 
       action: () => navigate('/admin/users'), 
       keywords: ['admin', 'pessoas', 'acesso'],

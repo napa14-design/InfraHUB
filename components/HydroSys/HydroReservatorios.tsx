@@ -16,6 +16,7 @@ import { ReservoirFichaModal } from './ReservoirFichaModal';
 import { useToast } from '../Shared/ToastContext';
 import { useConfirmation } from '../Shared/ConfirmationContext';
 import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
+import { logger } from '../../utils/logger';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 
@@ -82,6 +83,20 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
   const isAdmin = user.role === UserRole.ADMIN;
 
+  const addMonths = (dateStr: string, months: number) => {
+      const d = new Date(dateStr);
+      d.setMonth(d.getMonth() + months);
+      return d.toISOString().split('T')[0];
+  };
+
+  const getLatestDate = (a?: string, b?: string) => {
+      const dates = [a, b].filter(Boolean) as string[];
+      if (dates.length === 0) return '';
+      return dates.reduce((latest, current) => (
+          new Date(current) > new Date(latest) ? current : latest
+      ), dates[0]);
+  };
+
   useEffect(() => {
       loadSedes();
   }, [user]);
@@ -134,6 +149,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           type: "info",
           confirmLabel: "Salvar",
           onConfirm: async () => {
+              const cycleMonths = activeTab === 'cisternas'
+                  ? (settings?.validadeLimpezaCisterna || 6)
+                  : (settings?.validadeLimpezaCaixa || 6);
+              const latestLimpeza = getLatestDate(editItem.dataLimpeza1, editItem.dataLimpeza2);
+              if (latestLimpeza) {
+                  editItem.dataUltimaLimpeza = latestLimpeza;
+                  editItem.proximaLimpeza = addMonths(latestLimpeza, cycleMonths);
+              }
               if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
               
               if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
@@ -199,7 +222,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           const allLogs = await logService.getAll();
           const relevant = allLogs.filter(l => l.module === 'HYDROSYS' && (l.target.includes(item.local) || (l.details && l.details.includes(item.local))));
           setHistoryLogs(relevant);
-      } catch (e) { console.error(e); } finally { setLoadingHistory(false); }
+      } catch (e) { logger.error(e); } finally { setLoadingHistory(false); }
   };
 
   const TabButton = ({ id, label, count, icon: Icon }: any) => (
@@ -237,7 +260,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                         </button>
                         <div className="flex items-center gap-5">
                             <div className="w-14 h-14 border-2 border-cyan-500/20 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl text-cyan-600"><Droplet size={28} /></div>
-                            <div><h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono uppercase">reservatórios</h1><p className="text-slate-500 text-xs font-mono">Monitoramento de Limpeza.</p></div>
+                            <div><h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono uppercase">Reservatórios</h1><p className="text-slate-500 text-xs font-mono">Monitoramento de Limpeza.</p></div>
                         </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">

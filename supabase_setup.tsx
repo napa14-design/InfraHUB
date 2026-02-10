@@ -48,7 +48,7 @@ WITH CHECK (true);
 SELECT * FROM hydro_settings;
 `;
 
-export const EDGE_FUNCTION_CODE = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+export const EDGE_FUNCTION_RESET_CODE = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 type ResetBody = {
@@ -56,20 +56,32 @@ type ResetBody = {
   newPassword?: string
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+const allowedOrigins = (Deno.env.get("CORS_ORIGINS") || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+const resolveCorsOrigin = (req: Request) => {
+  const origin = req.headers.get("Origin") || ""
+  if (!allowedOrigins.length) return "*"
+  if (!origin) return allowedOrigins[0]
+  return allowedOrigins.includes(origin) ? origin : ""
 }
 
-const json = (status: number, body: Record<string, unknown>) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  })
+const buildCorsHeaders = (origin: string) => ({
+  "Access-Control-Allow-Origin": origin,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Vary": "Origin"
+})
 
 serve(async (req) => {
-  // Preflight
+  const corsOrigin = resolveCorsOrigin(req)
+  if (allowedOrigins.length && req.headers.get("Origin") && !corsOrigin) {
+    return new Response("Origin not allowed", { status: 403 })
+  }
+  const corsHeaders = buildCorsHeaders(corsOrigin || "*")
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
@@ -80,28 +92,35 @@ serve(async (req) => {
     const anonKey = Deno.env.get("SUPABASE_ANON_KEY")
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return json(500, {
-        error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
+      return new Response(JSON.stringify({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       })
     }
 
     const authHeader = req.headers.get("Authorization") || ""
     if (!authHeader) {
-      return json(401, { error: "Missing Authorization header" })
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     const supabaseAuth = createClient(supabaseUrl, anonKey || serviceRoleKey, {
       global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: { persistSession: false, autoRefreshToken: false }
     })
 
     const { data: authData, error: authError } = await supabaseAuth.auth.getUser()
     if (authError || !authData?.user) {
-      return json(401, { error: "Invalid or expired token" })
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: { persistSession: false, autoRefreshToken: false }
     })
 
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -111,11 +130,17 @@ serve(async (req) => {
       .single()
 
     if (profileError || !profile) {
-      return json(500, { error: "Failed to load requester profile" })
+      return new Response(JSON.stringify({ error: "Failed to load requester profile" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     if (profile.role !== "ADMIN") {
-      return json(403, { error: "Only ADMIN can reset passwords" })
+      return new Response(JSON.stringify({ error: "Only ADMIN can reset passwords" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     const body = (await req.json().catch(() => ({}))) as ResetBody
@@ -123,11 +148,17 @@ serve(async (req) => {
     const newPassword = body.newPassword
 
     if (!userId || !newPassword) {
-      return json(400, { error: "Missing userId or newPassword" })
+      return new Response(JSON.stringify({ error: "Missing userId or newPassword" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     if (newPassword.length < 6) {
-      return json(400, { error: "Password must be at least 6 characters" })
+      return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -136,21 +167,225 @@ serve(async (req) => {
     )
 
     if (updateError) {
-      return json(400, { error: updateError.message })
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
     }
 
-    return json(200, { message: "Password updated" })
+    const { error: profileUpdateError } = await supabaseAdmin
+      .from("profiles")
+      .update({ is_first_login: true })
+      .eq("id", userId)
+
+    if (profileUpdateError) {
+      return new Response(JSON.stringify({ error: "Password updated, but failed to flag first login." }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    return new Response(JSON.stringify({ message: "Password updated" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
   } catch (error) {
-    return json(500, { error: error.message })
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
+  }
+})`;
+
+export const EDGE_FUNCTION_CREATE_CODE = `import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+type CreateUserBody = {
+  user?: {
+    email?: string
+    name?: string
+    role?: string
+    organizationId?: string | null
+    regionId?: string | null
+    sedeIds?: string[]
+  }
+  password?: string
+}
+
+const allowedOrigins = (Deno.env.get("CORS_ORIGINS") || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+const resolveCorsOrigin = (req: Request) => {
+  const origin = req.headers.get("Origin") || ""
+  if (!allowedOrigins.length) return "*"
+  if (!origin) return allowedOrigins[0]
+  return allowedOrigins.includes(origin) ? origin : ""
+}
+
+const buildCorsHeaders = (origin: string) => ({
+  "Access-Control-Allow-Origin": origin,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Vary": "Origin"
+})
+
+serve(async (req) => {
+  const corsOrigin = resolveCorsOrigin(req)
+  if (allowedOrigins.length && req.headers.get("Origin") && !corsOrigin) {
+    return new Response("Origin not allowed", { status: 403 })
+  }
+  const corsHeaders = buildCorsHeaders(corsOrigin || "*")
+
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
+  }
+
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const authHeader = req.headers.get("Authorization") || ""
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing Authorization header" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, anonKey || serviceRoleKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+
+    const { data: authData, error: authError } = await supabaseAuth.auth.getUser()
+    if (authError || !authData?.user) {
+      return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    })
+
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .single()
+
+    if (profileError || !profile) {
+      return new Response(JSON.stringify({ error: "Failed to load requester profile" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    if (profile.role !== "ADMIN") {
+      return new Response(JSON.stringify({ error: "Only ADMIN can create users" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const body = (await req.json().catch(() => ({}))) as CreateUserBody
+    const payload = body.user || {}
+    const email = payload.email || ""
+    const password = body.password || ""
+    const role = payload.role || "OPERATIONAL"
+
+    if (!email || !password) {
+      return new Response(JSON.stringify({ error: "Missing email or password" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    if (password.length < 6) {
+      return new Response(JSON.stringify({ error: "Password must be at least 6 characters" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: { name: payload.name, role }
+    })
+
+    if (createError || !created?.user) {
+      return new Response(JSON.stringify({ error: createError?.message || "Failed to create user" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const userId = created.user.id
+    const { error: profileInsertError } = await supabaseAdmin
+      .from("profiles")
+      .upsert({
+        id: userId,
+        email,
+        name: payload.name || "Novo usuário",
+        role,
+        organization_id: payload.organizationId || null,
+        region_id: payload.regionId || null,
+        sede_ids: payload.sedeIds || [],
+        status: "ACTIVE",
+        is_first_login: true
+      })
+      .select()
+      .single()
+
+    if (profileInsertError) {
+      return new Response(JSON.stringify({ error: "Failed to create profile" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      })
+    }
+
+    const emailConfirmationRequired = !created.user.email_confirmed_at
+
+    return new Response(JSON.stringify({
+      id: userId,
+      email,
+      warning: emailConfirmationRequired ? "Este usuário requer confirmação de e-mail antes de logar." : undefined
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" }
+    })
   }
 })`;
 
 export const Instructions = () => {
   const [activeTab, setActiveTab] = useState<'SQL' | 'EDGE'>('EDGE');
+  const [edgeFunction, setEdgeFunction] = useState<'RESET' | 'CREATE'>('RESET');
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    const text = activeTab === 'SQL' ? SCHEMA_SQL : EDGE_FUNCTION_CODE;
+    const text = activeTab === 'SQL'
+      ? SCHEMA_SQL
+      : edgeFunction === 'RESET'
+        ? EDGE_FUNCTION_RESET_CODE
+        : EDGE_FUNCTION_CREATE_CODE;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -197,8 +432,9 @@ export const Instructions = () => {
                         <strong className="block mb-1 text-sm">CONFIGURAÇÃO DE SECRETS (OBRIGATÓRIO):</strong>
                         <ol className="list-decimal list-inside space-y-1 ml-1 text-slate-700 dark:text-slate-300">
                             <li>Defina as Secrets no painel do Supabase: <code>SUPABASE_URL</code> e <code>SUPABASE_SERVICE_ROLE_KEY</code>.</li>
+                            <li>Opcional: <code>CORS_ORIGINS</code> com URLs separadas por vírgula (ex: <code>https://infra-hub.vercel.app, http://localhost:5173</code>).</li>
                             <li>Não coloque a Service Role direto no código.</li>
-                            <li>Depois faça o deploy: <code>supabase functions deploy admin-reset-password</code></li>
+                            <li>Depois faça o deploy: <code>supabase functions deploy admin-reset-password</code> e <code>supabase functions deploy admin-create-user</code>.</li>
                         </ol>
                     </div>
                 </div>
@@ -216,9 +452,26 @@ export const Instructions = () => {
                 </div>
             )}
 
-            <div className="flex justify-between items-center mb-3">
+            <div className="flex flex-col gap-3 mb-3">
+                {activeTab === 'EDGE' && (
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setEdgeFunction('RESET')}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${edgeFunction === 'RESET' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800'}`}
+                        >
+                            admin-reset-password
+                        </button>
+                        <button
+                            onClick={() => setEdgeFunction('CREATE')}
+                            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all ${edgeFunction === 'CREATE' ? 'bg-cyan-600 text-white border-cyan-600' : 'bg-white dark:bg-slate-900 text-slate-500 border-slate-200 dark:border-slate-800'}`}
+                        >
+                            admin-create-user
+                        </button>
+                    </div>
+                )}
+                <div className="flex justify-between items-center">
                 <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    {activeTab === 'EDGE' ? 'código Final (admin-reset-password)' : 'SQL Editor'}
+                    {activeTab === 'EDGE' ? `código Final (${edgeFunction === 'RESET' ? 'admin-reset-password' : 'admin-create-user'})` : 'SQL Editor'}
                 </h3>
                 <button 
                     onClick={handleCopy}
@@ -227,11 +480,16 @@ export const Instructions = () => {
                     {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
                     {copied ? 'Copiado!' : 'Copiar código'}
                 </button>
+                </div>
             </div>
             
             <div className="flex-1 bg-slate-900 rounded-xl p-4 overflow-auto border border-slate-800 shadow-inner relative group">
                 <pre className="text-[11px] font-mono text-cyan-300 whitespace-pre-wrap leading-relaxed">
-                    {activeTab === 'SQL' ? SCHEMA_SQL : EDGE_FUNCTION_CODE}
+                    {activeTab === 'SQL'
+                      ? SCHEMA_SQL
+                      : edgeFunction === 'RESET'
+                        ? EDGE_FUNCTION_RESET_CODE
+                        : EDGE_FUNCTION_CREATE_CODE}
                 </pre>
             </div>
         </div>

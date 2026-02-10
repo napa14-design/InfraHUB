@@ -8,9 +8,9 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
 import { ToastProvider } from './components/Shared/ToastContext';
 import { ConfirmationProvider } from './components/Shared/ConfirmationContext';
-import { Instructions } from './supabase_setup';
+import { logger } from './utils/logger';
 
-console.log('[App] Module loaded');
+logger.log('[App] Module loaded');
 
 // --- ERROR BOUNDARY FOR LAZY LOADING ---
 interface ErrorBoundaryProps {
@@ -33,7 +33,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("Application Error (ErrorBoundary caught):", error, errorInfo);
+    logger.error("Application Error (ErrorBoundary caught):", error, errorInfo);
   }
 
   render() {
@@ -75,7 +75,7 @@ const lazyImport = <T extends React.ComponentType<any>>(
         return { default: module[name as keyof typeof module] };
       })
       .catch(err => {
-        console.error(`[LazyImport] Failed to load ${name}:`, err);
+        logger.error(`[LazyImport] Failed to load ${name}:`, err);
         throw err;
       })
   );
@@ -94,6 +94,7 @@ const AdminModuleManagement = lazyImport(() => import('./components/AdminModuleM
 const AdminOrgManagement = lazyImport(() => import('./components/AdminOrgManagement'), 'AdminOrgManagement');
 const AdminNotificationConfig = lazyImport(() => import('./components/AdminNotificationConfig'), 'AdminNotificationConfig');
 const AuditLogs = lazyImport(() => import('./components/AuditLogs'), 'AuditLogs');
+const Instructions = lazyImport(() => import('./supabase_setup'), 'Instructions');
 
 // HydroSys Components
 // CORRECTION: Changed from ./components/HydroSys/HydroSysDashboard to ./components/HydroSysDashboard
@@ -131,7 +132,7 @@ const AuthObserver = () => {
 
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("Password Recovery Event Detected - Redirecting...");
+        logger.log("Password Recovery Event Detected - Redirecting...");
         navigate('/update-password');
       }
     });
@@ -157,7 +158,7 @@ const PWANavigator = ({ user }: { user: User | null }) => {
        const mode = params.get('mode');
        
        if (mode === 'cloro') {
-           console.log("[PWA] Redirecting to Cloro Module");
+           logger.log("[PWA] Redirecting to Cloro Module");
            // Navega para o Módulo e remove o query param da história para não ficar preso
            navigate('/module/hydrosys/cloro', { replace: true });
        }
@@ -174,25 +175,25 @@ const App: React.FC = () => {
   const [redirectPath, setRedirectPath] = useState<string>('/');
 
   useEffect(() => {
-    console.log('[App] Initializing...');
+    logger.log('[App] Initializing...');
     const initApp = async () => {
         try {
             if (isSupabaseConfigured()) {
                 await supabase.auth.getSession();
             }
         } catch (e) {
-            console.warn("Session check failed", e);
+            logger.warn("Session check failed", e);
         }
 
         await orgService.initialize();
 
-        const currentUser = authService.getCurrentUser();
+        const currentUser = await authService.refreshSessionUser();
         if (currentUser) {
-            console.log('[App] User found:', currentUser.email);
-            setUser(currentUser);
+            logger.log('[App] User found:', currentUser.email);
         } else {
-            console.log('[App] No user session found.');
+            logger.log('[App] No user session found.');
         }
+        setUser(currentUser);
         
         // PWA Initial Detection for Login Redirect
         const params = new URLSearchParams(window.location.search);
@@ -206,16 +207,26 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  const handleLogin = async (email: string) => {
-    const users = await authService.getAllUsers();
-    const foundUser = users.find(u => u.email === email);
-    
-    if (foundUser) {
-      setUser(foundUser);
-      await orgService.initialize();
-      return true;
-    }
-    return false;
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        setUser(null);
+        return;
+      }
+      const refreshed = await authService.refreshSessionUser();
+      setUser(refreshed);
+    });
+
+    return () => {
+      if (data?.subscription) data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogin = async (userToSet: User) => {
+    setUser(userToSet);
+    await orgService.initialize();
+    return true;
   };
 
   const handleLogout = () => {

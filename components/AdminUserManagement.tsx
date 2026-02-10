@@ -138,8 +138,8 @@ export const AdminUserManagement: React.FC = () => {
   };
 
   const handleResetPassword = (user: User) => {
-      if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
-          addToast("você não tem permissão para resetar Administradores.", "error");
+      if (currentUser?.role !== UserRole.ADMIN) {
+          addToast("Apenas Administradores podem resetar senhas.", "error");
           return;
       }
       setUserToReset(user);
@@ -432,7 +432,7 @@ export const AdminUserManagement: React.FC = () => {
                         </button>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleResetPassword(user)} className="text-amber-500 hover:text-amber-600 disabled:opacity-30" title="Resetar Senha" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Lock size={16} /></button>
+                        <button onClick={() => handleResetPassword(user)} className="text-amber-500 hover:text-amber-600 disabled:opacity-30" title="Resetar Senha" disabled={currentUser?.role !== UserRole.ADMIN}><Lock size={16} /></button>
                         <button onClick={() => handleStartEdit(user)} className="text-brand-600 hover:text-brand-400 disabled:opacity-30" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Edit2 size={16} /></button>
                         <button onClick={() => requestDelete(user)} className="text-red-600 hover:text-red-400 disabled:opacity-30" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Trash2 size={16} /></button>
                     </td>
@@ -479,7 +479,7 @@ export const AdminUserManagement: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-3 gap-2">
-                          <button onClick={() => handleResetPassword(user)} disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-amber-50 dark:bg-amber-900/10 text-amber-600 rounded-lg text-[10px] font-bold uppercase hover:bg-amber-100 disabled:opacity-50">
+                          <button onClick={() => handleResetPassword(user)} disabled={currentUser?.role !== UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-amber-50 dark:bg-amber-900/10 text-amber-600 rounded-lg text-[10px] font-bold uppercase hover:bg-amber-100 disabled:opacity-50">
                               <Lock size={16} className="mb-1" /> Senha
                           </button>
                           <button onClick={() => handleStartEdit(user)} disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-blue-50 dark:bg-blue-900/10 text-blue-600 rounded-lg text-[10px] font-bold uppercase hover:bg-blue-100 disabled:opacity-50">

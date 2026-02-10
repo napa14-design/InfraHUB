@@ -2,6 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { User, HydroPoco, HydroCisterna, HydroCaixa, HydroSettings } from '../types';
 import { hydroService } from '../services/hydroService';
+import { logger } from '../utils/logger';
 
 interface UseHydroDataResult {
   pocos: HydroPoco[];
@@ -39,7 +40,7 @@ export const useHydroData = (user: User): UseHydroDataResult => {
       setCaixas(k);
       setSettings(s);
     } catch (error) {
-      console.error("Error fetching hydro data:", error);
+      logger.error("Error fetching hydro data:", error);
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,7 @@ export const useHydroData = (user: User): UseHydroDataResult => {
                 setSettings(s);
             }
         } catch (e) {
-            console.error(e);
+            logger.error(e);
         } finally {
             if (mounted) setLoading(false);
         }

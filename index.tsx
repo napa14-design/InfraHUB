@@ -3,8 +3,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { logger } from './utils/logger';
 
-console.log('[Index] Starting application...');
+logger.log('[Index] Starting application...');
 
 // Global capture for PWA Install Prompt
 // This ensures we catch the event even if it fires before React finishes mounting
@@ -19,20 +20,20 @@ window.addEventListener('beforeinstallprompt', (e) => {
   // We still stash the event so it can be triggered later if the user dismisses the native prompt but clicks a button later.
   // @ts-ignore
   window.deferredPrompt = e;
-  console.log("Global: beforeinstallprompt captured (Native prompt allowed)");
+  logger.log("Global: beforeinstallprompt captured (Native prompt allowed)");
 });
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
-  console.error('[Index] FATAL: Could not find root element');
+  logger.error('[Index] FATAL: Could not find root element');
   throw new Error("Could not find root element to mount to");
 }
 
-console.log('[Index] Root element found, mounting React...');
+logger.log('[Index] Root element found, mounting React...');
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <App />
   </React.StrictMode>
 );
-console.log('[Index] Render called.');
+logger.log('[Index] Render called.');

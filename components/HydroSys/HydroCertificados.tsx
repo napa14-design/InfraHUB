@@ -6,7 +6,7 @@ import {
   Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Eye, ExternalLink, Maximize2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCertificado, UserRole, Sede } from '../../types';
+import { User, HydroCertificado, UserRole, Sede, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
@@ -69,6 +69,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   
   const [data, setData] = useState<HydroCertificado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
@@ -102,13 +103,34 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     observacao: ''
   };
   const [formData, setFormData] = useState<HydroCertificado>(initialForm);
+  const validadeMeses = settings?.validadeCertificadoMeses || 6;
+
+  const addMonthsToDate = (dateStr: string, months: number) => {
+    const d = new Date(dateStr);
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getNextSemestre = (current: string) => {
+    const semMatch = current.match(/(?:^|\D)([12])(?:\D|$)/);
+    const yearMatch = current.match(/(20\d{2})/);
+    const semNum = semMatch ? parseInt(semMatch[1], 10) : null;
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+    if (semNum === 1) return '2º SEM - ' + year;
+    if (semNum === 2) return '1º SEM - ' + (year + 1);
+    return '1º SEM - ' + (year + 1);
+  };
 
   const loadData = async () => {
      setIsLoading(true);
      // Simulate slight delay for Skeleton demo
      setTimeout(async () => {
-         const res = await hydroService.getCertificados(user);
+         const [res, s] = await Promise.all([
+             hydroService.getCertificados(user),
+             hydroService.getSettings()
+         ]);
          setData(res);
+         setSettings(s);
          if (isAdmin) setAvailableSedes(orgService.getSedes());
          setIsLoading(false);
      }, 600);
@@ -133,7 +155,15 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleNew = () => {
     setSheetMode('NEW');
-    setFormData({ ...initialForm, id: Date.now().toString(), dataAnalise: new Date().toISOString().split('T')[0] });
+    const todayStr = new Date().toISOString().split('T')[0];
+    const validade = addMonthsToDate(todayStr, validadeMeses);
+    setFormData({ 
+      ...initialForm, 
+      id: Date.now().toString(), 
+      dataAnalise: todayStr, 
+      validade,
+      validadeSemestre: validade
+    });
     setIsSheetOpen(true);
   };
 
@@ -145,22 +175,16 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleRenovar = (item: HydroCertificado) => {
     setSheetMode('RENEW');
-    const today = new Date();
-    const nextValidade = new Date(today);
-    nextValidade.setMonth(nextValidade.getMonth() + 6);
-    let nextSemestre = item.semestre;
-    if (item.semestre.includes('1º')) nextSemestre = item.semestre.replace('1º', '2º');
-    else if (item.semestre.includes('2º')) {
-        const yearMatch = item.semestre.match(/\d{4}/);
-        const year = yearMatch ? parseInt(yearMatch[0]) : today.getFullYear();
-        nextSemestre = `1º SEM - ${year + 1}`;
-    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextValidade = addMonthsToDate(todayStr, validadeMeses);
+    const nextSemestre = getNextSemestre(item.semestre || '');
     setFormData({
       ...item,
       id: `cert-${Date.now()}`,
       semestre: nextSemestre,
-      dataAnalise: today.toISOString().split('T')[0],
-      validade: nextValidade.toISOString().split('T')[0],
+      dataAnalise: todayStr,
+      validade: nextValidade,
+      validadeSemestre: nextValidade,
       status: 'VIGENTE',
       linkMicro: '',
       linkFisico: ''
@@ -181,7 +205,11 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
         addToast("Preencha todos os campos obrigatérios.", "warning");
         return;
     }
-    await hydroService.saveCertificado(formData);
+    const payload = {
+      ...formData,
+      validadeSemestre: formData.validadeSemestre || formData.validade
+    };
+    await hydroService.saveCertificado(payload);
     await notificationService.markByLink('/module/hydrosys/certificados');
     await loadData();
     setIsSheetOpen(false);

@@ -1,14 +1,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, ChevronRight, FileDown, Calendar, Download, X, Waves, Activity } from 'lucide-react';
-import { User, UserRole, HydroCertificado, HydroFiltro } from '../types';
+import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, ChevronRight, FileDown, Calendar, Download, X, Waves, Activity, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
+import { User, UserRole, HydroCertificado } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
 import { exportToCSV } from '../utils/csvExport';
 import { Breadcrumbs } from './Shared/Breadcrumbs';
 import { DashboardGridSkeleton } from './Shared/Skeleton';
+import { diffDaysFromToday, firstDayOfMonthISO, isBeforeToday, lastDayOfMonthISO, parseISODate } from '../utils/dateUtils';
 
 interface Props {
   user: User;
@@ -27,6 +28,61 @@ const RouteMap: Record<string, string> = {
     'hs-dashboard': '/module/hydrosys/analytics'
 };
 
+const KPI_TONES: Record<string, { border: string; icon: string; badge: string; glow: string }> = {
+  neutral: {
+    border: 'border-slate-200 dark:border-white/5',
+    icon: 'bg-slate-50 dark:bg-white/[0.04] text-slate-600 dark:text-white/60',
+    badge: 'bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-white/50',
+    glow: 'bg-slate-500/10'
+  },
+  ok: {
+    border: 'border-emerald-500/20 dark:border-emerald-500/30',
+    icon: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    badge: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    glow: 'bg-emerald-500/10'
+  },
+  warning: {
+    border: 'border-amber-500/20 dark:border-amber-500/30',
+    icon: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    badge: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    glow: 'bg-amber-500/10'
+  },
+  danger: {
+    border: 'border-rose-500/20 dark:border-rose-500/30',
+    icon: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    badge: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',
+    glow: 'bg-rose-500/10'
+  },
+  info: {
+    border: 'border-cyan-500/20 dark:border-cyan-500/30',
+    icon: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    badge: 'bg-cyan-100 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
+    glow: 'bg-cyan-500/10'
+  }
+};
+
+const KpiCard = ({ label, value, subtext, icon: Icon, tone = 'neutral', delay = '0ms' }: any) => {
+  const styles = KPI_TONES[tone] || KPI_TONES.neutral;
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-white dark:bg-[#111114]/80 border ${styles.border} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5`}
+      style={{ animationDelay: delay, animation: 'fade-up 0.4s ease-out forwards', opacity: 0 }}
+    >
+      <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full ${styles.glow} transition-transform duration-500 group-hover:scale-110`} />
+      <div className="relative z-10 flex items-start justify-between gap-4">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${styles.icon}`}>
+          <Icon size={20} />
+        </div>
+        {subtext && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${styles.badge}`}>{subtext}</span>}
+      </div>
+      <div className="relative z-10 mt-4">
+        <div className="text-2xl font-black text-slate-900 dark:text-white">{value}</div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500 dark:text-white/40">{label}</div>
+      </div>
+    </div>
+  );
+};
+
 export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
@@ -34,6 +90,14 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const userSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
 
   const [isLoading, setIsLoading] = useState(true);
+  const [kpis, setKpis] = useState({
+    certificadosVencidos: 0,
+    filtrosVencidos: 0,
+    reservatoriosAtrasados: 0,
+    conformidade: 0,
+    cloroTotal: 0,
+    limpezasProximas: 0
+  });
 
   // --- REPORT MODAL STATE ---
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -42,20 +106,97 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
+    let isActive = true;
     setMounted(true);
+    setIsLoading(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    
-    // Simulate slight delay for skeleton
-    setTimeout(() => {
-        setIsLoading(false);
-    }, 800);
-    
-    const date = new Date();
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const firstDay = firstDayOfMonthISO();
+    const lastDay = lastDayOfMonthISO();
     setDateRange({ start: firstDay, end: lastDay });
 
-    return () => clearInterval(timer);
+    const loadKpis = async () => {
+      const startedAt = Date.now();
+      try {
+        const [
+          settings,
+          certificados,
+          filtros,
+          cloro,
+          pocos,
+          cisternas,
+          caixas
+        ] = await Promise.all([
+          hydroService.getSettings(),
+          hydroService.getCertificados(user),
+          hydroService.getFiltros(user),
+          hydroService.getCloro(user),
+          hydroService.getPocos(user),
+          hydroService.getCisternas(user),
+          hydroService.getCaixas(user)
+        ]);
+
+        const dateValue = (value?: string) => parseISODate(value)?.getTime() ?? 0;
+        const latestCertificados = Array.from(
+          certificados.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
+            const key = `${item.sedeId}-${item.parceiro}`;
+            const current = map.get(key);
+            if (!current || dateValue(item.validade) > dateValue(current.validade)) {
+              map.set(key, item);
+            }
+            return map;
+          }, new Map<string, HydroCertificado>()).values()
+        );
+
+        const certificadosVencidos = latestCertificados.filter(item => {
+          if (item.status === 'VENCIDO') return true;
+          return item.validade ? isBeforeToday(item.validade) : false;
+        }).length;
+
+        const filtrosVencidos = filtros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
+
+        const reservatorios = [...pocos, ...cisternas, ...caixas];
+        const reservatoriosAtrasados = reservatorios.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
+        const limpezasProximas = reservatorios.filter(item => {
+          const diff = diffDaysFromToday(item.proximaLimpeza);
+          return diff >= 0 && diff <= 30;
+        }).length;
+
+        const cloroPeriodo = cloro.filter(item => item.date >= firstDay && item.date <= lastDay);
+        const cloroValidos = cloroPeriodo.filter(item => Number.isFinite(Number(item.cl)) && Number.isFinite(Number(item.ph)));
+        const cloroConforme = cloroValidos.filter(item => {
+          const cl = Number(item.cl);
+          const ph = Number(item.ph);
+          return cl >= settings.cloroMin && cl <= settings.cloroMax && ph >= settings.phMin && ph <= settings.phMax;
+        }).length;
+
+        const conformidade = cloroValidos.length > 0 ? Math.round((cloroConforme / cloroValidos.length) * 100) : 0;
+
+        if (isActive) {
+          setKpis({
+            certificadosVencidos,
+            filtrosVencidos,
+            reservatoriosAtrasados,
+            conformidade,
+            cloroTotal: cloroValidos.length,
+            limpezasProximas
+          });
+        }
+      } finally {
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => {
+          if (isActive) setIsLoading(false);
+        }, remaining);
+      }
+    };
+
+    loadKpis();
+
+    return () => {
+      isActive = false;
+      clearInterval(timer);
+    };
   }, [user]);
 
   const allowedSubModules = HYDROSYS_SUBMODULES.filter(mod => {
@@ -66,6 +207,52 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       const route = RouteMap[id];
       if (route) navigate(route);
   };
+
+  const complianceTone = kpis.cloroTotal === 0
+    ? 'neutral'
+    : kpis.conformidade >= 90
+      ? 'ok'
+      : kpis.conformidade >= 70
+        ? 'warning'
+        : 'danger';
+
+  const kpiCards = [
+    {
+      label: 'Certificados vencidos',
+      value: kpis.certificadosVencidos,
+      icon: Award,
+      tone: kpis.certificadosVencidos > 0 ? 'danger' : 'ok',
+      subtext: kpis.certificadosVencidos > 0 ? 'Ação necessária' : 'Em dia'
+    },
+    {
+      label: 'Filtros vencidos',
+      value: kpis.filtrosVencidos,
+      icon: Filter,
+      tone: kpis.filtrosVencidos > 0 ? 'warning' : 'ok',
+      subtext: kpis.filtrosVencidos > 0 ? 'Troca urgente' : 'Regular'
+    },
+    {
+      label: 'Limpezas atrasadas',
+      value: kpis.reservatoriosAtrasados,
+      icon: AlertTriangle,
+      tone: kpis.reservatoriosAtrasados > 0 ? 'danger' : 'ok',
+      subtext: kpis.reservatoriosAtrasados > 0 ? 'Priorizar agenda' : 'Em dia'
+    },
+    {
+      label: 'Limpezas próximas (30d)',
+      value: kpis.limpezasProximas,
+      icon: CalendarClock,
+      tone: kpis.limpezasProximas > 0 ? 'warning' : 'neutral',
+      subtext: 'Planejamento'
+    },
+    {
+      label: 'Conformidade Cloro/pH',
+      value: `${kpis.conformidade}%`,
+      icon: CheckCircle2,
+      tone: complianceTone,
+      subtext: kpis.cloroTotal > 0 ? `${kpis.cloroTotal} medições` : 'Sem medições'
+    }
+  ];
 
   const handleExport = async () => {
       setIsExporting(true);
@@ -171,6 +358,37 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           </div>
         </header>
 
+        {/* KPI SECTION */}
+        <div className={`transition-all duration-700 delay-150 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-1 h-6 bg-cyan-500" />
+            <span className="text-sm font-mono text-slate-500 dark:text-white/40 uppercase tracking-widest">Indicadores-Chave</span>
+            <div className="flex-1 h-px bg-slate-200 dark:bg-white/5" />
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="h-24 rounded-2xl bg-slate-100 dark:bg-white/[0.04] animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {kpiCards.map((card, idx) => (
+                <KpiCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  icon={card.icon}
+                  tone={card.tone}
+                  subtext={card.subtext}
+                  delay={`${idx * 60}ms`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* MODULES SECTION WITH SKELETON */}
         <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="flex items-center gap-3 mb-6">
@@ -239,7 +457,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                                     <div className="flex items-center gap-2 mb-1"><TestTube size={16}/> Cloro e pH</div>
                                 </button>
                                 <button onClick={() => setReportType('RESERVATORIOS')} className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'RESERVATORIOS' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                                    <div className="flex items-center gap-2 mb-1"><Droplet size={16}/> reservatórios</div>
+                                    <div className="flex items-center gap-2 mb-1"><Droplet size={16}/> Reservatórios</div>
                                 </button>
                                 <button onClick={() => setReportType('CERTIFICADOS')} className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'CERTIFICADOS' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                     <div className="flex items-center gap-2 mb-1"><Award size={16}/> Certificados</div>

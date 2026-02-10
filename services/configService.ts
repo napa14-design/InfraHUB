@@ -2,6 +2,7 @@
 import { NotificationRule } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_RULES } from '../constants';
+import { logger } from '../utils/logger';
 
 const DEFAULT_RULES: NotificationRule[] = [
   // --- HYDROSYS ---
@@ -26,7 +27,7 @@ const DEFAULT_RULES: NotificationRule[] = [
   {
     id: 'rule_res',
     moduleId: 'hydrosys',
-    name: 'Limpeza de reservatórios',
+    name: 'Limpeza de Reservatórios',
     description: 'Monitora datas de limpeza de Caixas e Cisternas.',
     warningDays: 30,
     criticalDays: 7,
@@ -82,7 +83,7 @@ export const configService = {
         if (error) {
             // Se a tabela não existir, retorna defaults para evitar crash
             if (error.code === '42P01') {
-                console.warn("Table notification_rules not found. Using defaults.");
+                logger.warn("Table notification_rules not found. Using defaults.");
                 return DEFAULT_RULES;
             }
             throw error;
@@ -117,7 +118,7 @@ export const configService = {
         return mergedRules;
 
     } catch (e) {
-        console.warn("Using Mock Rules due to error or offline mode.");
+        logger.warn("Using Mock Rules due to error or offline mode.");
         return MOCK_RULES || DEFAULT_RULES;
     }
   },
@@ -138,7 +139,7 @@ export const configService = {
         const { error } = await supabase.from('notification_rules').upsert(dbPayload);
         
         if (error) {
-            console.error("Error saving rule:", error);
+            logger.error("Error saving rule:", error);
             // Return valid string error message
             return { error: error.message || JSON.stringify(error) };
         }

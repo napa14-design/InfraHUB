@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Download, Share } from 'lucide-react';
+import { logger } from '../../utils/logger';
 
 interface Props {
     collapsed?: boolean;
@@ -55,7 +56,7 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false, className
     const { outcome } = await promptEvent.userChoice;
     
     if (outcome === 'accepted') {
-      console.log('User accepted the install prompt');
+      logger.log('User accepted the install prompt');
       setDeferredPrompt(null);
       // @ts-ignore
       window.deferredPrompt = null;

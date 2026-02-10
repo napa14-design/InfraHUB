@@ -230,11 +230,11 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       <NavItem to="/module/hydrosys/cloro" icon={TestTube} label="Controle de Cloro" />
       <NavItem to="/module/hydrosys/certificados" icon={Award} label="Certificados" />
       <NavItem to="/module/hydrosys/filtros" icon={Filter} label="Filtros" />
-      <NavItem to="/module/hydrosys/reservatorios" icon={Droplet} label="reservatórios" />
+      <NavItem to="/module/hydrosys/reservatorios" icon={Droplet} label="Reservatórios" />
       {user.role === UserRole.ADMIN && (
          <>
             <NavItem to="/module/hydrosys/analytics" icon={PieChart} label="Analytics" />
-            <NavItem to="/module/hydrosys/config" icon={Settings} label="CONFIGURAÇÕES" />
+            <NavItem to="/module/hydrosys/config" icon={Settings} label="Configurações" />
          </>
       )}
       {renderBackToHub()}
@@ -249,7 +249,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
       {user.role === UserRole.ADMIN && (
          <>
             <NavItem to="/module/pestcontrol/analytics" icon={PieChart} label="Analytics" />
-            <NavItem to="/module/pestcontrol/config" icon={Settings} label="CONFIGURAÇÕES" />
+            <NavItem to="/module/pestcontrol/config" icon={Settings} label="Configurações" />
          </>
       )}
       <NavItem to="/module/pestcontrol/help" icon={HelpCircle} label="Ajuda" />
@@ -267,9 +267,9 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         <NavItem to="/" icon={LayoutGrid} label="Dashboard" />
         {(isAdmin || canManageUsers) && <SectionLabel label="Administração" />}
         {isAdmin && <NavItem to="/admin/org" icon={Building2} label="Estrutura Org." />}
-        {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão de usuários" />}
+        {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão de Usuários" />}
         {(isAdmin || isGestor) && <NavItem to="/admin/logs" icon={FileText} label="Logs de Auditoria" />}
-        {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catélogo Apps" />}
+        {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo de Apps" />}
         {isAdmin && <NavItem to="#" onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} icon={Bell} label="Central de Alertas" />}
       </>
     );
