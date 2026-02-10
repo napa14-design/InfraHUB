@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
 import { orgService } from '../services/orgService';
+import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { useToast } from './Shared/ToastContext';
 
@@ -57,7 +58,7 @@ export const AdminUserManagement: React.FC = () => {
   }, [currentUser?.id]);
 
   const loadData = async () => {
-    await orgService.initialize();
+    await orgService.initialize(authService.getCurrentUser() || undefined);
     let allUsers = await authService.getAllUsers();
     
     if (currentUser?.role === UserRole.GESTOR) {

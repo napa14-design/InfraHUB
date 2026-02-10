@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, Map, MapPin, Plus, Trash2, Edit2, Check, X, Layou
 import { useNavigate } from 'react-router-dom';
 import { Organization, Region, Sede, Local } from '../types';
 import { orgService } from '../services/orgService';
+import { authService } from '../services/authService';
 import { logger } from '../utils/logger';
 
 type Tab = 'org' | 'region' | 'sede' | 'local';
@@ -41,7 +42,7 @@ export const AdminOrgManagement: React.FC = () => {
 
   const handleForceRefresh = async () => {
     setIsLoading(true);
-    await orgService.initialize();
+    await orgService.initialize(authService.getCurrentUser() || undefined);
     refreshData();
     setIsLoading(false);
   };

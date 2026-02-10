@@ -1,5 +1,5 @@
 
-import { Organization, Region, Sede, Local } from '../types';
+import { Organization, Region, Sede, Local, User, UserRole } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_ORGS, MOCK_REGIONS, MOCK_SEDES, MOCK_LOCAIS } from '../constants';
 import { logService } from './logService';
@@ -34,7 +34,7 @@ const withTimeout = async <T>(promise: Promise<T>, ms = 8000): Promise<T> => {
 
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
-  initialize: async () => {
+  initialize: async (user?: User) => {
     if (initPromise) return initPromise;
     initPromise = (async () => {
     usingMocks = false;
@@ -50,56 +50,125 @@ export const orgService = {
           throw new Error("Mock Mode");
       }
 
-      logger.log("[OrgService] Fetching data...");
-      const [o, r, s, l] = await withTimeout(Promise.all([
-        supabase.from('organizations').select('*'),
-        supabase.from('regions').select('*'),
-        supabase.from('sedes').select('*'),
-        supabase.from('locais').select('*')
-      ]));
+      const isAdmin = !user || user.role === UserRole.ADMIN;
+      logger.log(`[OrgService] Fetching data${isAdmin ? '' : ' (scoped)' }...`);
 
-      if (o.error) logger.error("[OrgService] Error fetching Orgs:", o.error);
-      if (r.error) logger.error("[OrgService] Error fetching Regions:", r.error);
-      
-      if (o.error || r.error || s.error || l.error) throw new Error("Database error");
+      if (isAdmin) {
+        const [o, r, s, l] = await withTimeout(Promise.all([
+          supabase.from('organizations').select('id,name,logo_url'),
+          supabase.from('regions').select('id,name,organization_id'),
+          supabase.from('sedes').select('id,name,address,region_id'),
+          supabase.from('locais').select('id,name,tipo,sede_id')
+        ]));
 
-      // MAPPING: Convert Supabase snake_case to Frontend camelCase
-      if (o.data) {
-          cache.orgs = o.data.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              logoUrl: item.logo_url // Map logo_url -> logoUrl
-          }));
+        if (o.error) logger.error("[OrgService] Error fetching Orgs:", o.error);
+        if (r.error) logger.error("[OrgService] Error fetching Regions:", r.error);
+        
+        if (o.error || r.error || s.error || l.error) throw new Error("Database error");
+
+        // MAPPING: Convert Supabase snake_case to Frontend camelCase
+        if (o.data) {
+            cache.orgs = o.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                logoUrl: item.logo_url // Map logo_url -> logoUrl
+            }));
+        }
+
+        if (r.data) {
+            cache.regions = r.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                organizationId: item.organization_id // CRITICAL FIX: organization_id -> organizationId
+            }));
+        }
+
+        if (s.data) {
+            cache.sedes = s.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                address: item.address,
+                regionId: item.region_id // CRITICAL FIX: region_id -> regionId
+            }));
+        }
+
+        if (l.data) {
+            cache.locais = l.data.map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                tipo: item.tipo,
+                sedeId: item.sede_id // CRITICAL FIX: sede_id -> sedeId
+            }));
+        }
+
+        logger.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
+        hasSupabaseData = true;
+      } else {
+        const sedeIds = user?.sedeIds || [];
+        if (sedeIds.length === 0) {
+          cache.orgs = [];
+          cache.regions = [];
+          cache.sedes = [];
+          cache.locais = [];
+          hasSupabaseData = true;
+          return;
+        }
+
+        const [s, l] = await withTimeout(Promise.all([
+          supabase.from('sedes').select('id,name,address,region_id').in('id', sedeIds),
+          supabase.from('locais').select('id,name,tipo,sede_id').in('sede_id', sedeIds)
+        ]));
+
+        if (s.error || l.error) throw new Error("Database error");
+
+        const sedesData = s.data || [];
+        const locaisData = l.data || [];
+        const regionIds = Array.from(new Set(sedesData.map((item: any) => item.region_id).filter(Boolean)));
+
+        const r = regionIds.length
+          ? await withTimeout(supabase.from('regions').select('id,name,organization_id').in('id', regionIds))
+          : { data: [] as any[], error: null };
+
+        if (r.error) throw new Error("Database error");
+
+        const regionsData = r.data || [];
+        const orgIds = Array.from(new Set(regionsData.map((item: any) => item.organization_id).filter(Boolean)));
+
+        const o = orgIds.length
+          ? await withTimeout(supabase.from('organizations').select('id,name,logo_url').in('id', orgIds))
+          : { data: [] as any[], error: null };
+
+        if (o.error) throw new Error("Database error");
+
+        cache.sedes = sedesData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          address: item.address,
+          regionId: item.region_id
+        }));
+
+        cache.locais = locaisData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          tipo: item.tipo,
+          sedeId: item.sede_id
+        }));
+
+        cache.regions = regionsData.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          organizationId: item.organization_id
+        }));
+
+        cache.orgs = (o.data || []).map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          logoUrl: item.logo_url
+        }));
+
+        logger.log(`[OrgService] Loaded (scoped): ${cache.sedes.length} Sedes, ${cache.locais.length} Locais`);
+        hasSupabaseData = true;
       }
-
-      if (r.data) {
-          cache.regions = r.data.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              organizationId: item.organization_id // CRITICAL FIX: organization_id -> organizationId
-          }));
-      }
-
-      if (s.data) {
-          cache.sedes = s.data.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              address: item.address,
-              regionId: item.region_id // CRITICAL FIX: region_id -> regionId
-          }));
-      }
-
-      if (l.data) {
-          cache.locais = l.data.map((item: any) => ({
-              id: item.id,
-              name: item.name,
-              tipo: item.tipo,
-              sedeId: item.sede_id // CRITICAL FIX: sede_id -> sedeId
-          }));
-      }
-
-      logger.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
-      hasSupabaseData = true;
 
     } catch (err) {
       if (hadData) {
