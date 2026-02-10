@@ -2,6 +2,7 @@
 import { NotificationRule } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_RULES } from '../constants';
+import { logger } from '../utils/logger';
 
 const DEFAULT_RULES: NotificationRule[] = [
   // --- HYDROSYS ---
@@ -56,7 +57,7 @@ const DEFAULT_RULES: NotificationRule[] = [
     id: 'rule_pest_vector',
     moduleId: 'pestcontrol',
     name: 'Vetores Voadores',
-    description: 'Mosquitos, Muriçocas e Fumacê.',
+    description: 'Mosquitos, Muriçocas e fumaça.',
     warningDays: 3,
     criticalDays: 0,
     enabled: true
@@ -66,7 +67,7 @@ const DEFAULT_RULES: NotificationRule[] = [
     id: 'rule_pest_general',
     moduleId: 'pestcontrol',
     name: 'Outras Pragas (Geral)',
-    description: 'Regra padrão para tipos não especificados.',
+    description: 'Regra Padrão para tipos não especificados.',
     warningDays: 5,
     criticalDays: 0,
     enabled: true
@@ -82,7 +83,7 @@ export const configService = {
         if (error) {
             // Se a tabela não existir, retorna defaults para evitar crash
             if (error.code === '42P01') {
-                console.warn("Table notification_rules not found. Using defaults.");
+                logger.warn("Table notification_rules not found. Using defaults.");
                 return DEFAULT_RULES;
             }
             throw error;
@@ -117,7 +118,7 @@ export const configService = {
         return mergedRules;
 
     } catch (e) {
-        console.warn("Using Mock Rules due to error or offline mode.");
+        logger.warn("Using Mock Rules due to error or offline mode.");
         return MOCK_RULES || DEFAULT_RULES;
     }
   },
@@ -138,7 +139,7 @@ export const configService = {
         const { error } = await supabase.from('notification_rules').upsert(dbPayload);
         
         if (error) {
-            console.error("Error saving rule:", error);
+            logger.error("Error saving rule:", error);
             // Return valid string error message
             return { error: error.message || JSON.stringify(error) };
         }

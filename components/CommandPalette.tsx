@@ -42,7 +42,7 @@ export const CommandPalette: React.FC = () => {
     { 
       id: 'nav-hydro', 
       label: 'Módulo HydroSys', 
-      subLabel: 'Gestão de Água', 
+      subLabel: 'Gestão de água', 
       icon: Droplets, 
       action: () => navigate('/module/hydrosys'), 
       keywords: ['agua', 'hydro', 'modulo'] 
@@ -244,8 +244,8 @@ export const CommandPalette: React.FC = () => {
         {/* Footer */}
         <div className="px-4 py-2 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400 font-mono">
             <div className="flex gap-4">
-                <span><strong className="text-slate-500 dark:text-slate-300">↑↓</strong> Navegar</span>
-                <span><strong className="text-slate-500 dark:text-slate-300">↵</strong> Selecionar</span>
+                <span><strong className="text-slate-500 dark:text-slate-300">??</strong> Navegar</span>
+                <span><strong className="text-slate-500 dark:text-slate-300">?</strong> Selecionar</span>
             </div>
             <div className="flex items-center gap-1">
                 <Command size={10} /> <span>Command Center</span>

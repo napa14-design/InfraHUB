@@ -267,16 +267,16 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout }) => {
         <NavItem to="/" icon={LayoutGrid} label="Dashboard" />
         {(isAdmin || canManageUsers) && <SectionLabel label="Administração" />}
         {isAdmin && <NavItem to="/admin/org" icon={Building2} label="Estrutura Org." />}
-        {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão Usuários" />}
+        {canManageUsers && <NavItem to="/admin/users" icon={ShieldCheck} label="Gestão de Usuários" />}
         {(isAdmin || isGestor) && <NavItem to="/admin/logs" icon={FileText} label="Logs de Auditoria" />}
-        {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo Apps" />}
+        {isAdmin && <NavItem to="/admin/modules" icon={Layers} label="Catálogo de Apps" />}
         {isAdmin && <NavItem to="#" onClick={() => { setNotifFilter('ALL'); setIsNotifOpen(true); }} icon={Bell} label="Central de Alertas" />}
       </>
     );
   };
 
   const getModuleConfig = () => {
-      if (isHydroSys) return { title: 'HydroSys', subtitle: 'Gestão de Água', icon: Droplets, color: 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' };
+      if (isHydroSys) return { title: 'HydroSys', subtitle: 'Gestão de água', icon: Droplets, color: 'bg-gradient-to-br from-cyan-500 to-blue-600 shadow-cyan-500/30' };
       if (isPestControl) return { title: 'Pragas', subtitle: 'Controle Sanitário', icon: Bug, color: 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30' };
       return { title: 'InfraHub', subtitle: 'Infraestrutura', icon: LayoutGrid, color: 'bg-gradient-to-br from-brand-500 to-indigo-600 shadow-brand-500/30' };
   };

@@ -73,10 +73,10 @@ export const AdminNotificationConfig: React.FC = () => {
   };
 
   const handleReset = async () => {
-      if(confirm('Isso irá redefinir todas as regras para o padrão do sistema. Continuar?')) {
+      if(confirm('Isso irá redefinir todas as regras para o Padrão do sistema. Continuar?')) {
           setRules(await configService.resetDefaults());
           setHasChanges(false);
-          addToast("Regras redefinidas para o padrão.", "info");
+          addToast("Regras redefinidas para o Padrão.", "info");
       }
   }
 
@@ -125,7 +125,7 @@ export const AdminNotificationConfig: React.FC = () => {
             <Sliders className="text-brand-600 dark:text-brand-400" size={28} />
             SENSORES & ALERTAS
           </h1>
-          <p className="text-sm text-slate-500 font-mono">Calibragem de notificações por módulo.</p>
+          <p className="text-sm text-slate-500 font-mono">Calibragem de notificações por Módulo.</p>
         </div>
         
         <div className="flex gap-2">
@@ -134,7 +134,7 @@ export const AdminNotificationConfig: React.FC = () => {
                 className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
                 <RefreshCw size={16} className="mr-2" />
-                PADRÕES
+                PADR?.ES
             </button>
             <button 
                 onClick={handleSave}
@@ -169,7 +169,7 @@ export const AdminNotificationConfig: React.FC = () => {
 
       {/* TABS NAVIGATION */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
-          <TabButton id="hydrosys" label="Gestão Hídrica (HydroSys)" icon={Droplets} />
+          <TabButton id="hydrosys" label="gestão Hídrica (HydroSys)" icon={Droplets} />
           <TabButton id="pestcontrol" label="Controle de Pragas" icon={Bug} />
           <TabButton id="system" label="Sistema Geral" icon={Layout} />
       </div>
@@ -191,7 +191,7 @@ export const AdminNotificationConfig: React.FC = () => {
 
           {currentRules.length === 0 ? (
               <div className="p-12 text-center text-slate-400 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
-                  <p className="font-mono text-xs uppercase">Nenhuma regra encontrada para este módulo.</p>
+                  <p className="font-mono text-xs uppercase">Nenhuma regra encontrada para este Módulo.</p>
               </div>
           ) : (
               <div className="grid grid-cols-1 gap-6">
@@ -254,7 +254,7 @@ export const AdminNotificationConfig: React.FC = () => {
                                       <span>LIMITE CRÍTICO / ATRASO (ERROR)</span>
                                   </div>
                                   <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 w-fit rounded-lg">
-                                      <span className="text-[10px] font-mono text-slate-400 pl-2">APÓS</span>
+                                      <span className="text-[10px] font-mono text-slate-400 pl-2">AP?"S</span>
                                       <input 
                                         type="number"
                                         className="w-12 bg-transparent text-center font-mono font-bold text-slate-900 dark:text-white outline-none"

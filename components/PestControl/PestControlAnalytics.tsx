@@ -6,6 +6,15 @@ import { EmptyState } from '../Shared/EmptyState';
 import { User, PestControlEntry, UserRole } from '../../types';
 import { pestService } from '../../services/pestService';
 
+const ANALYTICS_COLOR_STYLES: Record<string, string> = {
+    emerald: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400',
+    amber: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
+    red: 'bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400',
+    blue: 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
+    purple: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
+    slate: 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+};
+
 // SVG Donut Chart Component
 const DonutChart = ({ percent, color, size = 120, stroke = 12, label }: { percent: number, color: string, size?: number, stroke?: number, label?: string }) => {
     const radius = (size - stroke) / 2;
@@ -57,18 +66,21 @@ const DonutChart = ({ percent, color, size = 120, stroke = 12, label }: { percen
     );
 };
 
-const StatWidget = ({ title, value, icon: Icon, color, subtext }: any) => (
-    <div className="bg-white dark:bg-[#16161a] p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
-        <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{title}</p>
-            <h3 className="text-3xl font-black text-slate-900 dark:text-white">{value}</h3>
-            {subtext && <p className="text-[10px] font-mono text-slate-500 mt-1">{subtext}</p>}
+const StatWidget = ({ title, value, icon: Icon, color, subtext }: any) => {
+    const iconStyle = ANALYTICS_COLOR_STYLES[color] || ANALYTICS_COLOR_STYLES.slate;
+    return (
+        <div className="bg-white dark:bg-[#16161a] p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between group hover:border-slate-300 dark:hover:border-slate-700 transition-all">
+            <div>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{title}</p>
+                <h3 className="text-3xl font-black text-slate-900 dark:text-white">{value}</h3>
+                {subtext && <p className="text-[10px] font-mono text-slate-500 mt-1">{subtext}</p>}
+            </div>
+            <div className={`p-4 rounded-2xl ${iconStyle} group-hover:scale-110 transition-transform`}>
+                <Icon size={24} />
+            </div>
         </div>
-        <div className={`p-4 rounded-2xl bg-${color}-50 dark:bg-${color}-500/10 text-${color}-600 dark:text-${color}-400 group-hover:scale-110 transition-transform`}>
-            <Icon size={24} />
-        </div>
-    </div>
-);
+    );
+};
 
 interface ProgressBarProps {
     label: string;
@@ -243,7 +255,7 @@ export const PestControlAnalytics: React.FC<{ user: User }> = ({ user }) => {
                            <AlertTriangle size={32} />
                        </div>
                        <div className="flex-1">
-                           <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase mb-1">Pontos de Atenção</h3>
+                           <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase mb-1">Pontos de atenção</h3>
                            <p className="text-sm text-slate-500 dark:text-slate-400">Unidades com maior volume de atrasos operacionais.</p>
                        </div>
                        <div className="flex flex-wrap gap-3 justify-center md:justify-end">

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Filter, AlertTriangle, CheckCircle, Clock, RotateCw, X, Plus, Trash2, Building2, MapPin, History, ArrowLeft, Calendar, User as UserIcon, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroFiltro, UserRole, Sede, LogEntry } from '../../types';
+import { User, HydroFiltro, UserRole, Sede, LogEntry, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
@@ -12,6 +12,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const [data, setData] = useState<HydroFiltro[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   // Filters
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
@@ -36,9 +37,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const initialNewFilter: Partial<HydroFiltro> = { sedeId: '', patrimonio: '', local: '', dataTroca: '', bebedouro: 'Bebedouro' };
   const [newFilter, setNewFilter] = useState<Partial<HydroFiltro>>(initialNewFilter);
 
-  useEffect(() => { loadData(); loadSedes(); }, [user]);
+  useEffect(() => { loadData(); loadSedes(); loadSettings(); }, [user]);
 
   const loadData = async () => setData(await hydroService.getFiltros(user));
+  const loadSettings = async () => setSettings(await hydroService.getSettings());
   const loadSedes = () => {
       const allSedes = orgService.getSedes();
       setAvailableSedes(user.role === UserRole.ADMIN ? allSedes : allSedes.filter(s => (user.sedeIds || []).includes(s.id)));
@@ -46,6 +48,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
 
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
   const isAdmin = user.role === UserRole.ADMIN;
+  const filtroMonths = settings?.validadeFiltroMeses || 6;
   
   const getDaysRemaining = (dateStr: string) => {
     if (!dateStr) return 999;
@@ -61,7 +64,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const handleExchangeClick = (item: HydroFiltro) => {
     setSelectedItem(item);
     const today = new Date();
-    const next = new Date(); next.setMonth(next.getMonth() + 6);
+    const next = new Date(); next.setMonth(next.getMonth() + filtroMonths);
     setTodayDate(today.toISOString().split('T')[0]);
     setNextDate(next.toISOString().split('T')[0]);
     setIsExchangeModalOpen(true);
@@ -96,7 +99,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
 
   const confirmAdd = async () => {
       if (newFilter.sedeId && newFilter.patrimonio && newFilter.local && newFilter.dataTroca) {
-          const next = new Date(newFilter.dataTroca); next.setMonth(next.getMonth() + 6);
+          const next = new Date(newFilter.dataTroca); next.setMonth(next.getMonth() + filtroMonths);
           await hydroService.saveFiltro({
               id: Date.now().toString(),
               sedeId: newFilter.sedeId,
@@ -109,7 +112,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
           await loadData();
           setIsAddModalOpen(false);
           setNewFilter(initialNewFilter);
-      } else { alert('Preencha os campos obrigatórios.'); }
+      } else { alert('Preencha os campos obrigatérios.'); }
   };
 
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
@@ -139,8 +142,8 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                             <Filter size={28} className="text-cyan-600 dark:text-cyan-500" />
                         </div>
                         <div>
-                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight font-mono uppercase">Gestão de Filtros</h1>
-                            <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">Manutenção de elementos filtrantes.</p>
+                            <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight font-mono uppercase">gestão de Filtros</h1>
+                            <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">manutenção de elementos filtrantes.</p>
                         </div>
                     </div>
                 </div>
@@ -178,7 +181,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
         </header>
 
         {filteredData.length === 0 ? (
-            <EmptyState icon={Filter} title="Nenhum Filtro Encontrado" description={selectedSedeFilter ? "Não há filtros cadastrados nesta unidade." : "Nenhum registro disponível."} actionLabel={canManage ? "Cadastrar Agora" : undefined} onAction={canManage ? handleAddNew : undefined} />
+            <EmptyState icon={Filter} title="Nenhum Filtro Encontrado" description={selectedSedeFilter ? "não há filtros cadastrados nesta unidade." : "Nenhum registro disponível."} actionLabel={canManage ? "Cadastrar Agora" : undefined} onAction={canManage ? handleAddNew : undefined} />
         ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
                 {filteredData.map(item => {
@@ -202,7 +205,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                             
                             <div className="bg-slate-50 dark:bg-black/20 rounded-2xl p-4 border border-slate-100 dark:border-slate-800 mb-6 flex justify-between items-center">
                                 <div>
-                                    <p className="text-[10px] uppercase text-slate-400 font-black tracking-widest mb-1">Próxima Troca</p>
+                                    <p className="text-[10px] uppercase text-slate-400 font-black tracking-widest mb-1">próxima Troca</p>
                                     <p className="text-sm font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.proximaTroca).toLocaleDateString()}</p>
                                 </div>
                                 <div className="text-right">
@@ -223,7 +226,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                 
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
                                     <button onClick={() => handleHistoryClick(item)} className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                                        <History size={16} /> Histórico
+                                        <History size={16} /> histórico
                                     </button>
                                     {canManage && (
                                         <button onClick={() => requestDelete(item)} className="p-3 text-red-400 hover:text-red-600 transition-colors">
@@ -243,16 +246,16 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
                     <div className="flex justify-between mb-6">
-                        <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Registrar Manutenção</h3>
+                        <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Registrar manutenção</h3>
                         <button onClick={() => setIsExchangeModalOpen(false)}><X size={20} className="text-slate-500"/></button>
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Data Realização</label>
-                            <input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={todayDate} onChange={e => { setTodayDate(e.target.value); const n = new Date(e.target.value); n.setMonth(n.getMonth()+6); setNextDate(n.toISOString().split('T')[0]); }} />
+                        <input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={todayDate} onChange={e => { setTodayDate(e.target.value); const n = new Date(e.target.value); n.setMonth(n.getMonth() + filtroMonths); setNextDate(n.toISOString().split('T')[0]); }} />
                         </div>
                         <div className="p-4 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20 rounded-2xl text-center">
-                            <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Nova Validade (+6 meses)</p>
+                            <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Nova Validade (+{filtroMonths} meses)</p>
                             <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">{new Date(nextDate).toLocaleDateString()}</p>
                         </div>
                         <button onClick={confirmExchange} className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20">CONFIRMAR TROCA</button>
@@ -285,7 +288,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                         <p className="text-[10px] font-black text-slate-400 uppercase mb-1">{new Date(log.timestamp).toLocaleString()}</p>
                                         <div className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-slate-800 p-3 rounded-xl">
                                             <div className="flex items-center gap-2 mb-1"><UserIcon size={12} className="text-slate-400" /><span className="text-xs font-bold text-slate-700 dark:text-slate-200">{log.userName}</span></div>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400 font-mono">{log.details || 'Manutenção realizada.'}</p>
+                                            <p className="text-xs text-slate-600 dark:text-slate-400 font-mono">{log.details || 'manutenção realizada.'}</p>
                                         </div>
                                     </div>
                                 ))}

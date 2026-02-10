@@ -67,7 +67,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
               globalFrequencies: { ...settings.globalFrequencies, [name]: 15 }
           });
           setNewPest('');
-          addToast(`${name} adicionada! Ciclo padrão de 15 dias definido na aba Global.`, "success");
+          addToast(`${name} adicionada! Ciclo Padrão de 15 dias definido na aba Global.`, "success");
       } else if (settings.pestTypes.includes(name)) {
           addToast("Esta praga já está cadastrada.", "warning");
       }
@@ -95,7 +95,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
       } else {
           const name = deleteTarget.id;
           setSettings({ ...settings, technicians: settings.technicians.filter(x => x.name !== name) });
-          addToast("Técnico removido.", "info");
+          addToast("técnico removido.", "info");
       }
       setDeleteModalOpen(false);
       setDeleteTarget(null);
@@ -106,7 +106,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
       if (name) {
           // Check if exists
           if (settings.technicians.some(t => t.name.toLowerCase() === name.toLowerCase())) {
-              addToast("Técnico já cadastrado.", "warning");
+              addToast("técnico já cadastrado.", "warning");
               return;
           }
 
@@ -116,7 +116,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
           });
           setNewTech('');
           setNewTechSede('');
-          addToast("Técnico adicionado com sucesso.", "success");
+          addToast("técnico adicionado com sucesso.", "success");
       }
   };
 
@@ -234,12 +234,12 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                         {/* TECNICOS */}
                         <div className="bg-white dark:bg-[#111114] p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2"><UserIcon size={20} className="text-cyan-600"/> Equipe / Técnicos</h3>
+                                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2"><UserIcon size={20} className="text-cyan-600"/> Equipe / técnicos</h3>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <input 
                                     className="w-full p-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-mono" 
-                                    placeholder="Nome do Técnico" 
+                                    placeholder="Nome do técnico" 
                                     value={newTech} 
                                     onChange={e => setNewTech(e.target.value)} 
                                 />
@@ -323,7 +323,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
            <div className="p-6 bg-slate-900 dark:bg-slate-800 rounded-3xl border border-slate-800 flex items-start gap-4">
                 <Info size={24} className="text-amber-500 flex-shrink-0" />
                 <p className="text-xs text-slate-300 leading-relaxed font-mono">
-                    <strong>NOTA DE SEGURANÇA:</strong> Alterar as frequências por sede afetará apenas os **novos** agendamentos gerados automaticamente após a conclusão da tarefa atual. Registros já agendados permanecem com suas datas originais.
+                    <strong>NOTA DE SEGURAN??A:</strong> Alterar as frequências por sede afetará apenas os **novos** agendamentos gerados automaticamente aPós a conclusão da tarefa atual. Registros já agendados permanecem com suas datas originais.
                 </p>
            </div>
        </div>
@@ -337,7 +337,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
                        <AlertCircle size={32} />
                    </div>
                    
-                   <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Confirmar Exclusão</h3>
+                   <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tight">Confirmar exclusão</h3>
                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
                        Tem certeza que deseja remover<br/>
                        <strong className="text-slate-900 dark:text-white">{deleteTarget.id}</strong><br/>

@@ -16,6 +16,7 @@ import { ReservoirFichaModal } from './ReservoirFichaModal';
 import { useToast } from '../Shared/ToastContext';
 import { useConfirmation } from '../Shared/ConfirmationContext';
 import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
+import { logger } from '../../utils/logger';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 
@@ -69,7 +70,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false); // Generic Edit
-  const [isFichaOpen, setIsFichaOpen] = useState(false); // Poço Specific
+  const [isFichaOpen, setIsFichaOpen] = useState(false); // poço Specific
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   const [editItem, setEditItem] = useState<any>(null);
@@ -81,6 +82,20 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [historyItem, setHistoryItem] = useState<any>(null);
 
   const isAdmin = user.role === UserRole.ADMIN;
+
+  const addMonths = (dateStr: string, months: number) => {
+      const d = new Date(dateStr);
+      d.setMonth(d.getMonth() + months);
+      return d.toISOString().split('T')[0];
+  };
+
+  const getLatestDate = (a?: string, b?: string) => {
+      const dates = [a, b].filter(Boolean) as string[];
+      if (dates.length === 0) return '';
+      return dates.reduce((latest, current) => (
+          new Date(current) > new Date(latest) ? current : latest
+      ), dates[0]);
+  };
 
   useEffect(() => {
       loadSedes();
@@ -134,6 +149,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           type: "info",
           confirmLabel: "Salvar",
           onConfirm: async () => {
+              const cycleMonths = activeTab === 'cisternas'
+                  ? (settings?.validadeLimpezaCisterna || 6)
+                  : (settings?.validadeLimpezaCaixa || 6);
+              const latestLimpeza = getLatestDate(editItem.dataLimpeza1, editItem.dataLimpeza2);
+              if (latestLimpeza) {
+                  editItem.dataUltimaLimpeza = latestLimpeza;
+                  editItem.proximaLimpeza = addMonths(latestLimpeza, cycleMonths);
+              }
               if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
               
               if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
@@ -141,7 +164,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
               
               await refresh();
               setIsModalOpen(false);
-              addToast("Reservatório atualizado com sucesso.", "success");
+              addToast("reservatório atualizado com sucesso.", "success");
           }
       });
   };
@@ -150,7 +173,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       if (!editItem) return;
 
       confirm({
-          title: "Finalizar Ficha Técnica",
+          title: "Finalizar Ficha TÉCNICA",
           message: "Isso atualizará o status do poço e calculará a próxima data de limpeza automaticamente.",
           type: "warning",
           confirmLabel: "Confirmar e Salvar",
@@ -169,7 +192,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                     statusLimpeza = getComputedStatus(nextLimpeza);
                     
                     const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
-                    feedbackMsg = `Ficha salva! Próxima limpeza: ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
+                    feedbackMsg = `Ficha salva! próxima limpeza: ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
                 }
 
                 const updatedPoco = {
@@ -199,7 +222,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
           const allLogs = await logService.getAll();
           const relevant = allLogs.filter(l => l.module === 'HYDROSYS' && (l.target.includes(item.local) || (l.details && l.details.includes(item.local))));
           setHistoryLogs(relevant);
-      } catch (e) { console.error(e); } finally { setLoadingHistory(false); }
+      } catch (e) { logger.error(e); } finally { setLoadingHistory(false); }
   };
 
   const TabButton = ({ id, label, count, icon: Icon }: any) => (
@@ -260,7 +283,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
             {/* Tabs */}
             <div className="flex flex-col md:flex-row gap-4">
-                <TabButton id="pocos" label="Poços Artesianos" count={filterList(pocos).length} icon={Activity} />
+                <TabButton id="pocos" label="poços Artesianos" count={filterList(pocos).length} icon={Activity} />
                 <TabButton id="cisternas" label="Cisternas" count={filterList(cisternas).length} icon={Waves} />
                 <TabButton id="caixas" label="Caixas D'água" count={filterList(caixas).length} icon={Box} />
             </div>
@@ -272,7 +295,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                    <span className="text-xs font-mono uppercase tracking-widest">Carregando dados...</span>
                </div>
             ) : data.length === 0 ? (
-                <EmptyState icon={Droplet} title="Nenhum registro" description="Não encontramos itens com os filtros atuais." />
+                <EmptyState icon={Droplet} title="Nenhum registro" description="não encontramos itens com os filtros atuais." />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {data.map((item: any) => {
@@ -313,11 +336,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                                 <div className="flex gap-2 mb-2 text-[10px] font-bold uppercase text-slate-400"><Droplet size={12} className="text-blue-500" /> Limpeza</div>
                                                 <div className="grid grid-cols-2 gap-2 text-center">
                                                     <div className="p-2 rounded border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30">
-                                                        <span className="text-[8px] font-bold uppercase block mb-1">Última</span>
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">última</span>
                                                         <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatDate(item.dataUltimaLimpeza || '')}</span>
                                                     </div>
                                                     <div className={`p-2 rounded border ${isDelayed ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
-                                                        <span className="text-[8px] font-bold uppercase block mb-1">Próxima</span>
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">próxima</span>
                                                         <span className={`text-xs font-mono font-bold ${isDelayed ? 'text-red-600' : 'text-slate-600 dark:text-slate-400'}`}>{formatDate(item.proximaLimpeza || '')}</span>
                                                     </div>
                                                 </div>
@@ -328,7 +351,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                             <div className="flex gap-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">
                                                 <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.capacidade || '-'} L</span> CAPACIDADE</div>
                                                 <div className="w-px h-3 bg-slate-300"></div>
-                                                <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.numCelulas}</span> CÉLULAS</div>
+                                                <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.numCelulas}</span> células</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3 text-center">
                                                 <div className="p-2 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
@@ -348,7 +371,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                     <div className="grid grid-cols-2 gap-2">
                                         <button onClick={() => handleEdit(item)} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm">
                                             {activeTab === 'pocos' ? <ClipboardList size={14}/> : <RotateCw size={14}/>} 
-                                            {activeTab === 'pocos' ? 'Ficha Técnica' : 'Manutenção'}
+                                            {activeTab === 'pocos' ? 'Ficha TÉCNICA' : 'manutenção'}
                                         </button>
                                         
                                         {item.fichaOperacional && item.fichaOperacional !== 'LINK' ? (
@@ -383,7 +406,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Editar Reservatório</h3>
+                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Editar reservatório</h3>
                             <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-500"/></button>
                         </div>
                         <div className="space-y-4">
@@ -402,7 +425,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
-                            <div><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase">Histórico</h3><p className="text-xs text-slate-500">{historyItem.local}</p></div>
+                            <div><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase">histórico</h3><p className="text-xs text-slate-500">{historyItem.local}</p></div>
                             <button onClick={() => setIsHistoryOpen(false)}><X size={20} className="text-slate-500"/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">

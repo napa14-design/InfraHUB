@@ -155,7 +155,7 @@ export interface HydroFiltro {
   proximaTroca: string;
 }
 
-// --- TIPAGEM AVANÇADA FICHA POÇO ---
+// --- TIPAGEM AVANÇADA FICHA poço ---
 export interface DadosPrePos {
   profundidade: string;
   nivelEstatico: string;
@@ -191,7 +191,7 @@ export interface FichaPoco {
   patrimonioBomba: string;
   marcaBomba: string;
   modeloBomba: string;
-  // Especificação Poço
+  // Especificação poço
   preLimpeza: DadosPrePos;
   posLimpeza: DadosPrePos;
   // Materiais

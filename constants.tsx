@@ -9,14 +9,14 @@ export const MOCK_ORGS: Organization[] = [
   { id: 'org-uni', name: 'Universidade', logoUrl: '' }
 ];
 
-// Nível 2: Regiões
+// Nível 2: regiões
 export const MOCK_REGIONS: Region[] = [
   // --- COLÉGIO ---
-  { id: 'reg-dt', organizationId: 'org-colegio', name: 'Região Dionísio Torres' },
-  { id: 'reg-ald-col', organizationId: 'org-colegio', name: 'Região Aldeota' }, // BS, SP, PNV
-  { id: 'reg-pql-col', organizationId: 'org-colegio', name: 'Região Parquelândia' },
-  { id: 'reg-sul', organizationId: 'org-colegio', name: 'Região Sul' },
-  { id: 'reg-benfica', organizationId: 'org-colegio', name: 'Região Benfica' },
+  { id: 'reg-dt', organizationId: 'org-colegio', name: 'região Dionísio Torres' },
+  { id: 'reg-ald-col', organizationId: 'org-colegio', name: 'região Aldeota' }, // BS, SP, PNV
+  { id: 'reg-pql-col', organizationId: 'org-colegio', name: 'região Parquelândia' },
+  { id: 'reg-sul', organizationId: 'org-colegio', name: 'região Sul' },
+  { id: 'reg-benfica', organizationId: 'org-colegio', name: 'região Benfica' },
   
   // --- UNIVERSIDADE ---
   { id: 'reg-campus', organizationId: 'org-uni', name: 'Campus Universitários' }
@@ -26,30 +26,30 @@ export const MOCK_REGIONS: Region[] = [
 export const MOCK_SEDES: Sede[] = [
   // ================= COLÉGIO =================
 
-  // Região Dionísio Torres
+  // região Dionísio Torres
   { id: 'DT', regionId: 'reg-dt', name: 'DT (Sede Principal)' },
   { id: 'DT1', regionId: 'reg-dt', name: 'DT 1' },
   { id: 'DT2', regionId: 'reg-dt', name: 'DT 2' },
   { id: 'PDT', regionId: 'reg-dt', name: 'PDT' },
   { id: 'IDIOMAS', regionId: 'reg-dt', name: 'IDIOMAS' },
 
-  // Região Aldeota (Apenas os listados para Colégio)
+  // região Aldeota (Apenas os listados para Colégio)
   { id: 'BS', regionId: 'reg-ald-col', name: 'BS' },
   { id: 'SP', regionId: 'reg-ald-col', name: 'SP' },
   { id: 'PNV', regionId: 'reg-ald-col', name: 'PNV' },
 
-  // Região Parquelândia (Colégio)
+  // região Parquelândia (Colégio)
   { id: 'PQL1', regionId: 'reg-pql-col', name: 'PQL 1' },
   { id: 'PQL2', regionId: 'reg-pql-col', name: 'PQL 2' },
   { id: 'PJF', regionId: 'reg-pql-col', name: 'PJF' },
 
-  // Região Sul
+  // região Sul
   { id: 'SUL1', regionId: 'reg-sul', name: 'SUL 1' },
   { id: 'SUL2', regionId: 'reg-sul', name: 'SUL 2' },
   { id: 'SUL3', regionId: 'reg-sul', name: 'SUL 3' },
   { id: 'PSUL', regionId: 'reg-sul', name: 'PSUL' },
 
-  // Região Benfica (Colégio)
+  // região Benfica (Colégio)
   { id: 'BN', regionId: 'reg-benfica', name: 'BN (Colégio)' },
 
   // ================= UNIVERSIDADE =================
@@ -218,7 +218,7 @@ export const INITIAL_MODULES: AppModule[] = [
   {
     id: 'org-structure',
     title: 'Estrutura Organizacional',
-    description: 'Gerenciar Instituições, Regiões, Sedes e Locais.',
+    description: 'Gerenciar Instituições, regiões, Sedes e Locais.',
     iconName: 'Building2',
     minRole: UserRole.ADMIN,
     path: '/admin/org',
@@ -312,7 +312,7 @@ export const HYDROSYS_SUBMODULES = [
   {
     id: 'hs-cloro',
     title: 'Medição de Cloro',
-    description: 'Registro diário de níveis de cloro.',
+    description: 'Registro Diário de níveis de cloro.',
     iconName: 'TestTube',
     roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
   },
@@ -325,7 +325,7 @@ export const HYDROSYS_SUBMODULES = [
   },
   {
     id: 'hs-limpeza',
-    title: 'Limpeza de Reservatório',
+    title: 'Limpeza de Reservatórios',
     description: 'Agendamento e laudos de higienização.',
     iconName: 'Droplet',
     roles: [UserRole.OPERATIONAL, UserRole.GESTOR, UserRole.ADMIN]
@@ -357,7 +357,7 @@ export const PESTCONTROL_SUBMODULES = [
   },
   {
     id: 'pc-config',
-    title: 'Configuração',
+    title: 'Configurações',
     description: 'Regras e períodos de serviço.',
     iconName: 'Settings',
     roles: [UserRole.ADMIN]

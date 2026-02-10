@@ -5,6 +5,8 @@ import { pestService } from './pestService';
 import { configService } from './configService';
 import { orgService } from './orgService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { logger } from '../utils/logger';
+import { diffDaysFromToday } from '../utils/dateUtils';
 
 // Evento customizado para notificar a UI
 const NOTIFICATION_UPDATE_EVENT = 'nexus_notification_update';
@@ -15,7 +17,7 @@ export const notificationService = {
       window.dispatchEvent(new Event(NOTIFICATION_UPDATE_EVENT));
   },
 
-  // Método para o componente ouvir
+  // método para o componente ouvir
   onRefresh: (callback: () => void) => {
       window.addEventListener(NOTIFICATION_UPDATE_EVENT, callback);
       return () => window.removeEventListener(NOTIFICATION_UPDATE_EVENT, callback);
@@ -47,7 +49,7 @@ export const notificationService = {
             module_source: notification.moduleSource,
             timestamp: notification.timestamp.toISOString()
         });
-        if (error) console.error("Erro ao criar notificação", error);
+        if (error) logger.error("Erro ao criar notificação", error);
     }
     if (notification.type === 'ERROR' && !notification.read) {
         notificationService.sendBrowserNotification(notification);
@@ -103,24 +105,18 @@ export const notificationService = {
               window.focus();
               if (notification.link) window.location.href = `/#${notification.link}`;
           };
-      } catch (e) { console.error(e); }
+      } catch (e) { logger.error(e); }
   },
 
   checkSystemStatus: async (user: User) => {
-    // Operacionais não veem notificações de sistema, apenas Gestores e Admins
+    // Operacionais não veem NOTIFICAÇÕES de sistema, apenas Gestores e Admins
     if (user.role === UserRole.OPERATIONAL) return;
 
     const rules = await configService.getNotificationRules();
     const today = new Date();
     today.setHours(0,0,0,0);
 
-    const getDiffDays = (dateStr: string) => {
-        if (!dateStr) return 999;
-        const [year, month, day] = dateStr.split('-').map(Number);
-        const target = new Date(year, month - 1, day);
-        const diff = target.getTime() - today.getTime();
-        return Math.ceil(diff / (1000 * 60 * 60 * 24));
-    };
+    const getDiffDays = (dateStr: string) => diffDaysFromToday(dateStr);
 
     // ==========================================
     // 1. HYDROSYS CERTIFICADOS (Individual)
@@ -167,7 +163,7 @@ export const notificationService = {
     }
 
     // ==========================================
-    // 2. HYDROSYS AGREGADO (Reservatórios e Filtros)
+    // 2. HYDROSYS AGREGADO (reservatórios e Filtros)
     // ==========================================
     // Lógica para agrupar alertas por SEDE e evitar poluição (spam)
     const resRule = rules.find(r => r.id === 'rule_res');
@@ -206,7 +202,7 @@ export const notificationService = {
             return issuesMap[sedeId];
         };
 
-        // Processar Reservatórios por Tipo
+        // Processar reservatórios por Tipo
         if (resRule && resRule.enabled) {
             allReservatorios.forEach(item => {
                 const days = getDiffDays(item.proximaLimpeza);
@@ -252,13 +248,13 @@ export const notificationService = {
                 let parts = [];
                 
                 // Críticos
-                if (counts.pocoCrit > 0) parts.push(`${counts.pocoCrit} Poço(s) Venc.`);
+                if (counts.pocoCrit > 0) parts.push(`${counts.pocoCrit} poço(s) Venc.`);
                 if (counts.cistCrit > 0) parts.push(`${counts.cistCrit} Cisterna(s) Venc.`);
                 if (counts.caixaCrit > 0) parts.push(`${counts.caixaCrit} Caixa(s) Venc.`);
                 if (counts.filtCrit > 0) parts.push(`${counts.filtCrit} Filtros Venc.`);
 
                 // Warnings
-                if (counts.pocoWarn > 0) parts.push(`${counts.pocoWarn} Poço(s) Próx.`);
+                if (counts.pocoWarn > 0) parts.push(`${counts.pocoWarn} poço(s) Próx.`);
                 if (counts.cistWarn > 0) parts.push(`${counts.cistWarn} Cisterna(s) Próx.`);
                 if (counts.caixaWarn > 0) parts.push(`${counts.caixaWarn} Caixa(s) Próx.`);
                 if (counts.filtWarn > 0) parts.push(`${counts.filtWarn} Filtros Próx.`);
@@ -270,7 +266,7 @@ export const notificationService = {
 
                 await notificationService.add({
                     id: notifId,
-                    title: isCritical ? `Atenção Crítica: ${sedeId}` : `Manutenção Prevista: ${sedeId}`,
+                    title: isCritical ? `atenção crítica: ${sedeId}` : `manutenção Prevista: ${sedeId}`,
                     message: message,
                     type: isCritical ? 'ERROR' : 'WARNING',
                     read: false,
@@ -311,7 +307,7 @@ export const notificationService = {
             await notificationService.add({
                 id: `pest-crit-${entry.id}`,
                 title: 'Dedetização Atrasada',
-                message: `Serviço de ${entry.target} em ${entry.sedeId} está atrasado (${Math.abs(days)} dias).`,
+                message: `serviço de ${entry.target} em ${entry.sedeId} está atrasado (${Math.abs(days)} dias).`,
                 type: 'ERROR',
                 read: false,
                 timestamp: new Date(),
@@ -321,8 +317,8 @@ export const notificationService = {
         } else if (days <= activeRule.warningDays) {
             await notificationService.add({
                 id: `pest-warn-${entry.id}`,
-                title: 'Dedetização Próxima',
-                message: `Serviço de ${entry.target} em ${entry.sedeId} agendado para ${days === 0 ? 'hoje' : 'daqui a ' + days + ' dias'}.`,
+                title: 'Dedetização próxima',
+                message: `serviço de ${entry.target} em ${entry.sedeId} agendado para ${days === 0 ? 'hoje' : 'daqui a ' + days + ' dias'}.`,
                 type: 'WARNING',
                 read: false,
                 timestamp: new Date(),

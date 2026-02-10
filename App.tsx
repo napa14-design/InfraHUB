@@ -1,3 +1,4 @@
+
 import React, { Component, useState, useEffect, Suspense, lazy, ReactNode } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole } from './types';
@@ -6,8 +7,10 @@ import { orgService } from './services/orgService';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
 import { ToastProvider } from './components/Shared/ToastContext';
-import { ConfirmationProvider } from './components/Shared/ConfirmationContext'; // Import ConfirmationProvider
-import { Instructions } from './supabase_setup';
+import { ConfirmationProvider } from './components/Shared/ConfirmationContext';
+import { logger } from './utils/logger';
+
+logger.log('[App] Module loaded');
 
 // --- ERROR BOUNDARY FOR LAZY LOADING ---
 interface ErrorBoundaryProps {
@@ -16,6 +19,7 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean;
+  error?: Error;
 }
 
 class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
@@ -25,11 +29,11 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   }
 
   static getDerivedStateFromError(error: any): ErrorBoundaryState {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error: any, errorInfo: any) {
-    console.error("Lazy Load Error:", error, errorInfo);
+    logger.error("Application Error (ErrorBoundary caught):", error, errorInfo);
   }
 
   render() {
@@ -38,12 +42,17 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 text-center">
           <div className="max-w-md p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-mono uppercase">Erro de Carregamento</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha ao baixar o módulo. Verifique sua conexão.</p>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha crítica na aplicação.</p>
+            <div className="text-xs text-red-500 mb-4 font-mono bg-red-50 dark:bg-red-900/10 p-2 rounded break-all text-left overflow-auto max-h-32">
+                {this.state.error?.message || 'Erro desconhecido'}
+                <br/>
+                Check console for details.
+            </div>
             <button 
               onClick={() => { this.setState({ hasError: false }); window.location.reload(); }} 
               className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-colors"
             >
-              Tentar Novamente
+              Recarregar Página
             </button>
           </div>
         </div>
@@ -59,7 +68,17 @@ const lazyImport = <T extends React.ComponentType<any>>(
   factory: () => Promise<{ [key: string]: T }>,
   name: string
 ): React.LazyExoticComponent<T> => {
-  return lazy(() => factory().then((module) => ({ default: module[name as keyof typeof module] })));
+  return lazy(() => 
+    factory()
+      .then((module) => {
+        // console.log(`[LazyImport] Loaded: ${name}`); 
+        return { default: module[name as keyof typeof module] };
+      })
+      .catch(err => {
+        logger.error(`[LazyImport] Failed to load ${name}:`, err);
+        throw err;
+      })
+  );
 };
 
 // Core Components
@@ -75,8 +94,10 @@ const AdminModuleManagement = lazyImport(() => import('./components/AdminModuleM
 const AdminOrgManagement = lazyImport(() => import('./components/AdminOrgManagement'), 'AdminOrgManagement');
 const AdminNotificationConfig = lazyImport(() => import('./components/AdminNotificationConfig'), 'AdminNotificationConfig');
 const AuditLogs = lazyImport(() => import('./components/AuditLogs'), 'AuditLogs');
+const Instructions = lazyImport(() => import('./supabase_setup'), 'Instructions');
 
 // HydroSys Components
+// CORRECTION: Changed from ./components/HydroSys/HydroSysDashboard to ./components/HydroSysDashboard
 const HydroSysDashboard = lazyImport(() => import('./components/HydroSysDashboard'), 'HydroSysDashboard');
 const HydroCertificados = lazyImport(() => import('./components/HydroSys/HydroCertificados'), 'HydroCertificados');
 const HydroCloro = lazyImport(() => import('./components/HydroSys/HydroCloro'), 'HydroCloro');
@@ -97,7 +118,7 @@ const PageLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
     <div className="flex flex-col items-center gap-4">
        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 dark:border-brand-400"></div>
-       <p className="text-slate-400 font-mono text-xs animate-pulse uppercase tracking-widest">Carregando Módulo...</p>
+       <p className="text-slate-400 font-mono text-xs animate-pulse uppercase tracking-widest">Carregando...</p>
     </div>
   </div>
 );
@@ -111,7 +132,7 @@ const AuthObserver = () => {
 
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
-        console.log("Password Recovery Event Detected - Redirecting...");
+        logger.log("Password Recovery Event Detected - Redirecting...");
         navigate('/update-password');
       }
     });
@@ -131,14 +152,14 @@ const PWANavigator = ({ user }: { user: User | null }) => {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    // Só executa se tiver usuário e ainda não tiver verificado nesta sessão do componente
+    // Só executa se tiver USUÁRIO e ainda não tiver verificado nesta sessão do componente
     if (user && !checked) {
        const params = new URLSearchParams(window.location.search);
        const mode = params.get('mode');
        
        if (mode === 'cloro') {
-           console.log("[PWA] Redirecting to Cloro Module");
-           // Navega para o módulo e remove o query param da história para não ficar preso
+           logger.log("[PWA] Redirecting to Cloro Module");
+           // Navega para o Módulo e remove o query param da história para não ficar preso
            navigate('/module/hydrosys/cloro', { replace: true });
        }
        setChecked(true);
@@ -154,21 +175,25 @@ const App: React.FC = () => {
   const [redirectPath, setRedirectPath] = useState<string>('/');
 
   useEffect(() => {
+    logger.log('[App] Initializing...');
     const initApp = async () => {
         try {
             if (isSupabaseConfigured()) {
                 await supabase.auth.getSession();
             }
         } catch (e) {
-            console.warn("Session check failed", e);
+            logger.warn("Session check failed", e);
         }
 
         await orgService.initialize();
 
-        const currentUser = authService.getCurrentUser();
+        const currentUser = await authService.refreshSessionUser();
         if (currentUser) {
-            setUser(currentUser);
+            logger.log('[App] User found:', currentUser.email);
+        } else {
+            logger.log('[App] No user session found.');
         }
+        setUser(currentUser);
         
         // PWA Initial Detection for Login Redirect
         const params = new URLSearchParams(window.location.search);
@@ -182,16 +207,26 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  const handleLogin = async (email: string) => {
-    const users = await authService.getAllUsers();
-    const foundUser = users.find(u => u.email === email);
-    
-    if (foundUser) {
-      setUser(foundUser);
-      await orgService.initialize();
-      return true;
-    }
-    return false;
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) {
+        setUser(null);
+        return;
+      }
+      const refreshed = await authService.refreshSessionUser();
+      setUser(refreshed);
+    });
+
+    return () => {
+      if (data?.subscription) data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const handleLogin = async (userToSet: User) => {
+    setUser(userToSet);
+    await orgService.initialize();
+    return true;
   };
 
   const handleLogout = () => {
@@ -217,7 +252,7 @@ const App: React.FC = () => {
                   <Route 
                     path="/login" 
                     element={
-                      // Se o usuário logar, usa o redirectPath definido no useEffect inicial
+                      // Se o USUÁRIO logar, usa o redirectPath definido no useEffect inicial
                       user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
                     } 
                   />

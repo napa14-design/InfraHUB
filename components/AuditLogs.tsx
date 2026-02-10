@@ -178,7 +178,7 @@ export const AuditLogs: React.FC = () => {
               currentUser, 
               'AUDIT', 
               'EXPORT', 
-              'Relatório CSV', 
+              'relatório CSV', 
               `Exportou ${filteredLogs.length} registros.`
           );
           // 3. Refresh list to show the new log entry
@@ -200,9 +200,9 @@ export const AuditLogs: React.FC = () => {
   // --- CONFIGURAÇÃO VISUAL DOS FILTROS DE AÇÃO ---
   const actionFiltersConfig = [
       { id: 'ALL', label: 'Todas', icon: Activity, activeClass: 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' },
-      { id: 'CREATE', label: 'Criação', icon: CheckCircle2, activeClass: 'bg-emerald-600 text-white shadow-emerald-500/30 shadow-md' },
+      { id: 'CREATE', label: 'criação', icon: CheckCircle2, activeClass: 'bg-emerald-600 text-white shadow-emerald-500/30 shadow-md' },
       { id: 'UPDATE', label: 'Edição', icon: RefreshCw, activeClass: 'bg-blue-600 text-white shadow-blue-500/30 shadow-md' },
-      { id: 'DELETE', label: 'Exclusão', icon: AlertTriangle, activeClass: 'bg-red-600 text-white shadow-red-500/30 shadow-md' },
+      { id: 'DELETE', label: 'exclusão', icon: AlertTriangle, activeClass: 'bg-red-600 text-white shadow-red-500/30 shadow-md' },
       { id: 'LOGIN', label: 'Acesso', icon: Shield, activeClass: 'bg-purple-600 text-white shadow-purple-500/30 shadow-md' },
       { id: 'EXPORT', label: 'Exportação', icon: Download, activeClass: 'bg-amber-500 text-white shadow-amber-500/30 shadow-md' },
   ];
@@ -248,8 +248,8 @@ export const AuditLogs: React.FC = () => {
       {/* STATS ROW */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <StatCard label="Eventos Listados" value={stats.total} icon={Database} color="bg-brand-500" />
-          <StatCard label="Ações Críticas" value={stats.critical} icon={AlertTriangle} color="bg-red-500" />
-          <StatCard label="Usuários Ativos" value={stats.users} icon={User} color="bg-emerald-500" />
+          <StatCard label="Ações críticas" value={stats.critical} icon={AlertTriangle} color="bg-red-500" />
+          <StatCard label="usuários Ativos" value={stats.users} icon={User} color="bg-emerald-500" />
           <StatCard label="Módulos" value={stats.modules} icon={Terminal} color="bg-purple-500" />
       </div>
 
@@ -261,7 +261,7 @@ export const AuditLogs: React.FC = () => {
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <input 
                 className="w-full pl-11 pr-4 py-3 bg-transparent text-sm outline-none font-mono text-slate-700 dark:text-slate-200 placeholder-slate-400"
-                placeholder="Buscar ID, Usuário ou Detalhes..."
+                placeholder="Buscar ID, usuário ou Detalhes..."
                 value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               />
@@ -344,8 +344,8 @@ export const AuditLogs: React.FC = () => {
                       <tr>
                           <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-48">Timestamp</th>
                           <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-32">Módulo</th>
-                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-48">Usuário</th>
-                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-32">Ação</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-48">usuário</th>
+                          <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest w-32">ação</th>
                           <th className="px-6 py-4 text-slate-400 text-[10px] font-black uppercase tracking-widest">Detalhes do Evento</th>
                       </tr>
                   </thead>

@@ -4,6 +4,7 @@ import { ArrowLeft, Building2, Map, MapPin, Plus, Trash2, Edit2, Check, X, Layou
 import { useNavigate } from 'react-router-dom';
 import { Organization, Region, Sede, Local } from '../types';
 import { orgService } from '../services/orgService';
+import { logger } from '../utils/logger';
 
 type Tab = 'org' | 'region' | 'sede' | 'local';
 
@@ -140,7 +141,7 @@ export const AdminOrgManagement: React.FC = () => {
                       });
                       successCount++;
                   } else {
-                      console.warn(`Sede ID invalido na linha ${i + 1}: ${sedeId}`);
+                      logger.warn(`Sede ID invalido na linha ${i + 1}: ${sedeId}`);
                       errorCount++;
                   }
               } else {
@@ -149,7 +150,7 @@ export const AdminOrgManagement: React.FC = () => {
           }
 
           setIsLoading(false);
-          alert(`Processamento Finalizado!\n\n✅ Importados: ${successCount}\n❌ Falhas/Ignorados: ${errorCount}\n\nNota: Certifique-se que o SEDE_ID existe.`);
+          alert(`Processamento Finalizado!\n\nNº Importados: ${successCount}\nNº Falhas/Ignorados: ${errorCount}\n\nNota: Certifique-se que o SEDE_ID existe.`);
           refreshData();
           if (fileInputRef.current) fileInputRef.current.value = '';
       };

@@ -5,9 +5,10 @@ import { authService } from '../services/authService';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { Link } from 'react-router-dom';
 import { useTheme } from './ThemeContext';
+import { User } from '../types';
 
 interface LoginProps {
-  onLogin: (email: string) => Promise<boolean>;
+  onLogin: (user: User) => Promise<boolean>;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -62,7 +63,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
       }
 
       if (result.user) {
-         await onLogin(result.user.email);
+         await onLogin(result.user);
       }
 
     } catch (err) {
@@ -280,7 +281,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
           </div>
           
           <p className="text-lg text-slate-600 dark:text-white/40 leading-relaxed">
-            Plataforma unificada para gestão de infraestrutura, 
+            Plataforma unificada para gestáo de infraestrutura, 
             monitoramento de recursos e operações em tempo real.
           </p>
 
@@ -302,7 +303,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
         {/* Bottom - Technical Footer */}
         <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 dark:text-white/20">
           <span>LAT -3.7319 | LONG -38.5267</span>
-          <span>© {new Date().getFullYear()} GRUPO CHRISTUS</span>
+          <span>©{new Date().getFullYear()} GRUPO CHRISTUS</span>
           <span>v2.0.0</span>
         </div>
       </div>
@@ -412,7 +413,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                             : 'bg-slate-50 dark:bg-white/[0.02] border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 text-slate-700 dark:text-white placeholder-slate-400 dark:placeholder-white/20'
                         }
                       `}
-                      placeholder="••••••••"
+                      placeholder="........"
                     />
                     <button
                       type="button"
@@ -522,7 +523,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin }) => {
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-2 h-2 bg-brand-600 dark:bg-orange-500" />
                         <span className="text-[10px] font-mono text-brand-600/70 dark:text-orange-500/70 uppercase tracking-widest">
-                          Recuperação
+                          recuperação
                         </span>
                       </div>
                       <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Recuperar Acesso</h3>

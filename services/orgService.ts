@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { MOCK_ORGS, MOCK_REGIONS, MOCK_SEDES, MOCK_LOCAIS } from '../constants';
 import { logService } from './logService';
 import { authService } from './authService';
+import { logger } from '../utils/logger';
 
 // Cache em memória
 let cache = {
@@ -17,26 +18,38 @@ let usingMocks = false;
 
 const getCurrentUser = () => authService.getCurrentUser();
 
+const withTimeout = async <T>(promise: Promise<T>, ms = 8000): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('timeout')), ms);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 export const orgService = {
   // Inicializa o cache buscando do Supabase ou usando Mocks
   initialize: async () => {
     usingMocks = false;
     try {
       if (!isSupabaseConfigured()) {
-          console.warn("Supabase not configured. Using Mock Data for OrgService.");
+          logger.warn("Supabase not configured. Using Mock Data for OrgService.");
           throw new Error("Mock Mode");
       }
 
-      console.log("[OrgService] Fetching data...");
-      const [o, r, s, l] = await Promise.all([
+      logger.log("[OrgService] Fetching data...");
+      const [o, r, s, l] = await withTimeout(Promise.all([
         supabase.from('organizations').select('*'),
         supabase.from('regions').select('*'),
         supabase.from('sedes').select('*'),
         supabase.from('locais').select('*')
-      ]);
+      ]));
 
-      if (o.error) console.error("[OrgService] Error fetching Orgs:", o.error);
-      if (r.error) console.error("[OrgService] Error fetching Regions:", r.error);
+      if (o.error) logger.error("[OrgService] Error fetching Orgs:", o.error);
+      if (r.error) logger.error("[OrgService] Error fetching Regions:", r.error);
       
       if (o.error || r.error || s.error || l.error) throw new Error("Database error");
 
@@ -75,10 +88,10 @@ export const orgService = {
           }));
       }
 
-      console.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
+      logger.log(`[OrgService] Loaded: ${cache.orgs.length} Orgs, ${cache.regions.length} Regions`);
 
     } catch (err) {
-      console.log("Using Fallback Data for OrgService due to error or config.");
+      logger.log("Using Fallback Data for OrgService due to error or config.");
       usingMocks = true;
       cache.orgs = MOCK_ORGS;
       cache.regions = MOCK_REGIONS;
@@ -90,7 +103,7 @@ export const orgService = {
   // Verifica se está usando dados mockados
   isMockMode: () => usingMocks,
 
-  // Leituras (Síncronas via Cache)
+  // Leituras (Sóncronas via Cache)
   getOrgs: () => [...cache.orgs],
   getRegions: () => [...cache.regions],
   getSedes: () => [...cache.sedes],
@@ -101,7 +114,7 @@ export const orgService = {
   getSedeById: (id: string) => cache.sedes.find(s => s.id === id),
   getLocalById: (id: string) => cache.locais.find(l => l.id === id),
 
-  // Escritas (Assíncronas + Atualização de Cache)
+  // Escritas (Assíncronas + atualização de Cache)
   // Nota: Ao salvar, convertemos de volta para snake_case para o Supabase
   saveOrg: async (item: Organization) => {
     if (isSupabaseConfigured()) {
@@ -136,7 +149,7 @@ export const orgService = {
     if (idx >= 0) cache.regions[idx] = item; else cache.regions.push(item);
     
     const u = getCurrentUser();
-    if(u) logService.logAction(u, 'ADMIN', action, `Região ${item.name}`, 'Estrutura Organizacional');
+    if(u) logService.logAction(u, 'ADMIN', action, `região ${item.name}`, 'Estrutura Organizacional');
 
     return { data: item, error: null };
   },
@@ -146,7 +159,7 @@ export const orgService = {
     const item = cache.regions.find(x => x.id === id);
     if (isSupabaseConfigured()) await supabase.from('regions').delete().eq('id', id);
     cache.regions = cache.regions.filter(x => x.id !== id);
-    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `Região ${item.name}`, 'Estrutura Organizacional');
+    if(u && item) logService.logAction(u, 'ADMIN', 'DELETE', `região ${item.name}`, 'Estrutura Organizacional');
   },
 
   saveSede: async (item: Sede) => {

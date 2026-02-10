@@ -13,16 +13,12 @@ import { orgService } from '../../services/orgService';
 import { Breadcrumbs } from '../Shared/Breadcrumbs';
 import { useConfirmation } from '../Shared/ConfirmationContext'; // New import
 import { PestExecutionCard } from './PestExecutionCard'; // New import
+import { logger } from '../../utils/logger';
+import { diffDaysFromToday } from '../../utils/dateUtils';
 
 // Helper de Data Robusto (Ignora Fuso Horário para comparação de dias puros)
 const getDaysDiff = (dateStr: string) => {
-    if (!dateStr) return 0;
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const target = new Date(year, month - 1, day);
-    const diffTime = target.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDaysFromToday(dateStr);
 };
 
 export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
@@ -43,6 +39,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   
   const [editingItem, setEditingItem] = useState<Partial<PestControlEntry>>({});
   const [historyItems, setHistoryItems] = useState<PestControlEntry[]>([]);
@@ -63,6 +60,11 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
       };
       init();
   }, [user]);
+
+  const closeModal = () => {
+      setIsModalOpen(false);
+      setIsCompleting(false);
+  };
 
   const refreshData = async () => {
       const [data, s] = await Promise.all([ pestService.getAll(user), pestService.getSettings() ]);
@@ -103,6 +105,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   }, [entries, search, selectedSedeId, statusFilter]);
 
   const handleAddNew = () => {
+      setIsCompleting(false);
       const defaultTechnician = settings?.technicians.find(t => !t.sedeId) || settings?.technicians[0];
       setEditingItem({
           id: Date.now().toString(),
@@ -121,11 +124,13 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleEdit = (item: PestControlEntry) => {
-      setEditingItem({...item, performedDate: undefined}); 
+      setIsCompleting(false);
+      setEditingItem({ ...item });
       setIsModalOpen(true);
   };
 
   const handleComplete = (item: PestControlEntry) => {
+      setIsCompleting(true);
       setEditingItem({ ...item, performedDate: new Date().toISOString().split('T')[0], status: 'REALIZADO' });
       setIsModalOpen(true);
   };
@@ -133,8 +138,8 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   const requestDelete = (item: PestControlEntry, e: React.MouseEvent) => {
       e.preventDefault(); e.stopPropagation();
       confirm({
-          title: "Confirmar Exclusão",
-          message: `Você está prestes a remover o agendamento de ${item.target}. Esta ação não pode ser desfeita.`,
+          title: "Confirmar exclusão",
+          message: `você está prestes a remover o agendamento de ${item.target}. Esta ação não pode ser desfeita.`,
           type: "danger",
           confirmLabel: "Excluir",
           onConfirm: async () => {
@@ -143,7 +148,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                 await pestService.delete(item.id);
                 await refreshData();
               } catch (e) {
-                console.error("Delete failed", e);
+                logger.error("Delete failed", e);
                 alert("Erro ao excluir.");
                 await refreshData();
               }
@@ -160,9 +165,12 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleSave = async () => {
-      if (editingItem.performedDate) {
+      if (isCompleting) {
+          if (!editingItem.performedDate) {
+              editingItem.performedDate = new Date().toISOString().split('T')[0];
+          }
           if (!editingItem.product || !editingItem.method) {
-              alert("Para concluir, é obrigatório informar Produto e Método.");
+              alert("Para concluir, é obrigatório informar Produto e método.");
               return;
           }
           editingItem.status = 'REALIZADO';
@@ -171,11 +179,12 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
           await pestService.save(editingItem as PestControlEntry);
           await notificationService.markByLink('/module/pestcontrol/execution');
           await refreshData();
-          setIsModalOpen(false);
+          closeModal();
       } else {
           alert("Preencha todos os campos obrigatórios.");
       }
   };
+
 
   // UPLOAD HANDLER
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,7 +200,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
               alert("Erro no upload da imagem.");
           }
       } catch (err) {
-          console.error(err);
+          logger.error(err);
           alert("Erro ao enviar imagem.");
       } finally {
           setIsUploading(false);
@@ -237,7 +246,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
                             <h1 className="text-2xl font-black text-slate-900 dark:text-white font-mono flex items-center gap-2 uppercase tracking-tight">
-                                <ShieldAlert className="text-amber-600" size={24} /> Ordem de Serviço
+                                <ShieldAlert className="text-amber-600" size={24} /> Ordem de serviço
                             </h1>
                         </div>
                         {canEdit && (
@@ -332,11 +341,11 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/80 dark:bg-black/40">
                        <div>
                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight text-xl">
-                               {editingItem.id && editingItem.performedDate ? 'Finalizar Serviço' : editingItem.id ? 'Editar Agendamento' : 'Novo Serviço'}
+                               {isCompleting ? 'Finalizar serviço' : editingItem.id ? (editingItem.status === 'REALIZADO' ? 'Editar Registro' : 'Editar Agendamento') : 'Novo serviço'}
                            </h3>
                            <p className="text-xs text-slate-500 font-medium mt-0.5">Preencha os dados técnicos da operação.</p>
                        </div>
-                       <button onClick={() => setIsModalOpen(false)} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><X size={20} className="text-slate-500"/></button>
+                       <button onClick={closeModal} className="p-2 bg-white dark:bg-slate-800 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"><X size={20} className="text-slate-500"/></button>
                    </div>
                    
                    <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -366,9 +375,9 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
 
                        <hr className="border-slate-100 dark:border-slate-800" />
 
-                       {/* 2. Técnico */}
+                       {/* 2. técnico */}
                        <section>
-                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Bug size={14}/> Especificações Técnicas</h4>
+                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Bug size={14}/> Especificações TÉCNICAs</h4>
                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div className="space-y-1.5">
                                     <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Praga Alvo</label>
@@ -377,7 +386,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300">Técnico Responsável</label>
+                                    <label className="text-xs font-bold text-slate-600 dark:text-slate-300">técnico Responsável</label>
                                     <select className="w-full p-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-sm outline-none focus:ring-2 focus:ring-amber-500" value={editingItem.technician} onChange={e => setEditingItem({...editingItem, technician: e.target.value})}>
                                         <option value="">Selecione...</option>
                                         {filteredTechnicians.map((t, idx) => (
@@ -393,7 +402,8 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                        </section>
 
                        {/* 3. Execução (Condicional) */}
-                       <div className={`transition-all duration-500 ${editingItem.performedDate !== undefined ? 'opacity-100 translate-y-0' : 'opacity-50 translate-y-4'}`}>
+                       {(isCompleting || editingItem.status === 'REALIZADO') && (
+                       <div className="transition-all duration-500 opacity-100 translate-y-0">
                            <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-800 rounded-2xl space-y-5">
                                <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 border-b border-emerald-200 dark:border-emerald-800/50 pb-3">
                                    <CheckCircle2 size={18}/>
@@ -406,12 +416,12 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                         <input type="date" className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm font-bold text-emerald-600 outline-none" value={editingItem.performedDate || ''} onChange={e => setEditingItem({...editingItem, performedDate: e.target.value})} />
                                    </div>
                                    <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Produto Químico</label>
+                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Produto químico</label>
                                         <input className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm outline-none" value={editingItem.product} onChange={e => setEditingItem({...editingItem, product: e.target.value})} placeholder="Ex: K-Othrine" />
                                    </div>
                                    <div className="space-y-1.5 md:col-span-2">
-                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Método de Aplicação</label>
-                                        <input className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm outline-none" value={editingItem.method} onChange={e => setEditingItem({...editingItem, method: e.target.value})} placeholder="Ex: Pulverização em área externa" />
+                                        <label className="text-xs font-bold text-emerald-800 dark:text-emerald-300">método de aplicação</label>
+                                        <input className="w-full p-3 bg-white dark:bg-slate-950 border border-emerald-200 dark:border-emerald-800 rounded-xl text-sm outline-none" value={editingItem.method} onChange={e => setEditingItem({...editingItem, method: e.target.value})} placeholder="Ex: Pulverização em Área externa" />
                                    </div>
                                    
                                    {/* PHOTO UPLOAD */}
@@ -464,12 +474,13 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                </div>
                            </div>
                        </div>
+                       )}
                    </div>
 
                    <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-black/20 flex gap-3">
-                       <button onClick={() => setIsModalOpen(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">Cancelar</button>
+                       <button onClick={closeModal} className="flex-1 py-4 text-slate-500 font-bold uppercase text-xs hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">Cancelar</button>
                        <button onClick={handleSave} className="flex-[2] py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black rounded-xl shadow-xl uppercase tracking-widest text-xs transition-all hover:scale-[1.01] active:scale-95 flex items-center justify-center gap-2">
-                           <Save size={18} /> {editingItem.performedDate ? 'Confirmar Execução' : 'Salvar Alterações'}
+                           <Save size={18} /> {isCompleting ? 'Confirmar Execução' : 'Salvar Alterações'}
                        </button>
                    </div>
                </div>
@@ -482,7 +493,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
                        <div>
-                           <h3 className="font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tighter">Histórico de Serviços</h3>
+                           <h3 className="font-bold text-slate-900 dark:text-white uppercase font-mono tracking-tighter">histórico de serviços</h3>
                            <p className="text-xs text-slate-500">{historyTitle}</p>
                        </div>
                        <button onClick={() => setIsHistoryOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full transition-colors"><X size={20} className="text-slate-500"/></button>
@@ -513,7 +524,7 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
                                                 <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 text-[10px]">
                                                     <p className="text-emerald-600 font-mono font-bold flex items-center gap-1 mb-1"><CalendarCheck size={10}/> Realizado: {new Date(item.performedDate).toLocaleDateString()}</p>
                                                     {item.product && <p className="text-slate-500"><span className="font-bold">Prod:</span> {item.product}</p>}
-                                                    {item.method && <p className="text-slate-500"><span className="font-bold">Método:</span> {item.method}</p>}
+                                                    {item.method && <p className="text-slate-500"><span className="font-bold">método:</span> {item.method}</p>}
                                                     {item.photoUrl && (
                                                         <a href={item.photoUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block w-fit px-2 py-1 bg-slate-200 dark:bg-slate-800 rounded text-slate-600 dark:text-slate-400 font-bold hover:text-emerald-600 flex items-center gap-1">
                                                             <Image size={10} /> Ver Foto
@@ -533,3 +544,4 @@ export const PestControlExecution: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
+

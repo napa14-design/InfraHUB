@@ -11,8 +11,8 @@ export default defineConfig({
       devOptions: {
         enabled: true
       },
-      // Removemos includeAssets de imagens que não existem para evitar erros 404
-      includeAssets: ['favicon.ico'], 
+      // Assets extras usados pelo PWA
+      includeAssets: ['pwa-icon.svg'],
       manifest: {
         id: 'hydrosys-cloro-app',
         name: 'HydroSys Cloro',

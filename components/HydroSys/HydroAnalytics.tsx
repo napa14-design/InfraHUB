@@ -76,7 +76,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
     certificados.forEach(c => { const diff = Math.ceil((new Date(c.validade).getTime() - today.getTime()) / 86400000); if (diff <= 30) criticalItems.push({ name: `Certificado ${c.parceiro}`, type: 'Certificado', days: diff }); });
     filtros.forEach(f => { const diff = Math.ceil((new Date(f.proximaTroca).getTime() - today.getTime()) / 86400000); if (diff <= 15) criticalItems.push({ name: `Filtro ${f.patrimonio}`, type: 'Filtro', days: diff }); });
-    pocos.forEach(p => { const diff = Math.ceil((new Date(p.proximaLimpeza).getTime() - today.getTime()) / 86400000); if (diff <= 30) criticalItems.push({ name: `Limpeza Reservatório`, type: 'Limpeza', days: diff }); });
+    pocos.forEach(p => { const diff = Math.ceil((new Date(p.proximaLimpeza).getTime() - today.getTime()) / 86400000); if (diff <= 30) criticalItems.push({ name: `Limpeza reservatório`, type: 'Limpeza', days: diff }); });
 
     const expiredCount = criticalItems.filter(i => i.days < 0).length;
     const warningCount = criticalItems.filter(i => i.days >= 0).length;
@@ -118,7 +118,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                     <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
                             <StatCard title="Índice de Saúde" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
-                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="Ação imediata" />
+                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="ação imediata" />
                             <StatCard title="Alertas Próximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
                             <StatCard title="Total Monitorado" value={totalAssets} icon={Droplets} type="info" subtitle="Ativos ativos" />
                         </div>

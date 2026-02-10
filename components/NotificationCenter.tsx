@@ -94,7 +94,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
         <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900">
           <div className="flex items-center gap-2">
             <Bell size={20} className="text-slate-600 dark:text-slate-400" />
-            <h2 className="font-bold text-slate-800 dark:text-white">Notificações</h2>
+            <h2 className="font-bold text-slate-800 dark:text-white">NOTIFICAÇÕES</h2>
           </div>
           <div className="flex items-center gap-2">
             {userRole === UserRole.ADMIN && (

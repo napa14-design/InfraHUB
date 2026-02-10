@@ -43,16 +43,16 @@ export const PestControlHelp: React.FC<{ user: User }> = () => {
                    
                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                        <h3 className="font-bold text-lg mb-4 flex items-center gap-2 text-slate-900 dark:text-white uppercase font-mono text-sm tracking-wider">
-                           <Shield size={18} className="text-amber-500"/> Procedimentos de Segurança
+                           <Shield size={18} className="text-amber-500"/> Procedimentos de segurança
                        </h3>
                        <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                            <li className="flex gap-3">
                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0"></span>
-                               <span><strong>Ventilação:</strong> Manter ambientes ventilados por no mínimo 2 horas após aplicação de fumacê.</span>
+                               <span><strong>Ventilação:</strong> Manter ambientes ventilados por no mínimo 2 horas aPós aplicação de fumaça.</span>
                            </li>
                            <li className="flex gap-3">
                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0"></span>
-                               <span><strong>Isolamento:</strong> Áreas com aplicação de pó químico devem ser isoladas e sinalizadas.</span>
+                               <span><strong>Isolamento:</strong> Áreas com aplicação de Pó químico devem ser isoladas e sinalizadas.</span>
                            </li>
                            <li className="flex gap-3">
                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0"></span>
@@ -81,12 +81,12 @@ export const PestControlHelp: React.FC<{ user: User }> = () => {
                {/* Right Column: Docs */}
                <div className="w-full md:w-80 space-y-4">
                    <h3 className="font-bold text-slate-900 dark:text-white uppercase font-mono text-sm tracking-wider pl-1">
-                       Documentação Técnica
+                       Documentação TÉCNICA
                    </h3>
                    <div className="space-y-3">
                        <DocCard title="Manual Operacional" desc="POP-001: Dedetização Geral" />
-                       <DocCard title="FISPQ - Racumin" desc="Ficha de Segurança Química" />
-                       <DocCard title="FISPQ - K-Othrine" desc="Ficha de Segurança Química" />
+                       <DocCard title="FISPQ - Racumin" desc="Ficha de segurança Química" />
+                       <DocCard title="FISPQ - K-Othrine" desc="Ficha de segurança Química" />
                        <DocCard title="Cronograma Anual" desc="Calendário 2025" />
                    </div>
                    

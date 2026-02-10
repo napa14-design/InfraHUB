@@ -84,7 +84,7 @@ export const AdminUserManagement: React.FC = () => {
 
   const handleStartEdit = async (user: User) => {
       if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
-          addToast("Você não tem permissão para editar Administradores.", "error");
+          addToast("você não tem permissão para editar Administradores.", "error");
           return;
       }
       await loadData();
@@ -107,11 +107,11 @@ export const AdminUserManagement: React.FC = () => {
 
   const requestDelete = (targetUser: User) => {
     if (targetUser.id === currentUser?.id) {
-        addToast("Você não pode excluir a si mesmo.", "warning");
+        addToast("você não pode excluir a si mesmo.", "warning");
         return;
     }
     if (currentUser?.role !== UserRole.ADMIN && targetUser.role === UserRole.ADMIN) {
-        addToast("Você não tem permissão para excluir Administradores.", "error");
+        addToast("você não tem permissão para excluir Administradores.", "error");
         return;
     }
     setUserToDelete(targetUser);
@@ -133,13 +133,13 @@ export const AdminUserManagement: React.FC = () => {
       loadData();
       setDeleteModalOpen(false);
       setUserToDelete(null);
-      addToast("Usuário removido com sucesso.", "success");
+      addToast("usuário removido com sucesso.", "success");
     }
   };
 
   const handleResetPassword = (user: User) => {
-      if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
-          addToast("Você não tem permissão para resetar Administradores.", "error");
+      if (currentUser?.role !== UserRole.ADMIN) {
+          addToast("Apenas Administradores podem resetar senhas.", "error");
           return;
       }
       setUserToReset(user);
@@ -186,11 +186,11 @@ export const AdminUserManagement: React.FC = () => {
       }
       if (formData.role !== UserRole.ADMIN) {
           if (!formData.organizationId) {
-              addToast("Usuários Operacionais e Gestores devem pertencer a uma Instituição.", "warning");
+              addToast("usuários Operacionais e Gestores devem pertencer a uma Instituição.", "warning");
               return false;
           }
           if (formData.role === UserRole.OPERATIONAL && (!formData.sedeIds || formData.sedeIds.length === 0)) {
-              addToast("Usuários Operacionais devem estar vinculados a pelo menos uma Unidade/Sede.", "warning");
+              addToast("usuários Operacionais devem estar vinculados a pelo menos uma Unidade/Sede.", "warning");
               return false;
           }
       }
@@ -218,16 +218,16 @@ export const AdminUserManagement: React.FC = () => {
         });
         loadData();
         setIsModalOpen(false);
-        addToast("Usuário atualizado com sucesso.", "success");
+        addToast("usuário atualizado com sucesso.", "success");
     } else {
         const created = await authService.createUser(formData, manualPassword || undefined);
         if (created.error) {
-            addToast(`Falha ao criar usuário: ${created.error}`, "error");
+            addToast(`Falha ao criar USUÁRIO: ${created.error}`, "error");
             return;
         }
         await notificationService.add({
             id: `new-user-${Date.now()}`,
-            title: 'Novo Usuário',
+            title: 'Novo usuário',
             message: `${formData.name} foi adicionado ao sistema por ${currentUser?.name}.`,
             type: 'SUCCESS',
             read: false,
@@ -238,10 +238,10 @@ export const AdminUserManagement: React.FC = () => {
         if (created && created.password) {
            setCreatedUserPass(created.password);
            if (created.warning) setCreationWarning(created.warning);
-           addToast("Usuário criado com sucesso! Salve as credenciais exibidas.", "success");
+           addToast("usuário criado com sucesso! Salve as credenciais exibidas.", "success");
         } else {
            setIsModalOpen(false);
-           addToast(`Usuário "${formData.name}" criado com sucesso!`, "success");
+           addToast(`usuário "${formData.name}" criado com sucesso!`, "success");
         }
     }
   };
@@ -258,7 +258,7 @@ export const AdminUserManagement: React.FC = () => {
 
   const toggleStatus = async (user: User) => {
     if (currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN) {
-        addToast("Ação não permitida em Administradores.", "error");
+        addToast("ação não permitida em Administradores.", "error");
         return; 
     }
     const newStatus = user.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
@@ -365,7 +365,7 @@ export const AdminUserManagement: React.FC = () => {
           onClick={handleStartNew}
           className="flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-none border border-brand-400 dark:border-brand-500 font-bold uppercase tracking-widest text-xs transition-all hover:shadow-[0_0_15px_rgba(14,165,233,0.3)] w-full sm:w-auto"
         >
-          <Plus size={16} className="mr-2" /> Novo Usuário
+          <Plus size={16} className="mr-2" /> Novo usuário
         </button>
       </div>
 
@@ -432,7 +432,7 @@ export const AdminUserManagement: React.FC = () => {
                         </button>
                     </td>
                     <td className="px-6 py-4 text-right space-x-2 opacity-60 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleResetPassword(user)} className="text-amber-500 hover:text-amber-600 disabled:opacity-30" title="Resetar Senha" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Lock size={16} /></button>
+                        <button onClick={() => handleResetPassword(user)} className="text-amber-500 hover:text-amber-600 disabled:opacity-30" title="Resetar Senha" disabled={currentUser?.role !== UserRole.ADMIN}><Lock size={16} /></button>
                         <button onClick={() => handleStartEdit(user)} className="text-brand-600 hover:text-brand-400 disabled:opacity-30" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Edit2 size={16} /></button>
                         <button onClick={() => requestDelete(user)} className="text-red-600 hover:text-red-400 disabled:opacity-30" disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN}><Trash2 size={16} /></button>
                     </td>
@@ -479,7 +479,7 @@ export const AdminUserManagement: React.FC = () => {
                       </div>
 
                       <div className="grid grid-cols-3 gap-2">
-                          <button onClick={() => handleResetPassword(user)} disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-amber-50 dark:bg-amber-900/10 text-amber-600 rounded-lg text-[10px] font-bold uppercase hover:bg-amber-100 disabled:opacity-50">
+                          <button onClick={() => handleResetPassword(user)} disabled={currentUser?.role !== UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-amber-50 dark:bg-amber-900/10 text-amber-600 rounded-lg text-[10px] font-bold uppercase hover:bg-amber-100 disabled:opacity-50">
                               <Lock size={16} className="mb-1" /> Senha
                           </button>
                           <button onClick={() => handleStartEdit(user)} disabled={currentUser?.role !== UserRole.ADMIN && user.role === UserRole.ADMIN} className="flex flex-col items-center justify-center py-2 bg-blue-50 dark:bg-blue-900/10 text-blue-600 rounded-lg text-[10px] font-bold uppercase hover:bg-blue-100 disabled:opacity-50">
@@ -524,7 +524,7 @@ export const AdminUserManagement: React.FC = () => {
                               {!isEditing && <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">SENHA INICIAL (OPCIONAL)</label><input type="text" className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" placeholder="VAZIO P/ AUTO-GERAR" value={manualPassword} onChange={e => setManualPassword(e.target.value)} minLength={6} /></div>}
                           </div>
                           <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">NÍVEL</label><select className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} disabled={currentUser?.role !== UserRole.ADMIN && isEditing}>{Object.values(UserRole).map(role => (currentUser?.role !== UserRole.ADMIN && role === UserRole.ADMIN) ? null : <option key={role} value={role}>{role}</option>)}</select></div>
+                              <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">NºVEL</label><select className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} disabled={currentUser?.role !== UserRole.ADMIN && isEditing}>{Object.values(UserRole).map(role => (currentUser?.role !== UserRole.ADMIN && role === UserRole.ADMIN) ? null : <option key={role} value={role}>{role}</option>)}</select></div>
                               <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">INSTITUIÇÃO</label><select className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" value={formData.organizationId} onChange={e => setFormData({...formData, organizationId: e.target.value, regionId: '', sedeIds: []})} disabled={currentUser?.role === UserRole.GESTOR || formData.role === UserRole.ADMIN}><option value="">{formData.role === UserRole.ADMIN ? 'GLOBAL' : 'SELECIONE...'}</option>{orgs.map(org => <option key={org.id} value={org.id}>{org.name.toUpperCase()}</option>)}</select></div>
                           </div>
                           {formData.role !== UserRole.ADMIN && (

@@ -6,7 +6,7 @@ import {
   Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Eye, ExternalLink, Maximize2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCertificado, UserRole, Sede } from '../../types';
+import { User, HydroCertificado, UserRole, Sede, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { notificationService } from '../../services/notificationService';
 import { orgService } from '../../services/orgService';
@@ -69,6 +69,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   
   const [data, setData] = useState<HydroCertificado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
@@ -102,13 +103,34 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     observacao: ''
   };
   const [formData, setFormData] = useState<HydroCertificado>(initialForm);
+  const validadeMeses = settings?.validadeCertificadoMeses || 6;
+
+  const addMonthsToDate = (dateStr: string, months: number) => {
+    const d = new Date(dateStr);
+    d.setMonth(d.getMonth() + months);
+    return d.toISOString().split('T')[0];
+  };
+
+  const getNextSemestre = (current: string) => {
+    const semMatch = current.match(/(?:^|\D)([12])(?:\D|$)/);
+    const yearMatch = current.match(/(20\d{2})/);
+    const semNum = semMatch ? parseInt(semMatch[1], 10) : null;
+    const year = yearMatch ? parseInt(yearMatch[1], 10) : new Date().getFullYear();
+    if (semNum === 1) return '2º SEM - ' + year;
+    if (semNum === 2) return '1º SEM - ' + (year + 1);
+    return '1º SEM - ' + (year + 1);
+  };
 
   const loadData = async () => {
      setIsLoading(true);
      // Simulate slight delay for Skeleton demo
      setTimeout(async () => {
-         const res = await hydroService.getCertificados(user);
+         const [res, s] = await Promise.all([
+             hydroService.getCertificados(user),
+             hydroService.getSettings()
+         ]);
          setData(res);
+         setSettings(s);
          if (isAdmin) setAvailableSedes(orgService.getSedes());
          setIsLoading(false);
      }, 600);
@@ -133,7 +155,15 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleNew = () => {
     setSheetMode('NEW');
-    setFormData({ ...initialForm, id: Date.now().toString(), dataAnalise: new Date().toISOString().split('T')[0] });
+    const todayStr = new Date().toISOString().split('T')[0];
+    const validade = addMonthsToDate(todayStr, validadeMeses);
+    setFormData({ 
+      ...initialForm, 
+      id: Date.now().toString(), 
+      dataAnalise: todayStr, 
+      validade,
+      validadeSemestre: validade
+    });
     setIsSheetOpen(true);
   };
 
@@ -145,22 +175,16 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleRenovar = (item: HydroCertificado) => {
     setSheetMode('RENEW');
-    const today = new Date();
-    const nextValidade = new Date(today);
-    nextValidade.setMonth(nextValidade.getMonth() + 6);
-    let nextSemestre = item.semestre;
-    if (item.semestre.includes('1º')) nextSemestre = item.semestre.replace('1º', '2º');
-    else if (item.semestre.includes('2º')) {
-        const yearMatch = item.semestre.match(/\d{4}/);
-        const year = yearMatch ? parseInt(yearMatch[0]) : today.getFullYear();
-        nextSemestre = `1º SEM - ${year + 1}`;
-    }
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextValidade = addMonthsToDate(todayStr, validadeMeses);
+    const nextSemestre = getNextSemestre(item.semestre || '');
     setFormData({
       ...item,
       id: `cert-${Date.now()}`,
       semestre: nextSemestre,
-      dataAnalise: today.toISOString().split('T')[0],
-      validade: nextValidade.toISOString().split('T')[0],
+      dataAnalise: todayStr,
+      validade: nextValidade,
+      validadeSemestre: nextValidade,
       status: 'VIGENTE',
       linkMicro: '',
       linkFisico: ''
@@ -178,10 +202,14 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleSave = async () => {
     if (!formData.parceiro || !formData.dataAnalise || !formData.validade) {
-        addToast("Preencha todos os campos obrigatórios.", "warning");
+        addToast("Preencha todos os campos obrigatérios.", "warning");
         return;
     }
-    await hydroService.saveCertificado(formData);
+    const payload = {
+      ...formData,
+      validadeSemestre: formData.validadeSemestre || formData.validade
+    };
+    await hydroService.saveCertificado(payload);
     await notificationService.markByLink('/module/hydrosys/certificados');
     await loadData();
     setIsSheetOpen(false);
@@ -292,7 +320,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                         <EmptyState 
                             icon={Filter} 
                             title="Nenhum certificado encontrado" 
-                            description={selectedSedeFilter ? "Não há laudos cadastrados para esta unidade com os filtros atuais." : "Ajuste os filtros ou cadastre um novo laudo."}
+                            description={selectedSedeFilter ? "não há laudos cadastrados para esta unidade com os filtros atuais." : "Ajuste os filtros ou cadastre um novo laudo."}
                         />
                     </div>
                 ) : (
@@ -313,7 +341,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                 </div>
                                 
                                 <div className="grid grid-cols-2 gap-2 mb-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl p-3 border border-slate-100 dark:border-slate-800/50 text-center">
-                                    <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
+                                    <div className="border-r border-slate-200 dark:border-slate-800"><p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">análise</p><p className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{new Date(item.dataAnalise).toLocaleDateString()}</p></div>
                                     <div>
                                         <p className="text-[9px] uppercase text-slate-400 font-black mb-0.5">Vencimento</p>
                                         <p className={`text-xs font-mono font-bold ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 30 ? 'text-amber-500' : 'text-emerald-500'}`}>
@@ -350,7 +378,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                             )}
                                         </div>
                                         <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
-                                            <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver Histórico"><History size={16}/></button>
+                                            <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver histórico"><History size={16}/></button>
                                             <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
                                             {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
                                         </div>
@@ -402,7 +430,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
           </div>
       )}
 
-      {/* MODAL HISTÓRICO */}
+      {/* MODAL HIST?"RICO */}
       {isHistoryOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
@@ -410,7 +438,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                       <div className="flex items-center gap-3">
                           <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 rounded-xl"><History size={20}/></div>
                           <div>
-                              <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">Histórico de Laudos</h3>
+                              <h3 className="font-bold text-slate-900 dark:text-white uppercase tracking-tight">histórico de Laudos</h3>
                               <p className="text-[10px] text-slate-500 font-black uppercase">{historyTitle}</p>
                           </div>
                       </div>
@@ -429,7 +457,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
                                                 <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase">{h.semestre}</p>
-                                                <p className="text-[10px] text-slate-500 font-mono">Análise: {new Date(h.dataAnalise).toLocaleDateString()}</p>
+                                                <p className="text-[10px] text-slate-500 font-mono">análise: {new Date(h.dataAnalise).toLocaleDateString()}</p>
                                             </div>
                                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase border ${getStatusConfig(h.status).bg} ${getStatusConfig(h.status).text}`}>
                                                 {h.status}

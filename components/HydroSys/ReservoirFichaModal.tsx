@@ -8,17 +8,17 @@ import { FichaPoco } from '../../types';
 
 // Constants locally scoped to this modal component
 const MATERIALS_LIST = ['CANO', 'LUVAS', 'CORDA', 'ELETRODO', 'QUADRO DE COMANDO', 'REFIL FILTRO'];
-const EPI_LIST = ['Luva nitrílica', 'Bota de borracha', 'Máscara respiratória PFF2', 'Óculos de proteção'];
+const EPI_LIST = ['Luva nitrílica', 'Bota de borracha', 'máscara respiratória PFF2', 'óculos de proteção'];
 const STEPS_DIA_1 = [
     '1.1. Desmontar sistema de bomba e retirar canos',
     '1.2. Montar sistema de compressor',
     '1.3. Diluir 1 kg do produto AMC Easy Clean (Hexa T)',
-    '1.4. Ligar compressor p/ homogenização (30 min)',
+    '1.4. Ligar compressor p/ homogeneização (30 min)',
     '1.5. Deixar produto agir (min 6 horas)'
 ];
 const STEPS_DIA_2 = [
     '2.1. Ligar compressor p/ movimentar produto (30 min) e descarte',
-    '2.2. Bombear água suja com compressor (início limpeza)',
+    '2.2. Bombear água suja com compressor (Início limpeza)',
     '2.3. Limpeza dos canos com cloro puro e palha de aço'
 ];
 const STEPS_DIA_3 = [
@@ -87,11 +87,11 @@ export const ReservoirFichaModal: React.FC<Props> = ({
         setErrorMsg(null);
         if (step === 'GERAL') {
             if (!fichaData.inicioLimpeza || !fichaData.terminoLimpeza) {
-                setErrorMsg("As datas de início e término são obrigatórias.");
+                setErrorMsg("As datas de Início e término são obrigatérias.");
                 return false;
             }
             if (!fichaData.supervisor || !fichaData.bombeiro) {
-                setErrorMsg("Supervisor e Bombeiro são obrigatórios.");
+                setErrorMsg("Supervisor e Bombeiro são obrigatérios.");
                 return false;
             }
         }
@@ -165,8 +165,8 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                             <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><Clock size={14}/> Cronograma (Obrigatório)</h3>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Início Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.inicioLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.inicioLimpeza} onChange={e => updateFicha('inicioLimpeza', e.target.value)} /></div>
-                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">Término Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.terminoLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.terminoLimpeza} onChange={e => updateFicha('terminoLimpeza', e.target.value)} /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">início Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.inicioLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.inicioLimpeza} onChange={e => updateFicha('inicioLimpeza', e.target.value)} /></div>
+                                    <div className="space-y-1"><label className="text-[10px] font-bold uppercase text-slate-500">término Limpeza *</label><input type="date" className={`w-full p-2 bg-slate-50 dark:bg-slate-950 border rounded-lg text-sm font-mono ${!fichaData.terminoLimpeza && errorMsg ? 'border-red-500' : 'border-slate-200 dark:border-slate-800'}`} value={fichaData.terminoLimpeza} onChange={e => updateFicha('terminoLimpeza', e.target.value)} /></div>
                                 </div>
                             </div>
                             {/* Team */}
@@ -181,7 +181,7 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                         </div>
                     </div>
 
-                    {/* SECTION: DADOS TÉCNICOS (BOMBA/PRE/POS) */}
+                    {/* SECTION: DADOS técnicos (BOMBA/PRE/POS) */}
                     <div className={activeFichaTab === 'DADOS' ? 'block space-y-6' : 'hidden'}>
                         
                         {/* Pump Data - Moved Here */}
@@ -335,7 +335,7 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                                 <AlertCircle size={16} /> {errorMsg}
                             </div>
                         )}
-                        {!errorMsg && <div className="text-xs text-slate-400 font-mono hidden md:block">Ultima atualização: {new Date().toLocaleDateString()}</div>}
+                        {!errorMsg && <div className="text-xs text-slate-400 font-mono hidden md:block">Última atualização: {new Date().toLocaleDateString()}</div>}
                     </div>
 
                     <div className="flex gap-3 w-full md:w-auto">
@@ -353,7 +353,7 @@ export const ReservoirFichaModal: React.FC<Props> = ({
                             </button>
                         ) : (
                             <button onClick={handleNext} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 transition-all hover:scale-105">
-                                Próximo <ArrowRight size={16} />
+                                próximo <ArrowRight size={16} />
                             </button>
                         )}
                     </div>

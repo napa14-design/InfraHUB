@@ -83,7 +83,7 @@ export const FirstLoginSetup: React.FC<FirstLoginSetupProps> = ({ user, onComple
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-white/[0.02] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-xl outline-none focus:border-brand-500 dark:focus:border-orange-500 transition-all font-mono"
-                          placeholder="Mínimo 6 caracteres"
+                          placeholder="mínimo 6 caracteres"
                         />
                         <button
                           type="button"

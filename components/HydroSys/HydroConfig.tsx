@@ -35,12 +35,12 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
       }
       
       if (settings.cloroMin >= settings.cloroMax) {
-          addToast("Cloro Mínimo deve ser menor que o Máximo.", "warning");
+          addToast("Cloro mínimo deve ser menor que o máximo.", "warning");
           return false;
       }
 
       if (settings.phMin >= settings.phMax) {
-          addToast("pH Mínimo deve ser menor que o Máximo.", "warning");
+          addToast("pH mínimo deve ser menor que o máximo.", "warning");
           return false;
       }
 
@@ -68,7 +68,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleReset = () => {
-      if(confirm('Restaurar configurações padrão?')) {
+      if(confirm('Restaurar configurações Padrão?')) {
           setSettings({ 
               validadeCertificadoMeses: 6, 
               validadeFiltroMeses: 6, 
@@ -122,7 +122,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                             <div>
                                 <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight font-mono">
-                                    CONFIGURAÇÕES
+                                    Configurações
                                 </h1>
                                 <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">
                                     Parâmetros e Automação.
@@ -177,7 +177,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                             onChange={(v: number) => setSettings({...settings, validadeLimpezaCisterna: v})} 
                         />
                         <CycleItem 
-                            label="Poço Artesiano" 
+                            label="poço Artesiano" 
                             icon={Activity}
                             value={settings.validadeLimpezaPoco} 
                             onChange={(v: number) => setSettings({...settings, validadeLimpezaPoco: v})} 
@@ -189,7 +189,7 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden h-fit">
                     <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                         <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono">
-                            <TestTube className="text-cyan-500" size={20} /> PADRÕES DE QUALIDADE
+                            <TestTube className="text-cyan-500" size={20} /> Padrões DE QUALIDADE
                         </h3>
                     </div>
                     <div className="p-6 space-y-8">
@@ -199,8 +199,8 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                                 <span className="bg-cyan-50 dark:bg-cyan-900/20 px-3 py-1 rounded-lg border border-cyan-100 dark:border-cyan-800 text-xs text-cyan-700 dark:text-cyan-300 font-mono font-bold">{settings.cloroMin} - {settings.cloroMax}</span>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mínimo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.cloroMin} onChange={e => setSettings({...settings, cloroMin: parseFloat(e.target.value)})} /></div>
-                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Máximo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.cloroMax} onChange={e => setSettings({...settings, cloroMax: parseFloat(e.target.value)})} /></div>
+                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">mínimo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.cloroMin} onChange={e => setSettings({...settings, cloroMin: parseFloat(e.target.value)})} /></div>
+                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">máximo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.cloroMax} onChange={e => setSettings({...settings, cloroMax: parseFloat(e.target.value)})} /></div>
                             </div>
                         </div>
                         
@@ -210,8 +210,8 @@ export const HydroConfig: React.FC<{ user: User }> = ({ user }) => {
                                 <span className="bg-blue-50 dark:bg-blue-900/20 px-3 py-1 rounded-lg border border-blue-100 dark:border-blue-800 text-xs text-blue-700 dark:text-blue-300 font-mono font-bold">{settings.phMin} - {settings.phMax}</span>
                             </div>
                             <div className="flex items-center gap-4">
-                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mínimo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.phMin} onChange={e => setSettings({...settings, phMin: parseFloat(e.target.value)})} /></div>
-                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Máximo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.phMax} onChange={e => setSettings({...settings, phMax: parseFloat(e.target.value)})} /></div>
+                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">mínimo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.phMin} onChange={e => setSettings({...settings, phMin: parseFloat(e.target.value)})} /></div>
+                                <div className="flex-1"><label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">máximo</label><input type="number" step="0.1" className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 font-bold text-slate-700 dark:text-white font-mono" value={settings.phMax} onChange={e => setSettings({...settings, phMax: parseFloat(e.target.value)})} /></div>
                             </div>
                         </div>
                     </div>

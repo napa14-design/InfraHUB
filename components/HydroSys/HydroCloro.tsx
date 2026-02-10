@@ -98,7 +98,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                                 CLORO & pH
                             </h1>
                             <p className="text-slate-500 dark:text-white/30 text-xs md:text-sm font-mono mt-0.5">
-                                Monitoramento diário da qualidade.
+                                Monitoramento Diário da qualidade.
                             </p>
                         </div>
                     </div>
@@ -144,7 +144,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
                         <p className="font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &gt; {settings.cloroMax} ppm</p>
-                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. Água s/ Cloro</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. água s/ Cloro</p>
                     </div>
                  </div>
              </div>
@@ -164,7 +164,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
                  <div className="grid grid-cols-2 gap-3 text-xs font-mono relative z-10">
                     <div className="bg-amber-50 dark:bg-amber-900/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/20">
                         <p className="font-bold text-amber-600 dark:text-amber-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &lt; {settings.phMin}</p>
-                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. Ácido Fosfórico</p>
+                        <p className="text-slate-600 dark:text-slate-400 leading-tight text-[10px] uppercase">Adic. ácido Fosfórico</p>
                     </div>
                     <div className="bg-purple-50 dark:bg-purple-900/10 p-3 rounded-xl border border-purple-100 dark:border-purple-900/20">
                         <p className="font-bold text-purple-600 dark:text-purple-400 mb-1 flex items-center gap-1"><AlertTriangle size={10}/> &gt; {settings.phMax}</p>
@@ -190,7 +190,7 @@ export const HydroCloro: React.FC<{ user: User }> = ({ user }) => {
             ) : (
               <>
                   <div className="grid grid-cols-7 gap-1 sm:gap-3 mb-2 md:mb-4 text-center text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+                      <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sób</div>
                   </div>
                   <div className="grid grid-cols-7 gap-1 sm:gap-3 lg:gap-4 relative z-10">
                       {Array.from({ length: firstDayOfMonth }).map((_, i) => <div key={`empty-${i}`} />)}

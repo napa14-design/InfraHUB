@@ -1,14 +1,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, Lock, ChevronRight, Activity, AlertTriangle, Gauge, Thermometer, Waves, FileDown, Calendar, Download, X } from 'lucide-react';
-import { User, UserRole, HydroCertificado, HydroFiltro } from '../types';
+import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, ChevronRight, FileDown, Calendar, Download, X, Waves, Activity, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
+import { User, UserRole, HydroCertificado } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
 import { exportToCSV } from '../utils/csvExport';
 import { Breadcrumbs } from './Shared/Breadcrumbs';
-import { DashboardGridSkeleton, Skeleton } from './Shared/Skeleton';
+import { DashboardGridSkeleton } from './Shared/Skeleton';
+import { diffDaysFromToday, firstDayOfMonthISO, isBeforeToday, lastDayOfMonthISO, parseISODate } from '../utils/dateUtils';
 
 interface Props {
   user: User;
@@ -27,27 +28,76 @@ const RouteMap: Record<string, string> = {
     'hs-dashboard': '/module/hydrosys/analytics'
 };
 
+const KPI_TONES: Record<string, { border: string; icon: string; badge: string; glow: string }> = {
+  neutral: {
+    border: 'border-slate-200 dark:border-white/5',
+    icon: 'bg-slate-50 dark:bg-white/[0.04] text-slate-600 dark:text-white/60',
+    badge: 'bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-white/50',
+    glow: 'bg-slate-500/10'
+  },
+  ok: {
+    border: 'border-emerald-500/20 dark:border-emerald-500/30',
+    icon: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    badge: 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+    glow: 'bg-emerald-500/10'
+  },
+  warning: {
+    border: 'border-amber-500/20 dark:border-amber-500/30',
+    icon: 'bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    badge: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300',
+    glow: 'bg-amber-500/10'
+  },
+  danger: {
+    border: 'border-rose-500/20 dark:border-rose-500/30',
+    icon: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400',
+    badge: 'bg-rose-100 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300',
+    glow: 'bg-rose-500/10'
+  },
+  info: {
+    border: 'border-cyan-500/20 dark:border-cyan-500/30',
+    icon: 'bg-cyan-50 dark:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400',
+    badge: 'bg-cyan-100 dark:bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
+    glow: 'bg-cyan-500/10'
+  }
+};
+
+const KpiCard = ({ label, value, subtext, icon: Icon, tone = 'neutral', delay = '0ms' }: any) => {
+  const styles = KPI_TONES[tone] || KPI_TONES.neutral;
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-2xl bg-white dark:bg-[#111114]/80 border ${styles.border} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5`}
+      style={{ animationDelay: delay, animation: 'fade-up 0.4s ease-out forwards', opacity: 0 }}
+    >
+      <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full ${styles.glow} transition-transform duration-500 group-hover:scale-110`} />
+      <div className="relative z-10 flex items-start justify-between gap-4">
+        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${styles.icon}`}>
+          <Icon size={20} />
+        </div>
+        {subtext && <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg ${styles.badge}`}>{subtext}</span>}
+      </div>
+      <div className="relative z-10 mt-4">
+        <div className="text-2xl font-black text-slate-900 dark:text-white">{value}</div>
+        <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500 dark:text-white/40">{label}</div>
+      </div>
+    </div>
+  );
+};
+
 export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const userSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
 
-  // Real Data State
-  const [stats, setStats] = useState({
-      reservatorios: 0,
-      certificados: 0,
-      filtros: 0,
-      alertas: 0
-  });
-  
-  const [latestReading, setLatestReading] = useState({
-      ph: 0,
-      cloro: 0,
-      date: ''
-  });
-
   const [isLoading, setIsLoading] = useState(true);
+  const [kpis, setKpis] = useState({
+    certificadosVencidos: 0,
+    filtrosVencidos: 0,
+    reservatoriosAtrasados: 0,
+    conformidade: 0,
+    cloroTotal: 0,
+    limpezasProximas: 0
+  });
 
   // --- REPORT MODAL STATE ---
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -56,97 +106,98 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
+    let isActive = true;
     setMounted(true);
+    setIsLoading(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    
-    // Simulate slight delay to show off skeleton
-    setTimeout(() => {
-        fetchDashboardData();
-    }, 800);
-    
-    const date = new Date();
-    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).toISOString().split('T')[0];
-    const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const firstDay = firstDayOfMonthISO();
+    const lastDay = lastDayOfMonthISO();
     setDateRange({ start: firstDay, end: lastDay });
 
-    return () => clearInterval(timer);
-  }, [user]);
-
-  const fetchDashboardData = async () => {
+    const loadKpis = async () => {
+      const startedAt = Date.now();
       try {
-          const [certs, filts, pocos, cist, caixas, cloroEntries] = await Promise.all([
-              hydroService.getCertificados(user),
-              hydroService.getFiltros(user),
-              hydroService.getPocos(user),
-              hydroService.getCisternas(user),
-              hydroService.getCaixas(user),
-              hydroService.getCloro(user)
-          ]);
+        const [
+          settings,
+          certificados,
+          filtros,
+          cloro,
+          pocos,
+          cisternas,
+          caixas
+        ] = await Promise.all([
+          hydroService.getSettings(),
+          hydroService.getCertificados(user),
+          hydroService.getFiltros(user),
+          hydroService.getCloro(user),
+          hydroService.getPocos(user),
+          hydroService.getCisternas(user),
+          hydroService.getCaixas(user)
+        ]);
 
-          // Sort descending by validity date to ensure the most relevant is kept during dedupe
-          const sortedCerts = [...certs].sort((a, b) => new Date(b.validade).getTime() - new Date(a.validade).getTime());
-          
-          const uniqueCerts = Array.from(sortedCerts.reduce((map, item) => {
-              const key = `${item.sedeId}-${item.parceiro}`;
-              // Since it's sorted descending, we just need to keep the first one encountered or check logic
-              if (!map.has(key)) {
-                  map.set(key, item);
-              }
-              return map;
-          }, new Map<string, HydroCertificado>()).values());
+        const dateValue = (value?: string) => parseISODate(value)?.getTime() ?? 0;
+        const latestCertificados = Array.from(
+          certificados.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
+            const key = `${item.sedeId}-${item.parceiro}`;
+            const current = map.get(key);
+            if (!current || dateValue(item.validade) > dateValue(current.validade)) {
+              map.set(key, item);
+            }
+            return map;
+          }, new Map<string, HydroCertificado>()).values()
+        );
 
-          // Sort filters by Next Exchange Date
-          const sortedFiltros = [...filts].sort((a, b) => new Date(b.proximaTroca).getTime() - new Date(a.proximaTroca).getTime());
+        const certificadosVencidos = latestCertificados.filter(item => {
+          if (item.status === 'VENCIDO') return true;
+          return item.validade ? isBeforeToday(item.validade) : false;
+        }).length;
 
-          const uniqueFiltros = Array.from(sortedFiltros.reduce((map, item) => {
-              const key = `${item.sedeId}-${item.patrimonio}`; 
-              if (!map.has(key)) {
-                  map.set(key, item);
-              }
-              return map;
-          }, new Map<string, HydroFiltro>()).values());
+        const filtrosVencidos = filtros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
 
-          const totalReservatorios = pocos.length + cist.length + caixas.length;
-          
-          const today = new Date();
-          let alertCount = 0;
+        const reservatorios = [...pocos, ...cisternas, ...caixas];
+        const reservatoriosAtrasados = reservatorios.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
+        const limpezasProximas = reservatorios.filter(item => {
+          const diff = diffDaysFromToday(item.proximaLimpeza);
+          return diff >= 0 && diff <= 30;
+        }).length;
 
-          const checkDate = (dateStr?: string, daysThreshold = 30) => {
-              if (!dateStr) return false;
-              const d = new Date(dateStr);
-              const diff = Math.ceil((d.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-              return diff <= daysThreshold;
-          };
+        const cloroPeriodo = cloro.filter(item => item.date >= firstDay && item.date <= lastDay);
+        const cloroValidos = cloroPeriodo.filter(item => Number.isFinite(Number(item.cl)) && Number.isFinite(Number(item.ph)));
+        const cloroConforme = cloroValidos.filter(item => {
+          const cl = Number(item.cl);
+          const ph = Number(item.ph);
+          return cl >= settings.cloroMin && cl <= settings.cloroMax && ph >= settings.phMin && ph <= settings.phMax;
+        }).length;
 
-          uniqueCerts.forEach(c => { if (c.status !== 'VIGENTE' || checkDate(c.validade)) alertCount++; });
-          uniqueFiltros.forEach(f => { if (checkDate(f.proximaTroca, 15)) alertCount++; });
-          pocos.forEach(p => { if (checkDate(p.proximaLimpeza)) alertCount++; });
-          cist.forEach(c => { if (checkDate(c.proximaLimpeza)) alertCount++; });
-          caixas.forEach(c => { if (checkDate(c.proximaLimpeza)) alertCount++; });
+        const conformidade = cloroValidos.length > 0 ? Math.round((cloroConforme / cloroValidos.length) * 100) : 0;
 
-          setStats({
-              reservatorios: totalReservatorios,
-              certificados: uniqueCerts.length,
-              filtros: uniqueFiltros.length,
-              alertas: alertCount
+        if (isActive) {
+          setKpis({
+            certificadosVencidos,
+            filtrosVencidos,
+            reservatoriosAtrasados,
+            conformidade,
+            cloroTotal: cloroValidos.length,
+            limpezasProximas
           });
-
-          if (cloroEntries.length > 0) {
-              const sorted = [...cloroEntries].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              const last = sorted[0];
-              setLatestReading({
-                  ph: last.ph,
-                  cloro: last.cl,
-                  date: last.date
-              });
-          }
-
-      } catch (error) {
-          console.error("Error loading dashboard data", error);
+        }
       } finally {
-          setIsLoading(false);
+        const elapsed = Date.now() - startedAt;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => {
+          if (isActive) setIsLoading(false);
+        }, remaining);
       }
-  };
+    };
+
+    loadKpis();
+
+    return () => {
+      isActive = false;
+      clearInterval(timer);
+    };
+  }, [user]);
 
   const allowedSubModules = HYDROSYS_SUBMODULES.filter(mod => {
     return mod.roles.includes(user.role);
@@ -157,13 +208,59 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       if (route) navigate(route);
   };
 
+  const complianceTone = kpis.cloroTotal === 0
+    ? 'neutral'
+    : kpis.conformidade >= 90
+      ? 'ok'
+      : kpis.conformidade >= 70
+        ? 'warning'
+        : 'danger';
+
+  const kpiCards = [
+    {
+      label: 'Certificados vencidos',
+      value: kpis.certificadosVencidos,
+      icon: Award,
+      tone: kpis.certificadosVencidos > 0 ? 'danger' : 'ok',
+      subtext: kpis.certificadosVencidos > 0 ? 'Ação necessária' : 'Em dia'
+    },
+    {
+      label: 'Filtros vencidos',
+      value: kpis.filtrosVencidos,
+      icon: Filter,
+      tone: kpis.filtrosVencidos > 0 ? 'warning' : 'ok',
+      subtext: kpis.filtrosVencidos > 0 ? 'Troca urgente' : 'Regular'
+    },
+    {
+      label: 'Limpezas atrasadas',
+      value: kpis.reservatoriosAtrasados,
+      icon: AlertTriangle,
+      tone: kpis.reservatoriosAtrasados > 0 ? 'danger' : 'ok',
+      subtext: kpis.reservatoriosAtrasados > 0 ? 'Priorizar agenda' : 'Em dia'
+    },
+    {
+      label: 'Limpezas próximas (30d)',
+      value: kpis.limpezasProximas,
+      icon: CalendarClock,
+      tone: kpis.limpezasProximas > 0 ? 'warning' : 'neutral',
+      subtext: 'Planejamento'
+    },
+    {
+      label: 'Conformidade Cloro/pH',
+      value: `${kpis.conformidade}%`,
+      icon: CheckCircle2,
+      tone: complianceTone,
+      subtext: kpis.cloroTotal > 0 ? `${kpis.cloroTotal} medições` : 'Sem medições'
+    }
+  ];
+
   const handleExport = async () => {
       setIsExporting(true);
       try {
           if (reportType === 'CLORO') {
               const data = await hydroService.getCloro(user);
               const filtered = data.filter(d => d.date >= dateRange.start && d.date <= dateRange.end);
-              const headers = { sedeId: 'Unidade/Sede', date: 'Data Coleta', cl: 'Cloro (ppm)', ph: 'pH', medidaCorretiva: 'Ação Corretiva', responsavel: 'Responsável Técnico' };
+              const headers = { sedeId: 'Unidade/Sede', date: 'Data Coleta', cl: 'Cloro (ppm)', ph: 'pH', medidaCorretiva: 'ação Corretiva', responsavel: 'Responsável técnico' };
               const finalData = filtered.map(item => ({ sedeId: item.sedeId, date: item.date, cl: item.cl, ph: item.ph, medidaCorretiva: item.medidaCorretiva, responsavel: item.responsavel }));
               exportToCSV(finalData, 'Relatorio_Cloro_pH', headers);
           } else if (reportType === 'CERTIFICADOS') {
@@ -172,7 +269,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
               exportToCSV(data, 'Relatorio_Certificados', headers);
           } else if (reportType === 'FILTROS') {
               const data = await hydroService.getFiltros(user);
-              const headers = { sedeId: 'Sede', local: 'Local Instalação', patrimonio: 'Patrimônio', dataTroca: 'Última Troca', proximaTroca: 'Próxima Troca' };
+              const headers = { sedeId: 'Sede', local: 'Local Instalação', patrimonio: 'Patrimônio', dataTroca: 'última Troca', proximaTroca: 'Próxima Troca' };
               exportToCSV(data, 'Inventario_Filtros', headers);
           } else if (reportType === 'RESERVATORIOS') {
               const pocos = await hydroService.getPocos(user);
@@ -185,7 +282,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           }
           setIsReportModalOpen(false);
       } catch (e) {
-          alert("Erro ao gerar relatório");
+          alert("Erro ao gerar relatério");
       } finally {
           setIsExporting(false);
       }
@@ -225,20 +322,23 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           <div className="p-6 md:p-8">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
               <div className="space-y-4">
+                <button onClick={() => navigate('/')} className="group flex items-center gap-2 text-slate-500 dark:text-white/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all text-xs font-mono uppercase tracking-widest">
+                  <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> Hub Principal
+                </button>
                 <div className="flex items-center gap-5">
                   <div className="w-16 h-16 border-2 border-cyan-500/20 dark:border-cyan-500/50 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl">
                     <Waves size={32} className="text-cyan-600 dark:text-cyan-500" strokeWidth={1.5} />
                   </div>
                   <div>
                     <h1 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight font-mono">HYDRO<span className="text-cyan-600 dark:text-cyan-500">SYS</span></h1>
-                    <p className="text-slate-500 dark:text-white/30 text-sm font-mono mt-0.5">Gestão de Recursos Hídricos</p>
+                    <p className="text-slate-500 dark:text-white/30 text-sm font-mono mt-0.5">gestão de Recursos Hídricos</p>
                   </div>
                 </div>
               </div>
               <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
                 {(user.role === UserRole.ADMIN || user.role === UserRole.GESTOR) && (
                     <button onClick={() => setIsReportModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-cyan-600 text-white rounded-xl shadow-lg shadow-cyan-500/20 hover:bg-cyan-700 transition-all text-xs font-bold font-mono uppercase">
-                        <FileDown size={16} /> Central de Relatórios
+                        <FileDown size={16} /> Central de relatórios
                     </button>
                 )}
                 {userSede && (
@@ -257,6 +357,37 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
             </div>
           </div>
         </header>
+
+        {/* KPI SECTION */}
+        <div className={`transition-all duration-700 delay-150 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-1 h-6 bg-cyan-500" />
+            <span className="text-sm font-mono text-slate-500 dark:text-white/40 uppercase tracking-widest">Indicadores-Chave</span>
+            <div className="flex-1 h-px bg-slate-200 dark:bg-white/5" />
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, idx) => (
+                <div key={idx} className="h-24 rounded-2xl bg-slate-100 dark:bg-white/[0.04] animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {kpiCards.map((card, idx) => (
+                <KpiCard
+                  key={card.label}
+                  label={card.label}
+                  value={card.value}
+                  icon={card.icon}
+                  tone={card.tone}
+                  subtext={card.subtext}
+                  delay={`${idx * 60}ms`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* MODULES SECTION WITH SKELETON */}
         <div className={`transition-all duration-700 delay-200 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -300,7 +431,6 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           )}
         </div>
 
-        {/* Modal code remains same */}
         {isReportModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 overflow-hidden">
@@ -321,7 +451,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
 
                     <div className="p-6 space-y-6">
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Selecione o Relatório</label>
+                            <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Selecione o relatório</label>
                             <div className="grid grid-cols-2 gap-3">
                                 <button onClick={() => setReportType('CLORO')} className={`p-3 rounded-xl border text-left text-sm font-bold transition-all ${reportType === 'CLORO' ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                     <div className="flex items-center gap-2 mb-1"><TestTube size={16}/> Cloro e pH</div>
@@ -341,11 +471,11 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                         {reportType === 'CLORO' && (
                             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800 animate-in fade-in">
                                 <div className="flex items-center gap-2 mb-3 text-xs font-bold text-slate-500 uppercase">
-                                    <Calendar size={14} /> Período de Análise
+                                    <Calendar size={14} /> Período de análise
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-[10px] text-slate-400 block mb-1">Início</label>
+                                        <label className="text-[10px] text-slate-400 block mb-1">início</label>
                                         <input type="date" className="w-full p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} />
                                     </div>
                                     <div>
@@ -359,7 +489,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                         <div className="pt-2">
                             <button onClick={handleExport} disabled={isExporting} className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 disabled:opacity-50 transition-all">
                                 {isExporting ? <Activity className="animate-spin" /> : <Download size={20} />}
-                                {isExporting ? 'Gerando Arquivo...' : 'Baixar Relatório CSV'}
+                                {isExporting ? 'Gerando Arquivo...' : 'Baixar relatório CSV'}
                             </button>
                         </div>
                     </div>

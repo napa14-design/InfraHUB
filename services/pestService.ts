@@ -4,6 +4,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logService } from './logService';
 import { authService } from './authService';
 import { notificationService } from './notificationService';
+import { logger } from '../utils/logger';
+import { isBeforeToday } from '../utils/dateUtils';
 
 const excelToISO = (serial: number) => {
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -15,7 +17,7 @@ const MOCK_PEST_ENTRIES: PestControlEntry[] = [
     { id: 'ald-2', sedeId: 'ALD', item: 'Dedetização', target: "Rato / Roedores", product: 'Racumin', frequency: 'Quinzenal', method: 'Isca nas caixas de passagem', technician: 'Fabio', scheduledDate: excelToISO(45922), performedDate: excelToISO(45922), observation: 'Ok', status: 'REALIZADO' },
     { id: 'ald-3', sedeId: 'ALD', item: 'Dedetização', target: "Muriçoca / Mosquitos", product: 'k-otrine', frequency: 'Semanal', method: 'Maquina de fumaça', technician: 'Fabio', scheduledDate: excelToISO(45906), performedDate: excelToISO(45906), observation: 'Ok', status: 'REALIZADO' },
     { id: 'dl-1', sedeId: 'DL', item: 'Dedetização', target: "Rato / Roedores", product: 'Racumin', frequency: 'Quinzenal', method: 'Isca com cuscuz', technician: 'BERNARDO', scheduledDate: excelToISO(45906), performedDate: excelToISO(45906), observation: 'Ok', status: 'REALIZADO' },
-    { id: 'eus-1', sedeId: 'EUS', item: 'Dedetização', target: "Barata / Escorpião", product: 'K-otrine pó', frequency: 'Quinzenal', method: 'Pó nas caixas de passagem', technician: 'PAULO', scheduledDate: excelToISO(45905), performedDate: excelToISO(45905), observation: 'Ok', status: 'REALIZADO' }
+    { id: 'eus-1', sedeId: 'EUS', item: 'Dedetização', target: "Barata / Escorpião", product: 'K-otrine Pó', frequency: 'Quinzenal', method: 'Pó nas caixas de passagem', technician: 'PAULO', scheduledDate: excelToISO(45905), performedDate: excelToISO(45905), observation: 'Ok', status: 'REALIZADO' }
 ];
 
 let LOCAL_SETTINGS: PestControlSettings = {
@@ -82,7 +84,7 @@ export const pestService = {
             .upload(fileName, file);
         
         if (error) {
-            console.error("Erro upload:", error);
+            logger.error("Erro upload:", error);
             return null;
         }
         
@@ -152,15 +154,31 @@ export const pestService = {
     },
 
     save: async (item: PestControlEntry) => {
+        let wasCompleted = false;
+        if (item.status === 'REALIZADO' && item.performedDate && item.id) {
+            if (isSupabaseConfigured()) {
+                const { data: existing, error: existingError } = await supabase
+                    .from('pest_control_entries')
+                    .select('status, performed_date')
+                    .eq('id', item.id)
+                    .single();
+                if (!existingError && existing) {
+                    wasCompleted = existing.status === 'REALIZADO' && !!existing.performed_date;
+                }
+            } else {
+                const existing = MOCK_PEST_ENTRIES.find(e => e.id === item.id);
+                if (existing) {
+                    wasCompleted = existing.status === 'REALIZADO' && !!existing.performedDate;
+                }
+            }
+        }
+
         let isCompletion = false;
         
         if (item.status === 'REALIZADO' && item.performedDate) {
-            isCompletion = true;
+            isCompletion = !wasCompleted;
         } else {
-            const sched = new Date(item.scheduledDate);
-            const today = new Date();
-            today.setHours(0,0,0,0);
-            if (sched < today) item.status = 'ATRASADO';
+            if (isBeforeToday(item.scheduledDate)) item.status = 'ATRASADO';
             else item.status = 'PENDENTE';
         }
 

@@ -150,7 +150,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </div>
                         <input 
                             type="text"
-                            placeholder="Acessar módulo..."
+                            placeholder="Acessar Módulo..."
                             className="w-full bg-transparent border-none outline-none px-3 py-2 text-sm font-mono text-slate-700 dark:text-slate-200 placeholder:text-slate-400"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -271,7 +271,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <div className="inline-flex items-center gap-4 text-[10px] font-mono text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">
               <span>Sistema v2.0</span>
               <span className="w-1 h-1 bg-slate-300 dark:bg-slate-700 rounded-full"></span>
-              <span>Conexão Segura</span>
+              <span>conexão Segura</span>
           </div>
       </div>
     </div>

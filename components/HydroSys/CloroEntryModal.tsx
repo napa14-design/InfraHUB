@@ -8,6 +8,7 @@ import { HydroCloroEntry, HydroSettings, User } from '../../types';
 import { compressImage } from '../../utils/imageUtils';
 import { hydroService } from '../../services/hydroService';
 import { formatDate } from '../../utils/formatters';
+import { logger } from '../../utils/logger';
 
 interface Props {
     isOpen: boolean;
@@ -93,7 +94,7 @@ export const CloroEntryModal: React.FC<Props> = ({
             if (url) setForm(prev => ({ ...prev, photoUrl: url }));
             else alert("Erro no upload da imagem.");
         } catch (err) {
-            console.error("Erro upload/compressão:", err);
+            logger.error("Erro upload/compressão:", err);
             alert("Erro ao processar imagem. Tente uma menor.");
         } finally {
             setIsUploading(false);
@@ -145,7 +146,7 @@ export const CloroEntryModal: React.FC<Props> = ({
                         <div className="flex items-center gap-2 text-slate-400 text-xs font-black uppercase tracking-widest mb-1">
                             <Calendar size={12}/> {formatDate(dateStr)}
                         </div>
-                        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Registro de Análise</h3>
+                        <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Registro de análise</h3>
                     </div>
                     <button onClick={onClose} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
                         <X size={20} />
@@ -243,7 +244,7 @@ export const CloroEntryModal: React.FC<Props> = ({
                     {/* Details */}
                     <div className="space-y-4">
                         <div className="space-y-1">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável Técnico</label>
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Responsável técnico</label>
                             <div className="relative">
                                 <UserIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                 <input className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-medium outline-none focus:border-cyan-500 transition-colors" value={form.responsavel} onChange={e => setForm({...form, responsavel: e.target.value})} placeholder="Nome do operador" />

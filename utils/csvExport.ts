@@ -1,7 +1,7 @@
 
 export const exportToCSV = (data: any[], filename: string, headers?: Record<string, string>) => {
   if (!data || data.length === 0) {
-    alert("Não há dados para exportar.");
+    alert("não há dados para exportar.");
     return;
   }
 

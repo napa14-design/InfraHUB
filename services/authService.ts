@@ -1,9 +1,9 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { createClient } from '@supabase/supabase-js'; 
 import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
 import { logService } from './logService';
+import { logger } from '../utils/logger';
 
 const SESSION_KEY = 'nexus_auth_user';
 
@@ -12,12 +12,29 @@ const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const normalizeName = (name?: string) =>
+    (name || '').trim().replace(/\s+/g, ' ');
+
+const withTimeout = async <T>(promise: Promise<T>, ms = 12000): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('timeout')), ms);
+    });
+    try {
+        return await Promise.race([promise, timeout]);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
+};
+
 // --- TRANSLATION HELPER ---
 const translateAuthError = (message: string): string => {
     const m = message.toLowerCase();
     if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
     if (m.includes("email not confirmed")) return "E-mail pendente de confirmação. Verifique sua caixa de entrada.";
-    if (m.includes("user not found")) return "Usuário não encontrado.";
+    if (m.includes("user not found")) return "usuário não encontrado.";
     if (m.includes("already registered")) return "Este e-mail já está cadastrado no sistema.";
     if (m.includes("password should be at least")) return "A senha deve ter no mínimo 6 caracteres.";
     if (m.includes("weak password")) return "Senha muito fraca. Tente uma combinação mais complexa.";
@@ -27,31 +44,32 @@ const translateAuthError = (message: string): string => {
     if (m.includes("network")) return "Erro de conexão. Verifique sua internet.";
     
     // Fallback amigável mantendo o erro original para debug se necessário
-    return `Não foi possível completar a ação. (${message})`;
+    return `não foi possível completar a ação. (${message})`;
 };
 
 export const authService = {
   // Login with Supabase or Mock
   login: async (email: string, passwordInput: string): Promise<{ user: User | null; error?: string }> => {
     try {
-      console.log(`[Auth] Attempting login for: ${email}`);
+      const safeEmail = normalizeEmail(email);
+      logger.log(`[Auth] Attempting login for: ${safeEmail}`);
       let supabaseErrorMsg = '';
 
       // 1. Try Supabase Auth first if configured
       if (isSupabaseConfigured()) {
-          console.log("[Auth] Supabase is configured. Sending request...");
+          logger.log("[Auth] Supabase is configured. Sending request...");
           
           const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email,
+            email: safeEmail,
             password: passwordInput,
           });
 
           if (authError) {
-            console.warn("[Auth] Supabase SignIn failed (falling back to mock):", authError.message);
+            logger.warn("[Auth] Supabase SignIn failed (falling back to mock):", authError.message);
             supabaseErrorMsg = authError.message;
             // DO NOT RETURN HERE. Fall through to check Mocks.
           } else if (authData.user) {
-              console.log("[Auth] User authenticated via Auth. Fetching profile...", authData.user.id);
+              logger.log("[Auth] User authenticated via Auth. Fetching profile...", authData.user.id);
               
               const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
@@ -60,10 +78,10 @@ export const authService = {
                 .single();
 
               if (profileError) {
-                  console.error("[Auth] Profile Fetch Error:", profileError);
+                  logger.error("[Auth] Profile Fetch Error:", profileError);
                   return { 
                       user: null, 
-                      error: "Login realizado, mas o perfil de usuário não foi encontrado." 
+                      error: "Login realizado, mas o perfil de USUÁRIO não foi encontrado." 
                   };
               }
 
@@ -97,11 +115,11 @@ export const authService = {
               }
           }
       } else {
-        console.warn("[Auth] Supabase NOT configured. Falling back to Mocks.");
+        logger.warn("[Auth] Supabase NOT configured. Falling back to Mocks.");
       }
 
       // 2. Fallback to MOCK_USERS if Supabase failed or not configured
-      const mockUser = MOCK_USERS.find(u => u.email === email);
+      const mockUser = MOCK_USERS.find(u => u.email === safeEmail);
       if (mockUser) {
           // --- BLOCK IF INACTIVE (MOCK) ---
           if (mockUser.status !== 'ACTIVE') {
@@ -111,7 +129,7 @@ export const authService = {
               };
           }
 
-          console.log("[Auth] Mock user found.");
+          logger.log("[Auth] Mock user found.");
           localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
           
           // LOG LOGIN ACTION
@@ -128,7 +146,7 @@ export const authService = {
       return { user: null, error: 'E-mail ou senha incorretos.' };
 
     } catch (err: any) {
-      console.error("[Auth] Unexpected Exception:", err);
+      logger.error("[Auth] Unexpected Exception:", err);
       return { user: null, error: `Erro inesperado: ${err.message || err}` };
     }
   },
@@ -170,6 +188,60 @@ export const authService = {
     return null;
   },
 
+  refreshSessionUser: async (): Promise<User | null> => {
+    if (!isSupabaseConfigured()) {
+      return authService.getCurrentUser();
+    }
+
+    try {
+      const { data, error } = await withTimeout(supabase.auth.getUser());
+      if (error || !data?.user) {
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+
+      const { data: profileData, error: profileError } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id)
+          .single()
+      );
+
+      if (profileError || !profileData) {
+        return null;
+      }
+
+      if (profileData.status !== 'ACTIVE') {
+        await supabase.auth.signOut();
+        localStorage.removeItem(SESSION_KEY);
+        return null;
+      }
+
+      const appUser: User = {
+        id: data.user.id,
+        email: data.user.email || '',
+        name: profileData.name || 'Usuário',
+        role: profileData.role as UserRole,
+        status: profileData.status,
+        isFirstLogin: profileData.is_first_login ?? false,
+        organizationId: profileData.organization_id,
+        regionId: profileData.region_id,
+        sedeIds: profileData.sede_ids || [],
+      };
+
+      localStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
+      return appUser;
+    } catch (error: any) {
+      if (error?.message === 'timeout') {
+        logger.log('[Auth] refreshSessionUser timeout, usando cache');
+      } else {
+        logger.warn('[Auth] Failed to refresh session user', error);
+      }
+      return authService.getCurrentUser();
+    }
+  },
+
   getAllUsers: async (): Promise<User[]> => {
     try {
         if (!isSupabaseConfigured()) throw new Error("Mock");
@@ -205,84 +277,61 @@ export const authService = {
      }
 
      const currentUser = authService.getCurrentUser();
+     const safeEmail = userData.email ? normalizeEmail(userData.email) : '';
+     const safeName = normalizeName(userData.name);
 
      if (isSupabaseConfigured()) {
          try {
-             // Accessing properties safely from the initialized client
-             // @ts-ignore
-             const sbUrl = supabase.supabaseUrl;
-             // @ts-ignore
-             const sbKey = supabase.supabaseKey;
-
-             if (sbUrl && sbKey && userData.email) {
-                 // Create a temporary client to avoid logging out the current admin
-                 const tempClient = createClient(sbUrl, sbKey, {
-                     auth: {
-                         persistSession: false,
-                         autoRefreshToken: false,
-                         detectSessionInUrl: false
-                     }
-                 });
-
-                 console.log("[Auth] Creating Auth User via Shadow Client...");
-                 const { data: authData, error: authError } = await tempClient.auth.signUp({
-                     email: userData.email,
-                     password: tempPassword,
-                     options: {
-                         data: {
-                             name: userData.name,
-                             role: userData.role
-                         }
-                     }
-                 });
-
-                 if (authError) {
-                     console.error("[Auth] Error creating Auth User:", authError.message);
-                     return { error: translateAuthError(authError.message) };
-                 } 
-                 
-                 let emailConfirmationRequired = false;
-
-                 if (authData.user) {
-                     tempId = authData.user.id; // USE THE REAL ID
-                     if (!authData.session) {
-                         emailConfirmationRequired = true;
-                     }
-                 } else {
-                     return { error: "Falha na criação do usuário Auth. Verifique o email." };
-                 }
-
-                 // Insert into profiles table
-                 const { error } = await supabase.from('profiles').upsert({
-                     id: tempId, 
-                     email: userData.email,
-                     name: userData.name || 'Novo Usuário',
-                     role: userData.role || 'OPERATIONAL',
-                     organization_id: userData.organizationId || null,
-                     region_id: userData.regionId || null,
-                     sede_ids: userData.sedeIds || [],
-                     status: 'ACTIVE',
-                     is_first_login: true // FORCE FIRST LOGIN FLAG
-                 }).select().single();
-
-                 if (error) {
-                     console.error("Error creating/updating profile in DB:", error.code, error.message);
-                     return { error: "Erro ao salvar perfil do usuário no banco de dados." };
-                 }
-
-                 if (currentUser) {
-                     logService.logAction(currentUser, 'ADMIN', 'CREATE', `Usuário ${userData.email}`, `Criou conta para ${userData.name} (${userData.role})`);
-                 }
-
-                 return { 
-                    id: tempId, 
-                    email: userData.email, 
-                    password: tempPassword,
-                    warning: emailConfirmationRequired ? "Este usuário requer confirmação de e-mail antes de logar." : undefined
-                 };
+             if (!safeEmail) {
+                 return { error: "Informe um e-mail válido." };
              }
+
+             const { data: { session } } = await supabase.auth.getSession();
+             if (!session) {
+                 return { error: "Sessão expirada. Faça login novamente." };
+             }
+
+             const { data, error } = await supabase.functions.invoke('admin-create-user', {
+                 body: {
+                     user: {
+                         email: safeEmail,
+                         name: safeName,
+                         role: userData.role,
+                         organizationId: userData.organizationId,
+                         regionId: userData.regionId,
+                         sedeIds: userData.sedeIds || []
+                     },
+                     password: tempPassword
+                 },
+                 headers: {
+                     Authorization: `Bearer ${session.access_token}`,
+                 }
+             });
+
+             if (error) {
+                 const msg =
+                     (error as any)?.context?.body?.error ||
+                     (error as any)?.context?.body?.message ||
+                     error.message ||
+                     "Falha ao executar a Edge Function.";
+                 return { error: msg };
+             }
+
+             const response: any = data || {};
+             if (response?.id) tempId = response.id;
+
+             if (currentUser) {
+                 logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuário ${safeEmail}`, `Criou conta para ${safeName || 'Usuário'} (${userData.role})`);
+             }
+
+             return { 
+                id: tempId, 
+                email: safeEmail, 
+                password: tempPassword,
+                warning: response?.warning
+             };
          } catch (e: any) {
-             console.error("Unexpected error in createUser:", e);
+             logger.error("Unexpected error in createUser:", e);
              return { error: e.message || "Erro inesperado." };
          }
      }
@@ -290,8 +339,8 @@ export const authService = {
      // Always update Mock/Local state so UI feels responsive
      MOCK_USERS.push({
          id: tempId,
-         name: userData.name || 'Novo Usuário',
-         email: userData.email || 'novo@email.com',
+         name: safeName || 'Novo usuário',
+         email: safeEmail || 'novo@email.com',
          role: userData.role || UserRole.OPERATIONAL,
          organizationId: userData.organizationId,
          regionId: userData.regionId,
@@ -301,12 +350,12 @@ export const authService = {
      });
 
      if (currentUser) {
-         logService.logAction(currentUser, 'ADMIN', 'CREATE', `Usuário ${userData.email}`, `Criou conta (Mock) para ${userData.name}`);
+         logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuário ${safeEmail || 'novo@email.com'}`, `Criou conta (Mock) para ${safeName || 'Usuário'}`);
      }
 
      return { 
          id: tempId, 
-         email: userData.email, 
+         email: safeEmail, 
          password: tempPassword
      };
   },
@@ -327,7 +376,7 @@ export const authService = {
         await supabase.from('profiles').update(dbUpdates).eq('id', id);
         
         if (currentUser) {
-            logService.logAction(currentUser, 'ADMIN', 'UPDATE', `Usuário ID ${id}`, `Atualizou dados: ${Object.keys(updates).join(', ')}`);
+            logService.logAction(currentUser, 'ADMIN', 'UPDATE', `usuário ID ${id}`, `Atualizou dados: ${Object.keys(updates).join(', ')}`);
         }
     }
     
@@ -358,7 +407,7 @@ export const authService = {
     }
 
     if (currentUser) {
-        logService.logAction(currentUser, 'ADMIN', 'DELETE', `Usuário ID ${id}`, 'Removeu conta do sistema');
+        logService.logAction(currentUser, 'ADMIN', 'DELETE', `usuário ID ${id}`, 'Removeu conta do sistema');
     }
   },
 
@@ -396,8 +445,9 @@ export const authService = {
   },
 
   resetPasswordRequest: async (email: string): Promise<{success: boolean, message?: string}> => {
+      const safeEmail = normalizeEmail(email);
       // Logic to detect "Dummy" or "Internal" accounts based on domain conventions
-      if (email.endsWith('.local') || email.includes('interno')) {
+      if (safeEmail.endsWith('.local') || safeEmail.includes('interno')) {
           return { 
               success: false, 
               message: "Contas operacionais internas não recebem e-mail. Solicite o reset de senha diretamente ao seu Gestor." 
@@ -405,7 +455,7 @@ export const authService = {
       }
 
       if (isSupabaseConfigured()) {
-          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          const { error } = await supabase.auth.resetPasswordForEmail(safeEmail, {
               redirectTo: `${window.location.origin}/#/update-password`,
           });
           return { success: !error };
@@ -414,43 +464,60 @@ export const authService = {
   },
 
   // NEW FUNCTION: Admin Reset Password (Production Ready via Edge Function)
-  // Calls 'admin-reset-password' Edge Function to bypass client-side restrictions
-  adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{success: boolean, error?: string}> => {
-      const currentUser = authService.getCurrentUser();
-      
-      if (!isSupabaseConfigured()) {
-          // Mock Mode: Update directly
-          const u = MOCK_USERS.find(u => u.id === targetUserId);
-          if (u) {
-              u.isFirstLogin = true; 
-          }
-          return { success: true };
-      } else {
-          // Supabase Mode: Try Edge Function first
-          try {
-const { data: result, error } = await supabase.functions.invoke('admin-reset-password', {
-        body: { userId: targetUserId, newPassword: newPassword }
-      });              if (error) {
-                  console.error("Edge Function Failed:", error);
-                  // Fallback: Just mark as 'Force Reset', but warn admin that password wasn't changed on backend
-                  await supabase.from('profiles').update({ is_first_login: true }).eq('id', targetUserId);
-                  return { 
-                      success: false, 
-                      error: "FALHA: É necessário configurar a Edge Function 'admin-reset-password' no Supabase para alterar a senha real." 
-                  };
-              }
+// Calls 'admin-reset-password' Edge Function to bypass client-side restrictions
+adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{success: boolean, error?: string}> => {
+    const currentUser = authService.getCurrentUser();
+    
+    if (!isSupabaseConfigured()) {
+        // Mock Mode: Update directly
+        const u = MOCK_USERS.find(u => u.id === targetUserId);
+        if (u) {
+            u.isFirstLogin = true; 
+        }
+        return { success: true };
+    } else {
+        // Supabase Mode: Try Edge Function first
+        try {
+            // 🔑 OBTER O TOKEN DE SESSÃO DO USUÁRIO LOGADO
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (!session) {
+                return { 
+                    success: false, 
+                    error: "Sessão expirada. Faça login novamente." 
+                };
+            }
 
-              if (currentUser) {
-                  logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha via Edge Function');
-              }
-              return { success: true };
+            // ✅ ENVIAR O TOKEN NO HEADER AUTHORIZATION
+            const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+                body: { userId: targetUserId, newPassword: newPassword },
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                }
+            });
 
-          } catch (e) {
-              console.error("Invoke Error:", e);
-              return { success: false, error: "Erro de conexão com o servidor de funções." };
-          }
-      }
-  },
+            if (error) {
+                logger.error("Edge Function Failed:", error);
+                const msg =
+                    (error as any)?.context?.body?.error ||
+                    (error as any)?.context?.body?.message ||
+                    error.message ||
+                    "Falha ao executar a Edge Function.";
+                return { success: false, error: msg };
+            }
+
+            if (currentUser) {
+                logService.logAction(currentUser, 'AUTH', 'UPDATE', `Reset Senha ID ${targetUserId}`, 'Resetou senha via Edge Function');
+            }
+            return { success: true };
+
+        } catch (e) {
+            logger.error("Invoke Error:", e);
+            return { success: false, error: "Erro de conexão com o servidor de funções." };
+        }
+    }
+},
+
 
   completeFirstLogin: async (userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
       if (isSupabaseConfigured()) {

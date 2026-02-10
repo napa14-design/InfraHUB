@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Download, Share } from 'lucide-react';
+import { logger } from '../../utils/logger';
 
 interface Props {
     collapsed?: boolean;
@@ -51,11 +52,11 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false, className
     // Mostra o prompt nativo
     promptEvent.prompt();
     
-    // Aguarda a escolha do usuário
+    // Aguarda a escolha do USUÁRIO
     const { outcome } = await promptEvent.userChoice;
     
     if (outcome === 'accepted') {
-      console.log('User accepted the install prompt');
+      logger.log('User accepted the install prompt');
       setDeferredPrompt(null);
       // @ts-ignore
       window.deferredPrompt = null;
@@ -94,7 +95,7 @@ export const PWAInstallPrompt: React.FC<Props> = ({ collapsed = false, className
       return (
         <div className={`flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 rounded-lg text-[10px] font-mono border border-slate-200 dark:border-slate-700 mb-2 ${className}`}>
             <Share size={12} /> 
-            <span>Para instalar: Compartilhar {'>'} Tela de Início</span>
+            <span>Para instalar: Compartilhar {'>'} Tela de início</span>
         </div>
       );
   }

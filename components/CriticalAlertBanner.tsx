@@ -37,7 +37,7 @@ export const CriticalAlertBanner: React.FC<Props> = ({ onViewCritical }) => {
             <AlertTriangle className="text-white" size={20} />
           </div>
           <div className="hidden md:block">
-            <p className="font-bold text-xs uppercase tracking-wider text-red-100">Atenção Necessária</p>
+            <p className="font-bold text-xs uppercase tracking-wider text-red-100">atenção Necessária</p>
           </div>
         </div>
 

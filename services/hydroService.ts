@@ -5,6 +5,7 @@ import { MOCK_HYDRO_CERTIFICADOS, MOCK_HYDRO_FILTROS, MOCK_HYDRO_RESERVATORIOS }
 import { logService } from './logService';
 import { authService } from './authService';
 import { notificationService } from './notificationService';
+import { logger } from '../utils/logger';
 
 // Cache em memória para Cloro quando offline/mock
 let MOCK_CLORO_CACHE: HydroCloroEntry[] = [];
@@ -206,7 +207,7 @@ export const hydroService = {
           });
       
       if (error) {
-          console.error("Erro upload:", error);
+          logger.error("Erro upload:", error);
           throw error;
       }
       
@@ -324,12 +325,12 @@ export const hydroService = {
     }
     const u = getCurrentUserForLog();
     if(u) {
-        let details = `Poço ${item.local}`;
+        let details = `poço ${item.local}`;
         
-        // Se tiver Ficha Técnica, cria um resumo rico para o log (Histórico Legível)
+        // Se tiver Ficha TÉCNICA, cria um resumo rico para o log (histórico Legível)
         if (item.dadosFicha) {
             details = `FICHA TÉCNICA - LIMPEZA REALIZADA\n` +
-                      `Data Término: ${item.dadosFicha.terminoLimpeza}\n` +
+                      `Data término: ${item.dadosFicha.terminoLimpeza}\n` +
                       `Bomba: ${item.dadosFicha.marcaBomba} ${item.dadosFicha.modeloBomba} (${item.dadosFicha.potenciaBomba}cv)\n` +
                       `Profundidade Bomba: ${item.dadosFicha.profundidadeBomba}m\n` +
                       `Pré-Limpeza: N.E ${item.dadosFicha.preLimpeza.nivelEstatico}m / Vazão ${item.dadosFicha.preLimpeza.vazao}\n` +
@@ -337,7 +338,7 @@ export const hydroService = {
                       `Obs: ${item.dadosFicha.observacoes}`;
         }
 
-        logService.logAction(u, 'HYDROSYS', 'UPDATE', `Poço ${item.local}`, details);
+        logService.logAction(u, 'HYDROSYS', 'UPDATE', `poço ${item.local}`, details);
         if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();
