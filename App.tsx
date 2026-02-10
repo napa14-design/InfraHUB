@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
 import { ToastProvider } from './components/Shared/ToastContext';
 import { ConfirmationProvider } from './components/Shared/ConfirmationContext';
+import { TetrisLoader } from './components/Shared/TetrisLoader';
 import { logger } from './utils/logger';
 
 logger.log('[App] Module loaded');
@@ -115,12 +116,7 @@ const PestControlHelp = lazyImport(() => import('./components/PestControl/PestCo
 
 // --- LOADING FALLBACK ---
 const PageLoader = () => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-    <div className="flex flex-col items-center gap-4">
-       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-brand-600 dark:border-brand-400"></div>
-       <p className="text-slate-400 font-mono text-xs animate-pulse uppercase tracking-widest">Carregando...</p>
-    </div>
-  </div>
+  <TetrisLoader />
 );
 
 // Component to handle Supabase Auth Events
