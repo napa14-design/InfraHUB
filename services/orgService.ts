@@ -17,10 +17,11 @@ let cache = {
 let usingMocks = false;
 let hasSupabaseData = false;
 let initPromise: Promise<void> | null = null;
+const ORG_TIMEOUT_MS = 5000;
 
 const getCurrentUser = () => authService.getCurrentUser();
 
-const withTimeout = async <T>(promise: Promise<T>, ms = 8000): Promise<T> => {
+const withTimeout = async <T>(promise: Promise<T>, ms = ORG_TIMEOUT_MS): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<T>((_, reject) => {
     timeoutId = setTimeout(() => reject(new Error('timeout')), ms);

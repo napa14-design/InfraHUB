@@ -6,6 +6,7 @@ import { logService } from './logService';
 import { logger } from '../utils/logger';
 
 const SESSION_KEY = 'nexus_auth_user';
+const AUTH_TIMEOUT_MS = 5000;
 
 // Helper for generating IDs safely in all environments
 const generateId = () => {
@@ -17,7 +18,7 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const normalizeName = (name?: string) =>
     (name || '').trim().replace(/\s+/g, ' ');
 
-const withTimeout = async <T>(promise: Promise<T>, ms = 12000): Promise<T> => {
+const withTimeout = async <T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promise<T> => {
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<T>((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error('timeout')), ms);
@@ -59,10 +60,12 @@ export const authService = {
       if (isSupabaseConfigured()) {
           logger.log("[Auth] Supabase is configured. Sending request...");
           
-          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-            email: safeEmail,
-            password: passwordInput,
-          });
+          const { data: authData, error: authError } = await withTimeout(
+            supabase.auth.signInWithPassword({
+              email: safeEmail,
+              password: passwordInput,
+            })
+          );
 
           if (authError) {
             logger.warn("[Auth] Supabase SignIn failed (falling back to mock):", authError.message);
@@ -71,11 +74,13 @@ export const authService = {
           } else if (authData.user) {
               logger.log("[Auth] User authenticated via Auth. Fetching profile...", authData.user.id);
               
-              const { data: profileData, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', authData.user.id)
-                .single();
+              const { data: profileData, error: profileError } = await withTimeout(
+                supabase
+                  .from('profiles')
+                  .select('*')
+                  .eq('id', authData.user.id)
+                  .single()
+              );
 
               if (profileError) {
                   logger.error("[Auth] Profile Fetch Error:", profileError);
@@ -146,6 +151,10 @@ export const authService = {
       return { user: null, error: 'E-mail ou senha incorretos.' };
 
     } catch (err: any) {
+      if (err?.message === 'timeout') {
+        logger.warn("[Auth] Login timeout");
+        return { user: null, error: "Tempo de conexÃ£o esgotado. Verifique sua internet." };
+      }
       logger.error("[Auth] Unexpected Exception:", err);
       return { user: null, error: `Erro inesperado: ${err.message || err}` };
     }
