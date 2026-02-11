@@ -27,6 +27,7 @@ export const AdminUserManagement: React.FC = () => {
   // Delete Modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Reset Password Modal
   const [resetModalOpen, setResetModalOpen] = useState(false);
@@ -117,30 +118,37 @@ export const AdminUserManagement: React.FC = () => {
         addToast("você não tem permissão para excluir Administradores.", "error");
         return;
     }
+    setIsDeleting(false);
     setUserToDelete(targetUser);
     setDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
+    if (isDeleting) return;
     if (userToDelete) {
-      const result = await authService.deleteUser(userToDelete.id);
-      if (!result.success) {
-        addToast(result.error || "Falha ao excluir usuário.", "error");
-        return;
+      setIsDeleting(true);
+      try {
+        const result = await authService.deleteUser(userToDelete.id);
+        if (!result.success) {
+          addToast(result.error || "Falha ao excluir usuário.", "error");
+          return;
+        }
+        await notificationService.add({
+          id: `del-user-${Date.now()}`,
+          title: 'Usuário Removido',
+          message: `${userToDelete.name} foi removido do sistema por ${currentUser?.name}.`,
+          type: 'WARNING',
+          read: false,
+          timestamp: new Date(),
+          moduleSource: 'UserManagement'
+        });
+        loadData();
+        setDeleteModalOpen(false);
+        setUserToDelete(null);
+        addToast("usuário removido com sucesso.", "success");
+      } finally {
+        setIsDeleting(false);
       }
-      await notificationService.add({
-        id: `del-user-${Date.now()}`,
-        title: 'Usuário Removido',
-        message: `${userToDelete.name} foi removido do sistema por ${currentUser?.name}.`,
-        type: 'WARNING',
-        read: false,
-        timestamp: new Date(),
-        moduleSource: 'UserManagement'
-      });
-      loadData();
-      setDeleteModalOpen(false);
-      setUserToDelete(null);
-      addToast("usuário removido com sucesso.", "success");
     }
   };
 
@@ -578,7 +586,28 @@ export const AdminUserManagement: React.FC = () => {
                 <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-500 flex items-center justify-center mx-auto mb-6"><AlertCircle size={32} /></div>
                 <h3 className="text-xl font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase">CONFIRMAR EXCLUSÃO</h3>
                 <p className="text-xs font-mono text-red-500 dark:text-red-400 mb-8">AÇÃO IRREVERSÍVEL. REMOVER ACESSO DE <br/> <span className="text-slate-900 dark:text-white font-bold text-sm">[{userToDelete.name}]</span>?</p>
-                <div className="grid grid-cols-2 gap-3"><button onClick={() => setDeleteModalOpen(false)} className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 transition-colors">CANCELAR</button><button onClick={confirmDelete} className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors">CONFIRMAR</button></div>
+                <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => {
+                        if (isDeleting) return;
+                        setDeleteModalOpen(false);
+                        setUserToDelete(null);
+                        setIsDeleting(false);
+                      }}
+                      disabled={isDeleting}
+                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      CANCELAR
+                    </button>
+                    <button
+                      onClick={confirmDelete}
+                      disabled={isDeleting}
+                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isDeleting ? <Loader2 size={14} className="animate-spin" /> : null}
+                      <span>{isDeleting ? 'EXCLUINDO...' : 'CONFIRMAR'}</span>
+                    </button>
+                </div>
             </div>
         </div>
       )}
