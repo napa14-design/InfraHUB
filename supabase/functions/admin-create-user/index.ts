@@ -65,17 +65,23 @@ serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+    const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!accessToken) {
+      return new Response(
+        JSON.stringify({ error: "Missing bearer token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     const supabaseAuth = createClient(supabaseUrl, anonKey || serviceRoleKey, {
-      global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
     const { data: authData, error: authError } =
-      await supabaseAuth.auth.getUser();
+      await supabaseAuth.auth.getUser(accessToken);
     if (authError || !authData?.user) {
       return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
+        JSON.stringify({ error: `Invalid or expired token: ${authError?.message || "unknown auth error"}` }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
