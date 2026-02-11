@@ -86,7 +86,7 @@ serve(async (req) => {
 
     const { data: requesterProfile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("role")
+      .select("role,name,email")
       .eq("id", authData.user.id)
       .single();
 
@@ -121,6 +121,42 @@ serve(async (req) => {
       );
     }
 
+    const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+      .from("profiles")
+      .select("id,role,status,name,email")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (targetProfileError) {
+      return new Response(
+        JSON.stringify({ error: "Failed to load target profile" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    // Safety: do not allow deleting the last active ADMIN.
+    if (targetProfile?.role === "ADMIN" && targetProfile?.status === "ACTIVE") {
+      const { count: activeAdminCount, error: activeAdminCountError } = await supabaseAdmin
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("role", "ADMIN")
+        .eq("status", "ACTIVE");
+
+      if (activeAdminCountError) {
+        return new Response(
+          JSON.stringify({ error: "Failed to validate active admin count" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if ((activeAdminCount || 0) <= 1) {
+        return new Response(
+          JSON.stringify({ error: "Cannot delete the last active ADMIN" }),
+          { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId);
     const authNotFound = !!deleteAuthError?.message &&
       deleteAuthError.message.toLowerCase().includes("not found");
@@ -132,6 +168,8 @@ serve(async (req) => {
       );
     }
 
+    const warnings: string[] = [];
+
     // Best effort cleanup in case profile row still exists.
     const { error: deleteProfileError } = await supabaseAdmin
       .from("profiles")
@@ -139,16 +177,39 @@ serve(async (req) => {
       .eq("id", userId);
 
     if (deleteProfileError) {
-      return new Response(
-        JSON.stringify({
-          warning: "Auth user deleted, but profile cleanup failed.",
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      warnings.push("Auth user deleted, but profile cleanup failed.");
+    }
+
+    const requesterName =
+      requesterProfile?.name ||
+      authData.user.user_metadata?.name ||
+      authData.user.email ||
+      authData.user.id;
+    const targetEmail = targetProfile?.email || "";
+    const targetName = targetProfile?.name || "";
+
+    const { error: auditError } = await supabaseAdmin
+      .from("audit_logs")
+      .insert({
+        user_id: authData.user.id,
+        user_name: requesterName,
+        user_role: requesterProfile.role,
+        module: "ADMIN",
+        action: "DELETE",
+        target: targetEmail ? `usuario ${targetEmail}` : `usuario ID ${userId}`,
+        details: `Exclusao de usuario. alvo_id=${userId}; alvo_nome=${targetName || "n/a"}; alvo_email=${targetEmail || "n/a"};`,
+        timestamp: new Date().toISOString(),
+      });
+
+    if (auditError && auditError.code !== "42P01") {
+      warnings.push("User deleted, but failed to write audit log.");
     }
 
     return new Response(
-      JSON.stringify({ message: "User deleted" }),
+      JSON.stringify({
+        message: "User deleted",
+        warning: warnings.length ? warnings.join(" ") : undefined,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (error) {
