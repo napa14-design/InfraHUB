@@ -134,7 +134,7 @@ serve(async (req) => {
       await supabaseAdmin.auth.admin.createUser({
         email,
         password,
-        email_confirm: false,
+        email_confirm: true,
         user_metadata: {
           name: payload.name,
           role,
@@ -172,15 +172,10 @@ serve(async (req) => {
       );
     }
 
-    const emailConfirmationRequired = !created.user.email_confirmed_at;
-
     return new Response(
       JSON.stringify({
         id: userId,
         email,
-        warning: emailConfirmationRequired
-          ? "Este usuário requer confirmação de e-mail antes de logar."
-          : undefined,
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
