@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { User, UserRole, UserStatus, Sede, Organization, Region } from '../types';
 import { authService } from '../services/authService';
 import { orgService } from '../services/orgService';
-import { authService } from '../services/authService';
 import { notificationService } from '../services/notificationService';
 import { useToast } from './Shared/ToastContext';
 
@@ -51,6 +50,7 @@ export const AdminUserManagement: React.FC = () => {
   // New User Created Password Display
   const [createdUserPass, setCreatedUserPass] = useState<string | null>(null);
   const [creationWarning, setCreationWarning] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -75,6 +75,7 @@ export const AdminUserManagement: React.FC = () => {
     await loadData();
     setIsEditing(false);
     setEditingId(null);
+    setIsSubmitting(false);
     setCreatedUserPass(null);
     setCreationWarning(null);
     setManualPassword(''); 
@@ -91,6 +92,7 @@ export const AdminUserManagement: React.FC = () => {
       await loadData();
       setIsEditing(true);
       setEditingId(user.id);
+      setIsSubmitting(false);
       setCreatedUserPass(null);
       setCreationWarning(null);
       setManualPassword('');
@@ -204,8 +206,11 @@ export const AdminUserManagement: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     if (!validateForm()) return;
 
+    setIsSubmitting(true);
+    try {
     if (isEditing && editingId) {
         await authService.updateUser(editingId, formData);
         await notificationService.add({
@@ -245,14 +250,19 @@ export const AdminUserManagement: React.FC = () => {
            addToast(`usuário "${formData.name}" criado com sucesso!`, "success");
         }
     }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const closeAndReset = () => {
+    if (isSubmitting) return;
     setIsModalOpen(false);
     setCreatedUserPass(null);
     setCreationWarning(null);
     setIsEditing(false);
     setEditingId(null);
+    setIsSubmitting(false);
     setFormData(initialFormState);
     setManualPassword('');
   };
@@ -498,12 +508,22 @@ export const AdminUserManagement: React.FC = () => {
       {isModalOpen && (
           <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
               <div className="bg-white dark:bg-[#0C0C0E] w-full max-w-xl border border-slate-200 dark:border-slate-700 shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto">
+                  {isSubmitting && (
+                      <div className="absolute inset-0 z-20 bg-black/55 backdrop-blur-[1px] flex items-center justify-center">
+                          <div className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
+                              <Loader2 size={16} className="animate-spin text-brand-600 dark:text-brand-400" />
+                              <span className="text-xs font-mono uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                                  Processando usuario...
+                              </span>
+                          </div>
+                      </div>
+                  )}
                   <div className="flex justify-between items-center p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
                       <div className="flex items-center gap-3">
                           <Terminal className="text-brand-600 dark:text-brand-500" size={20} />
                           <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-wider">{isEditing ? 'ATUALIZAR PERFIL' : 'NOVO CADASTRO'}</h3>
                       </div>
-                      <button onClick={closeAndReset}><X className="text-slate-500 hover:text-slate-900 dark:hover:text-white" /></button>
+                      <button onClick={closeAndReset} disabled={isSubmitting} className="disabled:opacity-40 disabled:cursor-not-allowed"><X className="text-slate-500 hover:text-slate-900 dark:hover:text-white" /></button>
                   </div>
                   {createdUserPass ? (
                       <div className="p-8 text-center bg-white dark:bg-[#0C0C0E]">
@@ -518,7 +538,7 @@ export const AdminUserManagement: React.FC = () => {
                           <button onClick={closeAndReset} className="w-full py-3 bg-brand-600 text-white font-mono font-bold uppercase">CIENTE</button>
                       </div>
                   ) : (
-                      <form onSubmit={handleSubmit} className="p-6 space-y-5 relative z-10 bg-white dark:bg-[#0C0C0E]">
+                      <form onSubmit={handleSubmit} className="p-6 space-y-5 relative z-10 bg-white dark:bg-[#0C0C0E]" aria-busy={isSubmitting}>
                           <div className="grid grid-cols-1 gap-4">
                               <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">NOME COMPLETO</label><input required className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" placeholder="DIGITE O NOME..." value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} /></div>
                               <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase">E-MAIL</label><input required type="email" className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono" placeholder="USER@NEXUS.COM" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
@@ -534,7 +554,13 @@ export const AdminUserManagement: React.FC = () => {
                                 <div className="space-y-1"><label className="text-[10px] font-mono text-brand-600 uppercase mb-2 block">UNIDADES (MULTI)</label>{formData.organizationId ? <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-2 max-h-32 overflow-y-auto">{availableSedes.length > 0 ? <div className="space-y-1">{availableSedes.map(sede => <label key={sede.id} className="flex items-center space-x-3 p-2 hover:bg-slate-200 dark:hover:bg-white/5 cursor-pointer"><input type="checkbox" checked={formData.sedeIds?.includes(sede.id)} onChange={() => toggleSedeSelection(sede.id)} className="w-4 h-4" /><div className="flex-1 text-xs font-mono text-slate-700 dark:text-slate-300 uppercase">{sede.name}</div></label>)}</div> : <p className="text-xs text-slate-500 text-center">NENHUM DADO</p>}</div> : <div className="p-3 text-center border border-dashed border-slate-300 text-slate-500 text-xs font-mono uppercase">AGUARDANDO ORG...</div>}</div>
                               </>
                           )}
-                          <div className="pt-4 flex gap-3 border-t border-slate-200 dark:border-slate-800 mt-2"><button type="button" onClick={closeAndReset} className="flex-1 py-3 text-slate-500 font-mono text-xs uppercase hover:bg-slate-100 transition-colors">CANCELAR</button><button type="submit" className="flex-1 py-3 bg-brand-600 text-white font-mono font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">{isEditing ? <Save size={14}/> : <Plus size={14}/>}<span>{isEditing ? 'SALVAR' : 'CRIAR'}</span></button></div>
+                          <div className="pt-4 flex gap-3 border-t border-slate-200 dark:border-slate-800 mt-2">
+                              <button type="button" onClick={closeAndReset} disabled={isSubmitting} className="flex-1 py-3 text-slate-500 font-mono text-xs uppercase hover:bg-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">CANCELAR</button>
+                              <button type="submit" disabled={isSubmitting} className="flex-1 py-3 bg-brand-600 text-white font-mono font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : isEditing ? <Save size={14}/> : <Plus size={14}/>}
+                                  <span>{isSubmitting ? (isEditing ? 'SALVANDO...' : 'CRIANDO...') : isEditing ? 'SALVAR' : 'CRIAR'}</span>
+                              </button>
+                          </div>
                       </form>
                   )}
               </div>

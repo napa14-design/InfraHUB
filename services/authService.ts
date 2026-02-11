@@ -30,6 +30,29 @@ const withTimeout = async <T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promis
     }
 };
 
+const extractEdgeFunctionError = async (error: any): Promise<string> => {
+    const context = (error as any)?.context;
+
+    if (context && typeof context === 'object' && typeof (context as any).clone === 'function') {
+        const response = context as Response;
+        const parsedJson = await response.clone().json().catch(() => null);
+        if (parsedJson && typeof parsedJson === 'object') {
+            if (typeof (parsedJson as any).error === 'string') return (parsedJson as any).error;
+            if (typeof (parsedJson as any).message === 'string') return (parsedJson as any).message;
+        }
+
+        const textBody = await response.clone().text().catch(() => '');
+        if (textBody) return textBody;
+    }
+
+    const msgFromBody =
+        (error as any)?.context?.body?.error ||
+        (error as any)?.context?.body?.message;
+    if (msgFromBody) return msgFromBody;
+
+    return error?.message || "Falha ao executar a Edge Function.";
+};
+
 // --- TRANSLATION HELPER ---
 const translateAuthError = (message: string): string => {
     const m = message.toLowerCase();
@@ -318,11 +341,7 @@ export const authService = {
              });
 
              if (error) {
-                 const msg =
-                     (error as any)?.context?.body?.error ||
-                     (error as any)?.context?.body?.message ||
-                     error.message ||
-                     "Falha ao executar a Edge Function.";
+                 const msg = await extractEdgeFunctionError(error);
                  return { error: msg };
              }
 
@@ -507,11 +526,7 @@ adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{
 
             if (error) {
                 logger.error("Edge Function Failed:", error);
-                const msg =
-                    (error as any)?.context?.body?.error ||
-                    (error as any)?.context?.body?.message ||
-                    error.message ||
-                    "Falha ao executar a Edge Function.";
+                const msg = await extractEdgeFunctionError(error);
                 return { success: false, error: msg };
             }
 
