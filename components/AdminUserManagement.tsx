@@ -123,7 +123,11 @@ export const AdminUserManagement: React.FC = () => {
 
   const confirmDelete = async () => {
     if (userToDelete) {
-      await authService.deleteUser(userToDelete.id);
+      const result = await authService.deleteUser(userToDelete.id);
+      if (!result.success) {
+        addToast(result.error || "Falha ao excluir usuário.", "error");
+        return;
+      }
       await notificationService.add({
         id: `del-user-${Date.now()}`,
         title: 'Usuário Removido',

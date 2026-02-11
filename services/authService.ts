@@ -422,13 +422,31 @@ export const authService = {
     return null;
   },
 
-  deleteUser: async (id: string) => {
+  deleteUser: async (id: string): Promise<{ success: boolean; error?: string }> => {
     const currentUser = authService.getCurrentUser();
     
     if (isSupabaseConfigured()) {
-        await supabase.from('profiles').delete().eq('id', id);
-        // Note: Auth user deletion is restricted via client SDK. Usually handled by Edge Function or Admin API.
-        // We delete the profile which effectively removes access from the app logic.
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                return { success: false, error: "Sessão expirada. Faça login novamente." };
+            }
+
+            const { error } = await supabase.functions.invoke('admin-delete-user', {
+                body: { userId: id },
+                headers: {
+                    Authorization: `Bearer ${session.access_token}`,
+                }
+            });
+
+            if (error) {
+                const msg = await extractEdgeFunctionError(error);
+                return { success: false, error: msg };
+            }
+        } catch (e: any) {
+            logger.error("Unexpected error in deleteUser:", e);
+            return { success: false, error: e?.message || "Erro inesperado ao excluir usuário." };
+        }
     } else {
         const idx = MOCK_USERS.findIndex(u => u.id === id);
         if (idx > -1) MOCK_USERS.splice(idx, 1);
@@ -437,6 +455,7 @@ export const authService = {
     if (currentUser) {
         logService.logAction(currentUser, 'ADMIN', 'DELETE', `usuário ID ${id}`, 'Removeu conta do sistema');
     }
+    return { success: true };
   },
 
   hasPermission: (userRole: UserRole, requiredRole: UserRole): boolean => {
