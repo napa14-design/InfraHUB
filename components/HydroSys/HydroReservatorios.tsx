@@ -82,7 +82,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   
   // Modals
   const [isModalOpen, setIsModalOpen] = useState(false); // Generic Edit
-  const [isFichaOpen, setIsFichaOpen] = useState(false); // poço Specific
+  const [isFichaOpen, setIsFichaOpen] = useState(false); // poco Specific
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   const [editItem, setEditItem] = useState<any>(null);
@@ -91,6 +91,8 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   // Create flow
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [isSavingGeneric, setIsSavingGeneric] = useState(false);
+  const [isSavingFicha, setIsSavingFicha] = useState(false);
   const [createForm, setCreateForm] = useState<CreateReservatorioForm>({
       sedeId: '',
       local: '',
@@ -110,6 +112,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [historyItem, setHistoryItem] = useState<any>(null);
 
   const isAdmin = user.role === UserRole.ADMIN;
+  const isActionBusy = isCreating || isSavingGeneric || isSavingFicha;
 
   const addMonths = (dateStr: string, months: number) => {
       const d = new Date(dateStr);
@@ -129,7 +132,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       void loadSedes();
   }, [user]);
 
-  // Efeito para capturar filtro da URL (ao clicar em notificação)
+  // Efeito para capturar filtro da URL (ao clicar em notificacao)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const sedeParam = params.get('sede');
@@ -185,12 +188,12 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const closeCreateModal = () => {
-      if (isCreating) return;
+      if (isActionBusy) return;
       setIsCreateModalOpen(false);
   };
 
   const handleCreateReservatorio = async () => {
-      if (isCreating) return;
+      if (isActionBusy) return;
 
       const local = createForm.local.trim();
       if (!createForm.sedeId) {
@@ -327,72 +330,90 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   };
   
   const handleSaveGeneric = async () => {
+      if (isSavingGeneric) return;
+
       confirm({
-          title: "Salvar Alterações?",
-          message: "Deseja confirmar a atualização dos dados deste reservatório?",
+          title: "Salvar Alteracoes?",
+          message: "Deseja confirmar a atualizacao dos dados deste reservatorio?",
           type: "info",
           confirmLabel: "Salvar",
           onConfirm: async () => {
-              const cycleMonths = activeTab === 'cisternas'
-                  ? (settings?.validadeLimpezaCisterna || 6)
-                  : (settings?.validadeLimpezaCaixa || 6);
-              const latestLimpeza = getLatestDate(editItem.dataLimpeza1, editItem.dataLimpeza2);
-              if (latestLimpeza) {
-                  editItem.dataUltimaLimpeza = latestLimpeza;
-                  editItem.proximaLimpeza = addMonths(latestLimpeza, cycleMonths);
+              setIsSavingGeneric(true);
+              try {
+                  const cycleMonths = activeTab === 'cisternas'
+                      ? (settings?.validadeLimpezaCisterna || 6)
+                      : (settings?.validadeLimpezaCaixa || 6);
+                  const latestLimpeza = getLatestDate(editItem.dataLimpeza1, editItem.dataLimpeza2);
+                  if (latestLimpeza) {
+                      editItem.dataUltimaLimpeza = latestLimpeza;
+                      editItem.proximaLimpeza = addMonths(latestLimpeza, cycleMonths);
+                  }
+                  if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
+
+                  if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
+                  else await hydroService.saveCaixa(editItem);
+
+                  await refresh();
+                  setIsModalOpen(false);
+                  addToast("reservatorio atualizado com sucesso.", "success");
+              } catch (err: any) {
+                  logger.error('Erro ao salvar reservatorio:', err);
+                  addToast(err?.message || 'Erro ao salvar reservatorio.', 'error');
+              } finally {
+                  setIsSavingGeneric(false);
               }
-              if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
-              
-              if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
-              else await hydroService.saveCaixa(editItem);
-              
-              await refresh();
-              setIsModalOpen(false);
-              addToast("reservatório atualizado com sucesso.", "success");
           }
       });
   };
 
   const handleSaveFicha = async () => {
-      if (!editItem) return;
+      if (!editItem || isSavingFicha) return;
 
       confirm({
-          title: "Finalizar Ficha TÉCNICA",
-          message: "Isso atualizará o status do poço e calculará a próxima data de limpeza automaticamente.",
+          title: "Finalizar Ficha TECNICA",
+          message: "Isso atualizara o status do poco e calculara a proxima data de limpeza automaticamente.",
           type: "warning",
           confirmLabel: "Confirmar e Salvar",
           onConfirm: async () => {
-                // Calcular Data de Validade
-                let nextLimpeza = editItem.proximaLimpeza;
-                let statusLimpeza = editItem.situacaoLimpeza;
-                let feedbackMsg = "Ficha técnica salva com sucesso.";
+              setIsSavingFicha(true);
+              try {
+                  // Calcular Data de Validade
+                  let nextLimpeza = editItem.proximaLimpeza;
+                  let statusLimpeza = editItem.situacaoLimpeza;
+                  let feedbackMsg = "Ficha tecnica salva com sucesso.";
 
-                if (fichaData.terminoLimpeza) {
-                    const end = new Date(fichaData.terminoLimpeza);
-                    const mesesValidade = settings?.validadeLimpezaPoco || 12; 
-                    end.setMonth(end.getMonth() + mesesValidade);
-                    
-                    nextLimpeza = end.toISOString().split('T')[0];
-                    statusLimpeza = getComputedStatus(nextLimpeza);
-                    
-                    const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
-                    feedbackMsg = `Ficha salva! próxima limpeza: ${fmtDate} (Ciclo: ${mesesValidade} meses).`;
-                }
+                  if (fichaData.terminoLimpeza) {
+                      const end = new Date(fichaData.terminoLimpeza);
+                      const mesesValidade = settings?.validadeLimpezaPoco || 12;
+                      end.setMonth(end.getMonth() + mesesValidade);
 
-                const updatedPoco = {
-                    ...editItem,
-                    responsavel: fichaData.supervisor || editItem.responsavel,
-                    referenciaBomba: fichaData.patrimonioBomba || editItem.referenciaBomba,
-                    dataUltimaLimpeza: fichaData.terminoLimpeza || editItem.dataUltimaLimpeza,
-                    proximaLimpeza: nextLimpeza,
-                    situacaoLimpeza: statusLimpeza,
-                    dadosFicha: fichaData
-                };
+                      nextLimpeza = end.toISOString().split('T')[0];
+                      statusLimpeza = getComputedStatus(nextLimpeza);
 
-                await hydroService.savePoco(updatedPoco);
-                await refresh();
-                setIsFichaOpen(false);
-                addToast(feedbackMsg, "success");
+                      const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
+                      feedbackMsg = 'Ficha salva! proxima limpeza: ' + fmtDate + ' (Ciclo: ' + mesesValidade + ' meses).';
+                  }
+
+                  const updatedPoco = {
+                      ...editItem,
+                      responsavel: fichaData.supervisor || editItem.responsavel,
+                      referenciaBomba: fichaData.patrimonioBomba || editItem.referenciaBomba,
+                      dataUltimaLimpeza: fichaData.terminoLimpeza || editItem.dataUltimaLimpeza,
+                      proximaLimpeza: nextLimpeza,
+                      situacaoLimpeza: statusLimpeza,
+                      dadosFicha: fichaData
+                  };
+
+                  await hydroService.savePoco(updatedPoco);
+                  await refresh();
+                  setIsFichaOpen(false);
+                  addToast(feedbackMsg, "success");
+              } catch (err: any) {
+                  logger.error('Erro ao salvar ficha do poco:', err);
+                  addToast(err?.message || 'Erro ao salvar ficha.', 'error');
+              } finally {
+                  setIsSavingFicha(false);
+              }
           }
       });
   };
@@ -444,7 +465,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                         </button>
                         <div className="flex items-center gap-5">
                             <div className="w-14 h-14 border-2 border-cyan-500/20 flex items-center justify-center bg-cyan-50 dark:bg-cyan-500/5 rounded-xl text-cyan-600"><Droplet size={28} /></div>
-                            <div><h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono uppercase">Reservatórios</h1><p className="text-slate-500 text-xs font-mono">Monitoramento de Limpeza.</p></div>
+                            <div><h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white font-mono uppercase">Reservatorios</h1><p className="text-slate-500 text-xs font-mono">Monitoramento de Limpeza.</p></div>
                         </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
@@ -464,10 +485,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                         {isAdmin && (
                             <button
                                 onClick={openCreateModal}
-                                className="w-full sm:w-auto px-4 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                disabled={isActionBusy}
+                                className="w-full sm:w-auto px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <Plus size={16} />
-                                Novo {getTabLabel(activeTab)}
+                                {isActionBusy ? <Loader2 size={14} className="animate-spin" /> : <Plus size={16} />}
+                                Cadastrar {getTabLabel(activeTab)}
                             </button>
                         )}
                     </div>
@@ -476,9 +498,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
             {/* Tabs */}
             <div className="flex flex-col md:flex-row gap-4">
-                <TabButton id="pocos" label="poços Artesianos" count={filterList(pocos).length} icon={Activity} />
+                <TabButton id="pocos" label="pocos Artesianos" count={filterList(pocos).length} icon={Activity} />
                 <TabButton id="cisternas" label="Cisternas" count={filterList(cisternas).length} icon={Waves} />
-                <TabButton id="caixas" label="Caixas D'água" count={filterList(caixas).length} icon={Box} />
+                <TabButton id="caixas" label="Caixas D'agua" count={filterList(caixas).length} icon={Box} />
             </div>
 
             {/* List */}
@@ -492,8 +514,8 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                     icon={Droplet}
                     title="Nenhum registro"
                     description="nao encontramos itens com os filtros atuais."
-                    actionLabel={isAdmin ? ('Cadastrar ' + getTabLabel(activeTab)) : undefined}
-                    onAction={isAdmin ? openCreateModal : undefined}
+                    actionLabel={isAdmin && !isActionBusy ? ('Cadastrar ' + getTabLabel(activeTab)) : undefined}
+                    onAction={isAdmin && !isActionBusy ? openCreateModal : undefined}
                 />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -507,7 +529,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                     <div>
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-[10px] font-black uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{item.sedeId}</span>
-                                            <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-0.5 rounded">{activeTab === 'pocos' ? 'POÇO' : activeTab === 'cisternas' ? 'CISTERNA' : 'CAIXA'}</span>
+                                            <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-0.5 rounded">{activeTab === 'pocos' ? 'POCO' : activeTab === 'cisternas' ? 'CISTERNA' : 'CAIXA'}</span>
                                         </div>
                                         <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight uppercase">{item.local}</h3>
                                     </div>
@@ -535,11 +557,11 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                                 <div className="flex gap-2 mb-2 text-[10px] font-bold uppercase text-slate-400"><Droplet size={12} className="text-blue-500" /> Limpeza</div>
                                                 <div className="grid grid-cols-2 gap-2 text-center">
                                                     <div className="p-2 rounded border bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30">
-                                                        <span className="text-[8px] font-bold uppercase block mb-1">última</span>
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">ultima</span>
                                                         <span className="text-xs font-mono font-bold text-emerald-600 dark:text-emerald-400">{formatDate(item.dataUltimaLimpeza || '')}</span>
                                                     </div>
                                                     <div className={`p-2 rounded border ${isDelayed ? 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30' : 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
-                                                        <span className="text-[8px] font-bold uppercase block mb-1">próxima</span>
+                                                        <span className="text-[8px] font-bold uppercase block mb-1">proxima</span>
                                                         <span className={`text-xs font-mono font-bold ${isDelayed ? 'text-red-600' : 'text-slate-600 dark:text-slate-400'}`}>{formatDate(item.proximaLimpeza || '')}</span>
                                                     </div>
                                                 </div>
@@ -550,15 +572,15 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                             <div className="flex gap-4 text-[10px] uppercase font-black text-slate-400 tracking-widest">
                                                 <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.capacidade || '-'} L</span> CAPACIDADE</div>
                                                 <div className="w-px h-3 bg-slate-300"></div>
-                                                <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.numCelulas}</span> células</div>
+                                                <div><span className="font-black text-slate-900 dark:text-white text-xs">{item.numCelulas}</span> celulas</div>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3 text-center">
                                                 <div className="p-2 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
-                                                    <p className="text-[9px] font-bold uppercase text-slate-400">1º Semestre</p>
+                                                    <p className="text-[9px] font-bold uppercase text-slate-400">1o Semestre</p>
                                                     <p className={`text-xs font-bold font-mono ${item.dataLimpeza1 ? 'text-emerald-500' : 'text-slate-400'}`}>{item.dataLimpeza1 ? formatDate(item.dataLimpeza1) : 'PENDENTE'}</p>
                                                 </div>
                                                 <div className="p-2 border rounded-xl bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800">
-                                                    <p className="text-[9px] font-bold uppercase text-slate-400">2º Semestre</p>
+                                                    <p className="text-[9px] font-bold uppercase text-slate-400">2o Semestre</p>
                                                     <p className={`text-xs font-bold font-mono ${item.dataLimpeza2 ? 'text-emerald-500' : 'text-slate-400'}`}>{item.dataLimpeza2 ? formatDate(item.dataLimpeza2) : 'PENDENTE'}</p>
                                                 </div>
                                             </div>
@@ -568,9 +590,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
                                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => handleEdit(item)} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm">
-                                            {activeTab === 'pocos' ? <ClipboardList size={14}/> : <RotateCw size={14}/>} 
-                                            {activeTab === 'pocos' ? 'Ficha TÉCNICA' : 'manutenção'}
+                                        <button onClick={() => handleEdit(item)} disabled={isActionBusy} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+                                            {isActionBusy ? <Loader2 size={14} className="animate-spin"/> : activeTab === 'pocos' ? <ClipboardList size={14}/> : <RotateCw size={14}/>} 
+                                            {activeTab === 'pocos' ? 'Ficha TECNICA' : 'manutencao'}
                                         </button>
                                         
                                         {item.fichaOperacional && item.fichaOperacional !== 'LINK' ? (
@@ -581,12 +603,21 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                     </div>
                                     <div className="flex justify-between items-center px-1 pt-1">
                                         <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 uppercase"><UserIcon size={12}/> {item.responsavel || 'N/A'}</div>
-                                        <button onClick={() => handleHistory(item)} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors"><History size={18}/></button>
+                                        <button onClick={() => handleHistory(item)} disabled={isActionBusy} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><History size={18}/></button>
                                     </div>
                                 </div>
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {isActionBusy && (
+                <div className="fixed inset-0 z-[90] bg-black/25 backdrop-blur-[1px] flex items-center justify-center">
+                    <div className="px-4 py-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 shadow-lg flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-slate-600 dark:text-slate-300">
+                        <Loader2 size={14} className="animate-spin" />
+                        Processando...
+                    </div>
                 </div>
             )}
 
@@ -737,7 +768,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
             {/* --- SEPARATED FICHA MODAL --- */}
             <ReservoirFichaModal 
                 isOpen={isFichaOpen}
-                onClose={() => setIsFichaOpen(false)}
+                onClose={() => { if (!isSavingFicha) setIsFichaOpen(false); }}
                 editItem={editItem}
                 fichaData={fichaData}
                 setFichaData={setFichaData}
@@ -749,15 +780,15 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Editar reservatório</h3>
-                            <button onClick={() => setIsModalOpen(false)}><X size={20} className="text-slate-500"/></button>
+                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Editar reservatorio</h3>
+                            <button onClick={() => setIsModalOpen(false)} disabled={isSavingGeneric}><X size={20} className="text-slate-500"/></button>
                         </div>
                         <div className="space-y-4">
                             <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.capacidade || ''} onChange={e => setEditItem({...editItem, capacidade: e.target.value})} /></div>
-                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Células</label><input type="number" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} /></div>
-                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 1º Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
-                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 2º Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
-                            <div className="pt-4"><button onClick={handleSaveGeneric} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Salvar Alterações</button></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Celulas</label><input type="number" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.numCelulas || ''} onChange={e => setEditItem({...editItem, numCelulas: parseInt(e.target.value)})} /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 1o Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza1 || ''} onChange={e => setEditItem({...editItem, dataLimpeza1: e.target.value})} /></div>
+                            <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 2o Sem</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm" value={editItem.dataLimpeza2 || ''} onChange={e => setEditItem({...editItem, dataLimpeza2: e.target.value})} /></div>
+                            <div className="pt-4"><button onClick={handleSaveGeneric} disabled={isSavingGeneric} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl flex items-center justify-center gap-2 disabled:opacity-70">{isSavingGeneric ? <Loader2 size={14} className="animate-spin"/> : null}{isSavingGeneric ? 'Salvando...' : 'Salvar Alteracoes'}</button></div>
                         </div>
                     </div>
                 </div>
@@ -768,7 +799,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                     <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-lg border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-black/20">
-                            <div><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase">histórico</h3><p className="text-xs text-slate-500">{historyItem.local}</p></div>
+                            <div><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase">historico</h3><p className="text-xs text-slate-500">{historyItem.local}</p></div>
                             <button onClick={() => setIsHistoryOpen(false)}><X size={20} className="text-slate-500"/></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6">
@@ -794,3 +825,4 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
+

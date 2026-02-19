@@ -28,9 +28,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
   const [mounted, setMounted] = useState(false);
   
   useEffect(() => {
+    let active = true;
+
     setMounted(true);
     setModules(moduleService.getAll());
-    
+
     const updateGreeting = () => {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 12) setGreeting('Bom dia');
@@ -38,13 +40,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
         else setGreeting('Boa noite');
     };
 
+    const syncModules = async () => {
+      try {
+        const synced = await moduleService.sync();
+        if (active) setModules(synced);
+      } catch {
+        // Keep local cache if sync fails.
+      }
+    };
+
     updateGreeting();
-    
+    void syncModules();
+
     const clockInterval = setInterval(() => {
         setCurrentTime(new Date());
     }, 1000);
 
-    return () => clearInterval(clockInterval);
+    return () => {
+      active = false;
+      clearInterval(clockInterval);
+    };
   }, []);
 
   const accessibleModules = modules.filter(module => 
@@ -150,7 +165,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </div>
                         <input 
                             type="text"
-                            placeholder="Acessar Módulo..."
+                            placeholder="Acessar Modulo..."
                             className="w-full bg-transparent border-none outline-none px-3 py-2 text-sm font-mono text-slate-700 dark:text-slate-200 placeholder:text-slate-400"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -170,7 +185,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             <div className="flex items-center gap-3 mb-6">
                 <LayoutGrid size={20} className="text-brand-600 dark:text-brand-400" />
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
-                    Aplicações Ativas
+                    Aplicacoes Ativas
                 </h2>
                 <div className="h-px flex-1 bg-slate-200 dark:bg-slate-800"></div>
                 <span className="text-xs font-mono text-slate-400">
@@ -271,9 +286,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           <div className="inline-flex items-center gap-4 text-[10px] font-mono text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">
               <span>Sistema v2.0</span>
               <span className="w-1 h-1 bg-slate-300 dark:bg-slate-700 rounded-full"></span>
-              <span>conexão Segura</span>
+              <span>conexao Segura</span>
           </div>
       </div>
     </div>
   );
 };
+

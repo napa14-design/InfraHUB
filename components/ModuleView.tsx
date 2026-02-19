@@ -1,13 +1,34 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Construction, Pickaxe } from 'lucide-react';
+import { ArrowLeft, Construction } from 'lucide-react';
 import { moduleService } from '../services/moduleService';
 
 export const ModuleView: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const moduleInfo = moduleService.getAll().find(m => m.path.includes(id || ''));
+  const [moduleInfo, setModuleInfo] = useState(() => moduleService.getAll().find(m => m.path.includes(id || '')));
+
+  useEffect(() => {
+    let active = true;
+
+    const syncModuleInfo = async () => {
+      try {
+        const synced = await moduleService.sync();
+        if (!active) return;
+        setModuleInfo(synced.find(m => m.path.includes(id || '')));
+      } catch {
+        if (!active) return;
+        setModuleInfo(moduleService.getAll().find(m => m.path.includes(id || '')));
+      }
+    };
+
+    void syncModuleInfo();
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   return (
     <div className="relative min-h-screen p-8 flex flex-col">
@@ -48,7 +69,7 @@ export const ModuleView: React.FC = () => {
                   </div>
                   
                   <h1 className="text-4xl font-black text-slate-900 dark:text-white uppercase tracking-tighter mb-2">
-                      {moduleInfo ? moduleInfo.title : 'Módulo Interno'}
+                      {moduleInfo ? moduleInfo.title : 'Modulo Interno'}
                   </h1>
                   
                   <div className="bg-yellow-500 text-black px-4 py-1 font-mono font-bold text-sm uppercase mb-6">
@@ -56,13 +77,13 @@ export const ModuleView: React.FC = () => {
                   </div>
 
                   <p className="text-slate-600 dark:text-slate-400 font-mono text-sm max-w-md leading-relaxed mb-10">
-                      O módulo operacional <strong>[{id}]</strong> está em fase de desenvolvimento.
-                      A infraestrutura está sendo preparada.
+                      O modulo operacional <strong>[{id}]</strong> esta em fase de desenvolvimento.
+                      A infraestrutura esta sendo preparada.
                   </p>
 
                   <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
                       <button className="py-3 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-mono text-xs hover:border-slate-900 dark:hover:border-white hover:text-slate-900 dark:hover:text-white transition-colors uppercase">
-                          VER ESPECIFICAÇÕES
+                          VER ESPECIFICACOES
                       </button>
                       <button className="py-3 bg-slate-900 dark:bg-slate-800 text-white font-mono text-xs hover:bg-slate-800 dark:hover:bg-slate-700 transition-colors uppercase">
                           NOTIFICAR-ME
@@ -74,3 +95,4 @@ export const ModuleView: React.FC = () => {
     </div>
   );
 };
+

@@ -1,17 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, Laptop, AlertCircle, Box } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Edit2, Layout, Save, X, Globe, AlertCircle, Box, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { AppModule, UserRole, ModuleStatus, ModuleType } from '../types';
 import { moduleService } from '../services/moduleService';
+import { useToast } from './Shared/ToastContext';
 
 export const AdminModuleManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [modules, setModules] = useState<AppModule[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [moduleToDelete, setModuleToDelete] = useState<AppModule | null>(null);
-  
+  const [isLoadingModules, setIsLoadingModules] = useState(true);
+  const [isSavingModule, setIsSavingModule] = useState(false);
+  const [isDeletingModule, setIsDeletingModule] = useState(false);
+
   // Empty state for form
   const initialFormState: AppModule = {
     id: '',
@@ -26,42 +31,75 @@ export const AdminModuleManagement: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<AppModule>(initialFormState);
+  const isActionBusy = isSavingModule || isDeletingModule;
+
+  const loadModules = async () => {
+    setIsLoadingModules(true);
+    try {
+      const synced = await moduleService.sync();
+      setModules(synced);
+    } catch (error) {
+      setModules(moduleService.getAll());
+      addToast('Falha ao sincronizar catalogo com Supabase.', 'warning');
+    } finally {
+      setIsLoadingModules(false);
+    }
+  };
 
   useEffect(() => {
-    setModules(moduleService.getAll());
+    void loadModules();
   }, []);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSavingModule) return;
+
     const moduleToSave = { ...formData };
-    
-    // Generate ID if new
+
     if (!moduleToSave.id) {
-        moduleToSave.id = `mod-${Date.now()}`;
+      moduleToSave.id = 'mod-' + Date.now();
     }
 
-    moduleService.save(moduleToSave);
-    setModules(moduleService.getAll());
-    setIsEditing(false);
-    setFormData(initialFormState);
+    setIsSavingModule(true);
+    try {
+      await moduleService.save(moduleToSave);
+      await loadModules();
+      setIsEditing(false);
+      setFormData(initialFormState);
+      addToast('Modulo salvo com sucesso.', 'success');
+    } catch (error: any) {
+      addToast(error?.message || 'Erro ao salvar modulo.', 'error');
+    } finally {
+      setIsSavingModule(false);
+    }
   };
 
   const handleEdit = (module: AppModule) => {
+    if (isActionBusy) return;
     setFormData(module);
     setIsEditing(true);
   };
 
   const requestDelete = (module: AppModule) => {
+    if (isActionBusy) return;
     setModuleToDelete(module);
     setDeleteModalOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (moduleToDelete) {
-      moduleService.delete(moduleToDelete.id);
-      setModules(moduleService.getAll());
+  const confirmDelete = async () => {
+    if (!moduleToDelete || isDeletingModule) return;
+
+    setIsDeletingModule(true);
+    try {
+      await moduleService.delete(moduleToDelete.id);
+      await loadModules();
       setDeleteModalOpen(false);
       setModuleToDelete(null);
+      addToast('Modulo removido com sucesso.', 'success');
+    } catch (error: any) {
+      addToast(error?.message || 'Erro ao remover modulo.', 'error');
+    } finally {
+      setIsDeletingModule(false);
     }
   };
 
@@ -87,7 +125,7 @@ export const AdminModuleManagement: React.FC = () => {
           </button>
           <h1 className="text-3xl font-black text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
             <Layout className="text-brand-600 dark:text-brand-400" size={28} />
-            CATÁLOGO DE APLICAÇÕES
+            CATALOGO DE APLICACOES
           </h1>
           <p className="text-sm text-slate-500 font-mono">Registro de ferramentas e dashboards.</p>
         </div>
@@ -95,10 +133,11 @@ export const AdminModuleManagement: React.FC = () => {
         {!isEditing && (
           <button 
             onClick={() => { setFormData(initialFormState); setIsEditing(true); }}
-            className="flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
+            disabled={isActionBusy || isLoadingModules}
+            className="flex items-center justify-center px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <Plus size={16} className="mr-2" />
-            NOVO MÓDULO
+            {(isActionBusy || isLoadingModules) ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Plus size={16} className="mr-2" />}
+            NOVO MODULO
           </button>
         )}
       </div>
@@ -112,7 +151,7 @@ export const AdminModuleManagement: React.FC = () => {
             <h2 className="text-lg font-mono font-bold text-slate-900 dark:text-white uppercase tracking-widest">
               {formData.id ? `EDITAR // ${formData.id}` : 'NOVO REGISTRO'}
             </h2>
-            <button onClick={() => setIsEditing(false)} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors">
+            <button onClick={() => setIsEditing(false)} disabled={isSavingModule} className="text-slate-500 hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
               <X size={24} />
             </button>
           </div>
@@ -120,7 +159,7 @@ export const AdminModuleManagement: React.FC = () => {
           <form onSubmit={handleSave} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME DE EXIBIÇÃO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">NOME DE EXIBICAO</label>
                 <input 
                   type="text" 
                   required
@@ -131,7 +170,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">ÍCONE (LUCIDE LIB)</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">ICONE (LUCIDE LIB)</label>
                 <input 
                   type="text" 
                   required
@@ -142,7 +181,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="md:col-span-2 space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">DESCRIÇÃO FUNCIONAL</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">DESCRICAO FUNCIONAL</label>
                 <input 
                   type="text" 
                   required
@@ -153,7 +192,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">TIPO DE APLICAÇÃO</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">TIPO DE APLICACAO</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.type}
@@ -178,7 +217,7 @@ export const AdminModuleManagement: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">PERMISSÃO MÍNIMA</label>
+                <label className="text-[10px] font-mono text-brand-600 dark:text-brand-500 uppercase tracking-widest">PERMISSAO MINIMA</label>
                 <select
                   className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-300 dark:border-slate-700 p-3 text-slate-900 dark:text-white font-mono outline-none focus:border-brand-500"
                   value={formData.minRole}
@@ -208,21 +247,29 @@ export const AdminModuleManagement: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-6 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white transition-colors"
+                disabled={isSavingModule}
+                className="px-6 py-3 text-slate-500 dark:text-slate-400 font-mono text-xs uppercase hover:text-slate-900 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20"
+                disabled={isSavingModule}
+                className="flex items-center px-8 py-3 bg-brand-600 hover:bg-brand-700 dark:hover:bg-brand-500 text-white font-mono font-bold text-xs uppercase tracking-widest transition-colors shadow-lg shadow-brand-500/20 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                <Save size={16} className="mr-2" />
-                Salvar Alterações
+                {isSavingModule ? <Loader2 size={16} className="mr-2 animate-spin" /> : <Save size={16} className="mr-2" />}
+                {isSavingModule ? 'Salvando...' : 'Salvar Alteracoes'}
               </button>
             </div>
           </form>
         </div>
       ) : (
+        isLoadingModules ? (
+          <div className="py-16 text-center text-slate-400 flex flex-col items-center gap-2">
+            <Loader2 size={26} className="animate-spin" />
+            <span className="text-xs font-mono uppercase tracking-widest">Carregando catalogo...</span>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 gap-4">
           {modules.map(module => (
              <div key={module.id} className="group bg-white dark:bg-slate-900 p-5 border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 relative overflow-hidden">
@@ -230,7 +277,7 @@ export const AdminModuleManagement: React.FC = () => {
                <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-500 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                
                <div className="flex items-center gap-5">
-                 <div className={`w-12 h-12 flex items-center justify-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:text-brand-500 group-hover:border-brand-500/50 transition-colors`}>
+                 <div className="w-12 h-12 flex items-center justify-center border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:text-brand-500 group-hover:border-brand-500/50 transition-colors">
                     {module.type === ModuleType.EXTERNAL ? <Globe size={24} strokeWidth={1.5} /> : <Box size={24} strokeWidth={1.5} />}
                  </div>
                  <div>
@@ -246,13 +293,15 @@ export const AdminModuleManagement: React.FC = () => {
                <div className="flex gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
                  <button 
                   onClick={() => handleEdit(module)}
-                  className="p-2 text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                  disabled={isActionBusy}
+                  className="p-2 text-slate-400 hover:text-brand-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                    <Edit2 size={18} />
                  </button>
                  <button 
                   onClick={() => requestDelete(module)}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors"
+                  disabled={isActionBusy}
+                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                    <Trash2 size={18} />
                  </button>
@@ -260,6 +309,7 @@ export const AdminModuleManagement: React.FC = () => {
              </div>
           ))}
         </div>
+        )
       )}
 
       {/* Delete Confirmation Modal */}
@@ -270,24 +320,27 @@ export const AdminModuleManagement: React.FC = () => {
                     <AlertCircle size={32} />
                 </div>
                 
-                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CONFIRMAR REMOÇÃO</h3>
+                <h3 className="text-lg font-mono font-bold text-slate-900 dark:text-white mb-2 uppercase tracking-widest">CONFIRMAR REMOCAO</h3>
                 <p className="text-xs font-mono text-slate-500 dark:text-slate-400 mb-6">
                     ALVO: <span className="text-slate-900 dark:text-white font-bold">[{moduleToDelete.title}]</span><br/>
-                    O ACESSO SERÁ REVOGADO PARA TODOS.
+                    O ACESSO SERA REVOGADO PARA TODOS.
                 </p>
 
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setDeleteModalOpen(false)}
-                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
+                      disabled={isDeletingModule}
+                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Cancelar
                     </button>
                     <button 
                       onClick={confirmDelete}
-                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase"
+                      disabled={isDeletingModule}
+                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        Confirmar
+                        {isDeletingModule ? <Loader2 size={14} className="animate-spin" /> : null}
+                        {isDeletingModule ? 'Removendo...' : 'Confirmar'}
                     </button>
                 </div>
             </div>
@@ -296,3 +349,4 @@ export const AdminModuleManagement: React.FC = () => {
     </div>
   );
 };
+
