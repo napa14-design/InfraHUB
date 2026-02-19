@@ -4,7 +4,7 @@ import {
   Droplet, X, Search, ArrowLeft,
   Waves, Box, History, User as UserIcon,
   RotateCw, Building2,
-  FileJson, Loader2, Activity, ClipboardList
+  FileJson, Loader2, Activity, ClipboardList, Plus
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole, Sede, LogEntry, FichaPoco } from '../../types';
@@ -19,6 +19,18 @@ import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
 import { logger } from '../../utils/logger';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
+type CreateReservatorioForm = {
+    sedeId: string;
+    local: string;
+    responsavel: string;
+    referenciaBomba: string;
+    refil: string;
+    capacidade: string;
+    numCelulas: string;
+    dataUltimaLimpeza: string;
+    dataLimpeza1: string;
+    dataLimpeza2: string;
+};
 
 // --- HELPERS ---
 const formatDate = (dateStr: string) => {
@@ -76,6 +88,22 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [editItem, setEditItem] = useState<any>(null);
   const [fichaData, setFichaData] = useState<FichaPoco>(INITIAL_FICHA);
 
+  // Create flow
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createForm, setCreateForm] = useState<CreateReservatorioForm>({
+      sedeId: '',
+      local: '',
+      responsavel: '',
+      referenciaBomba: '',
+      refil: '',
+      capacidade: '',
+      numCelulas: '',
+      dataUltimaLimpeza: '',
+      dataLimpeza1: '',
+      dataLimpeza2: ''
+  });
+
   // History
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyLogs, setHistoryLogs] = useState<LogEntry[]>([]);
@@ -98,7 +126,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   };
 
   useEffect(() => {
-      loadSedes();
+      void loadSedes();
   }, [user]);
 
   // Efeito para capturar filtro da URL (ao clicar em notificação)
@@ -114,9 +142,165 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
     }
   }, [location.search, isAdmin]);
 
-  const loadSedes = () => {
+  const getTabTipo = (tab: Tab): 'POCO' | 'CISTERNA' | 'CAIXA' => {
+      if (tab === 'pocos') return 'POCO';
+      if (tab === 'cisternas') return 'CISTERNA';
+      return 'CAIXA';
+  };
+
+  const getTabLabel = (tab: Tab) => {
+      if (tab === 'pocos') return 'Poco';
+      if (tab === 'cisternas') return 'Cisterna';
+      return "Caixa D'Agua";
+  };
+
+  const buildDefaultCreateForm = (sedeId = ''): CreateReservatorioForm => ({
+      sedeId,
+      local: '',
+      responsavel: user.name || '',
+      referenciaBomba: '',
+      refil: '',
+      capacidade: '',
+      numCelulas: '',
+      dataUltimaLimpeza: '',
+      dataLimpeza1: '',
+      dataLimpeza2: ''
+  });
+
+  const loadSedes = async (): Promise<Sede[]> => {
+      await orgService.initialize(user);
       const allSedes = orgService.getSedes();
-      setAvailableSedes(user.role === UserRole.ADMIN ? allSedes : allSedes.filter(s => (user.sedeIds || []).includes(s.id)));
+      const scoped = user.role === UserRole.ADMIN
+          ? allSedes
+          : allSedes.filter(s => (user.sedeIds || []).includes(s.id));
+      setAvailableSedes(scoped);
+      return scoped;
+  };
+
+  const openCreateModal = async () => {
+      const sedes = await loadSedes();
+      const defaultSede = selectedSedeFilter || sedes[0]?.id || '';
+      setCreateForm(buildDefaultCreateForm(defaultSede));
+      setIsCreateModalOpen(true);
+  };
+
+  const closeCreateModal = () => {
+      if (isCreating) return;
+      setIsCreateModalOpen(false);
+  };
+
+  const handleCreateReservatorio = async () => {
+      if (isCreating) return;
+
+      const local = createForm.local.trim();
+      if (!createForm.sedeId) {
+          addToast('Selecione uma sede para continuar.', 'warning');
+          return;
+      }
+      if (!local) {
+          addToast('Informe o local do reservatorio.', 'warning');
+          return;
+      }
+
+      if (activeTab !== 'pocos' && !createForm.capacidade.trim()) {
+          addToast('Informe a capacidade do reservatorio.', 'warning');
+          return;
+      }
+
+      const parsedNumCelulas = createForm.numCelulas.trim() ? Number(createForm.numCelulas) : undefined;
+      if (activeTab !== 'pocos' && createForm.numCelulas.trim() && (!Number.isFinite(parsedNumCelulas) || parsedNumCelulas <= 0)) {
+          addToast('Numero de celulas invalido.', 'warning');
+          return;
+      }
+
+      setIsCreating(true);
+      try {
+          const id = 'res-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+          const tipo = getTabTipo(activeTab);
+          const responsavel = createForm.responsavel.trim() || user.name || 'N/A';
+          const dataReferencia = activeTab === 'pocos'
+              ? createForm.dataUltimaLimpeza
+              : getLatestDate(createForm.dataLimpeza1, createForm.dataLimpeza2);
+
+          let proximaLimpeza = '';
+          let situacaoLimpeza: 'DENTRO DO PRAZO' | 'FORA DO PRAZO' | 'PENDENTE' | 'DESATIVADO' = 'PENDENTE';
+
+          if (dataReferencia) {
+              const cicloMeses = activeTab === 'pocos'
+                  ? (settings?.validadeLimpezaPoco || 12)
+                  : activeTab === 'cisternas'
+                      ? (settings?.validadeLimpezaCisterna || 6)
+                      : (settings?.validadeLimpezaCaixa || 6);
+              proximaLimpeza = addMonths(dataReferencia, cicloMeses);
+              situacaoLimpeza = getComputedStatus(proximaLimpeza) === 'FORA DO PRAZO' ? 'FORA DO PRAZO' : 'DENTRO DO PRAZO';
+          }
+
+          const baseItem = {
+              id,
+              sedeId: createForm.sedeId,
+              tipo,
+              local,
+              responsavel,
+              dataUltimaLimpeza: dataReferencia || undefined,
+              proximaLimpeza,
+              situacaoLimpeza
+          };
+
+          if (tipo === 'POCO') {
+              await hydroService.savePoco({
+                  ...baseItem,
+                  tipo: 'POCO',
+                  referenciaBomba: createForm.referenciaBomba.trim() || undefined,
+                  refil: createForm.refil.trim() || undefined
+              });
+          } else if (tipo === 'CISTERNA') {
+              await hydroService.saveCisterna({
+                  ...baseItem,
+                  tipo: 'CISTERNA',
+                  capacidade: createForm.capacidade.trim(),
+                  numCelulas: parsedNumCelulas,
+                  dataLimpeza1: createForm.dataLimpeza1 || undefined,
+                  dataLimpeza2: createForm.dataLimpeza2 || undefined
+              });
+          } else {
+              await hydroService.saveCaixa({
+                  ...baseItem,
+                  tipo: 'CAIXA',
+                  capacidade: createForm.capacidade.trim(),
+                  numCelulas: parsedNumCelulas,
+                  dataLimpeza1: createForm.dataLimpeza1 || undefined,
+                  dataLimpeza2: createForm.dataLimpeza2 || undefined
+              });
+          }
+
+          try {
+              const normalizedLocal = local.toUpperCase();
+              const existing = orgService.getLocais().find(l =>
+                  l.sedeId === createForm.sedeId &&
+                  (l.tipo || '').toUpperCase() === tipo &&
+                  l.name.trim().toUpperCase() === normalizedLocal
+              );
+              if (!existing) {
+                  await orgService.saveLocal({
+                      id: 'loc-' + id,
+                      sedeId: createForm.sedeId,
+                      name: local,
+                      tipo
+                  });
+              }
+          } catch (syncErr) {
+              logger.warn('Falha ao sincronizar local na estrutura organizacional.', syncErr);
+          }
+
+          await refresh();
+          setIsCreateModalOpen(false);
+          addToast(getTabLabel(activeTab) + ' criado com sucesso.', 'success');
+      } catch (err: any) {
+          logger.error('Erro ao criar reservatorio:', err);
+          addToast(err?.message || 'Erro ao criar reservatorio.', 'error');
+      } finally {
+          setIsCreating(false);
+      }
   };
 
   // --- ACTIONS ---
@@ -277,6 +461,15 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                             <input type="text" placeholder="Buscar Local..." className="w-full pl-10 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold outline-none uppercase font-mono" value={filterText} onChange={e => setFilterText(e.target.value)} />
                         </div>
+                        {isAdmin && (
+                            <button
+                                onClick={openCreateModal}
+                                className="w-full sm:w-auto px-4 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                            >
+                                <Plus size={16} />
+                                Novo {getTabLabel(activeTab)}
+                            </button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -295,7 +488,13 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                    <span className="text-xs font-mono uppercase tracking-widest">Carregando dados...</span>
                </div>
             ) : data.length === 0 ? (
-                <EmptyState icon={Droplet} title="Nenhum registro" description="não encontramos itens com os filtros atuais." />
+                <EmptyState
+                    icon={Droplet}
+                    title="Nenhum registro"
+                    description="nao encontramos itens com os filtros atuais."
+                    actionLabel={isAdmin ? ('Cadastrar ' + getTabLabel(activeTab)) : undefined}
+                    onAction={isAdmin ? openCreateModal : undefined}
+                />
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {data.map((item: any) => {
@@ -388,6 +587,150 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {isCreateModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-md p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="font-black text-slate-900 dark:text-white uppercase font-mono tracking-tight">Novo {getTabLabel(activeTab)}</h3>
+                            <button onClick={closeCreateModal} disabled={isCreating}><X size={20} className="text-slate-500"/></button>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Sede</label>
+                                <select
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    value={createForm.sedeId}
+                                    onChange={e => setCreateForm({ ...createForm, sedeId: e.target.value })}
+                                    disabled={isCreating}
+                                >
+                                    <option value="">Selecione...</option>
+                                    {availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Local</label>
+                                <input
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    value={createForm.local}
+                                    onChange={e => setCreateForm({ ...createForm, local: e.target.value })}
+                                    disabled={isCreating}
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold text-slate-500 uppercase">Responsavel</label>
+                                <input
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                    value={createForm.responsavel}
+                                    onChange={e => setCreateForm({ ...createForm, responsavel: e.target.value })}
+                                    disabled={isCreating}
+                                />
+                            </div>
+
+                            {activeTab === 'pocos' ? (
+                                <>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Referencia da bomba</label>
+                                        <input
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.referenciaBomba}
+                                            onChange={e => setCreateForm({ ...createForm, referenciaBomba: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Refil</label>
+                                        <input
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.refil}
+                                            onChange={e => setCreateForm({ ...createForm, refil: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Data ultima limpeza</label>
+                                        <input
+                                            type="date"
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.dataUltimaLimpeza}
+                                            onChange={e => setCreateForm({ ...createForm, dataUltimaLimpeza: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Capacidade (L)</label>
+                                        <input
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.capacidade}
+                                            onChange={e => setCreateForm({ ...createForm, capacidade: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Numero de celulas</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.numCelulas}
+                                            onChange={e => setCreateForm({ ...createForm, numCelulas: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 1 semestre</label>
+                                        <input
+                                            type="date"
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.dataLimpeza1}
+                                            onChange={e => setCreateForm({ ...createForm, dataLimpeza1: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Limpeza 2 semestre</label>
+                                        <input
+                                            type="date"
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm"
+                                            value={createForm.dataLimpeza2}
+                                            onChange={e => setCreateForm({ ...createForm, dataLimpeza2: e.target.value })}
+                                            disabled={isCreating}
+                                        />
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="pt-4 grid grid-cols-2 gap-3">
+                                <button
+                                    onClick={closeCreateModal}
+                                    disabled={isCreating}
+                                    className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-xs uppercase"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateReservatorio}
+                                    disabled={isCreating}
+                                    className="py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 disabled:opacity-70"
+                                >
+                                    {isCreating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                                    {isCreating ? 'Criando...' : ('Criar ' + getTabLabel(activeTab))}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
