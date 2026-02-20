@@ -159,8 +159,9 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
         const filtrosVencidos = filtros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
 
         const reservatorios = [...pocos, ...cisternas, ...caixas];
-        const reservatoriosAtrasados = reservatorios.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
-        const limpezasProximas = reservatorios.filter(item => {
+        const reservatoriosAtivos = reservatorios.filter(item => item.situacaoLimpeza !== 'DESATIVADO');
+        const reservatoriosAtrasados = reservatoriosAtivos.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
+        const limpezasProximas = reservatoriosAtivos.filter(item => {
           const diff = diffDaysFromToday(item.proximaLimpeza);
           return diff >= 0 && diff <= 30;
         }).length;

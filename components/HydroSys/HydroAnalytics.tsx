@@ -73,9 +73,11 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
             if (!isActive) return;
 
+            const reservatoriosAtivos = [...pocos, ...cisternas, ...caixas].filter(item => item.situacaoLimpeza !== 'DESATIVADO');
+
             setCertificados(uniqueCerts);
             setFiltros(uniqueFiltros);
-            setReservatorios([...pocos, ...cisternas, ...caixas]);
+            setReservatorios(reservatoriosAtivos);
             setLoading(false);
         };
 

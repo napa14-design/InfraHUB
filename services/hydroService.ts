@@ -368,7 +368,7 @@ export const hydroService = {
         }
 
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `poço ${item.local}`, details);
-        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO' || item.situacaoLimpeza === 'DESATIVADO') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();
     }
@@ -398,7 +398,7 @@ export const hydroService = {
     const u = getCurrentUserForLog();
     if(u) {
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `Cisterna ${item.local}`);
-        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO' || item.situacaoLimpeza === 'DESATIVADO') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();
     }
@@ -428,7 +428,7 @@ export const hydroService = {
     const u = getCurrentUserForLog();
     if(u) {
         logService.logAction(u, 'HYDROSYS', 'UPDATE', `Caixa ${item.local}`);
-        if(item.situacaoLimpeza === 'DENTRO DO PRAZO') await notificationService.resolveAlert(item.id);
+        if(item.situacaoLimpeza === 'DENTRO DO PRAZO' || item.situacaoLimpeza === 'DESATIVADO') await notificationService.resolveAlert(item.id);
         await notificationService.checkSystemStatus(u);
         notificationService.notifyRefresh();
     }

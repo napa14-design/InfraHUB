@@ -184,7 +184,7 @@ export const notificationService = {
             hydroService.getFiltros(user)
         ]);
 
-        const allReservatorios = [...pocos, ...cist, ...caixas];
+        const allReservatorios = [...pocos, ...cist, ...caixas].filter(item => item.situacaoLimpeza !== 'DESATIVADO');
         
         // Mapa de problemas por Sede
         // Detalhado por Tipo para mensagem clara

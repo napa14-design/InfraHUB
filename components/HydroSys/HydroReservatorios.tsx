@@ -4,7 +4,7 @@ import {
   Droplet, X, Search, ArrowLeft,
   Waves, Box, History, User as UserIcon,
   RotateCw, Building2,
-  FileJson, Loader2, Activity, ClipboardList, Plus
+  FileJson, Loader2, Activity, ClipboardList, Plus, Power
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { User, UserRole, Sede, LogEntry, FichaPoco } from '../../types';
@@ -107,6 +107,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [isSavingGeneric, setIsSavingGeneric] = useState(false);
   const [isSavingFicha, setIsSavingFicha] = useState(false);
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false);
   const [createForm, setCreateForm] = useState<CreateReservatorioForm>({
       sedeId: '',
       local: '',
@@ -126,7 +127,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const [historyItem, setHistoryItem] = useState<any>(null);
 
   const isAdmin = user.role === UserRole.ADMIN;
-  const isActionBusy = isCreating || isSavingGeneric || isSavingFicha;
+  const isActionBusy = isCreating || isSavingGeneric || isSavingFicha || isTogglingStatus;
 
   const addMonths = (dateStr: string, months: number) => {
       const d = new Date(dateStr);
@@ -180,6 +181,48 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
       if (tab === 'pocos') return 'Poco';
       if (tab === 'cisternas') return 'Cisterna';
       return "Caixa D'Agua";
+  };
+
+  const isReservatorioDesativado = (item: any) => item?.situacaoLimpeza === 'DESATIVADO';
+
+  const resolveSituacaoAtiva = (proximaLimpeza?: string) => {
+      if (!proximaLimpeza) return 'PENDENTE';
+      return getComputedStatus(proximaLimpeza) === 'FORA DO PRAZO' ? 'FORA DO PRAZO' : 'DENTRO DO PRAZO';
+  };
+
+  const saveReservatorioByTipo = async (item: any) => {
+      if (item.tipo === 'POCO') await hydroService.savePoco(item);
+      else if (item.tipo === 'CISTERNA') await hydroService.saveCisterna(item);
+      else await hydroService.saveCaixa(item);
+  };
+
+  const handleToggleReservatorioStatus = async (item: any) => {
+      if (!isAdmin || isActionBusy) return;
+
+      const currentlyDesativado = isReservatorioDesativado(item);
+      const nextSituacao = currentlyDesativado ? resolveSituacaoAtiva(item.proximaLimpeza) : 'DESATIVADO';
+
+      confirm({
+          title: currentlyDesativado ? 'Ativar reservatorio?' : 'Desativar reservatorio?',
+          message: currentlyDesativado
+              ? 'O reservatorio voltara para monitoramento de prazos.'
+              : 'O reservatorio sera ignorado nos alertas e indicadores ate ser ativado novamente.',
+          type: currentlyDesativado ? 'info' : 'warning',
+          confirmLabel: currentlyDesativado ? 'Ativar' : 'Desativar',
+          onConfirm: async () => {
+              setIsTogglingStatus(true);
+              try {
+                  await saveReservatorioByTipo({ ...item, situacaoLimpeza: nextSituacao });
+                  await refresh();
+                  addToast(currentlyDesativado ? 'Reservatorio ativado com sucesso.' : 'Reservatorio desativado com sucesso.', 'success');
+              } catch (err: any) {
+                  logger.error('Erro ao atualizar status do reservatorio:', err);
+                  addToast(err?.message || 'Erro ao atualizar status do reservatorio.', 'error');
+              } finally {
+                  setIsTogglingStatus(false);
+              }
+          }
+      });
   };
 
   const buildDefaultCreateForm = (sedeId = ''): CreateReservatorioForm => ({
@@ -373,10 +416,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                       editItem.dataUltimaLimpeza = latestLimpeza;
                       editItem.proximaLimpeza = addMonths(latestLimpeza, cycleMonths);
                   }
-                  if (editItem.proximaLimpeza) editItem.situacaoLimpeza = getComputedStatus(editItem.proximaLimpeza);
+                  if (!isReservatorioDesativado(editItem) && editItem.proximaLimpeza) editItem.situacaoLimpeza = resolveSituacaoAtiva(editItem.proximaLimpeza);
 
-                  if (activeTab === 'cisternas') await hydroService.saveCisterna(editItem);
-                  else await hydroService.saveCaixa(editItem);
+                  await saveReservatorioByTipo(editItem);
 
                   await refresh();
                   setIsModalOpen(false);
@@ -413,7 +455,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                       end.setMonth(end.getMonth() + mesesValidade);
 
                       nextLimpeza = end.toISOString().split('T')[0];
-                      statusLimpeza = getComputedStatus(nextLimpeza);
+                      if (!isReservatorioDesativado(editItem)) statusLimpeza = resolveSituacaoAtiva(nextLimpeza);
 
                       const fmtDate = new Date(nextLimpeza).toLocaleDateString('pt-BR');
                       feedbackMsg = 'Ficha salva! proxima limpeza: ' + fmtDate + ' (Ciclo: ' + mesesValidade + ' meses).';
@@ -476,6 +518,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
   const matchesSituacaoFilter = (item: any) => {
       if (!situacaoFilter) return true;
+      if (isReservatorioDesativado(item)) return false;
       const days = getDaysToLimpeza(item.proximaLimpeza);
       if (days === null) return false;
       if (situacaoFilter === 'ATRASADO') return days < 0;
@@ -601,8 +644,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                     {data.map((item: any) => {
-                        const computedStatusLimpeza = getComputedStatus(item.proximaLimpeza);
-                        const isDelayed = computedStatusLimpeza === 'FORA DO PRAZO';
+                        const isDesativado = isReservatorioDesativado(item);
+                        const computedStatusLimpeza = isDesativado ? 'DESATIVADO' : getComputedStatus(item.proximaLimpeza);
+                        const isDelayed = !isDesativado && computedStatusLimpeza === 'FORA DO PRAZO';
 
                         return (
                             <div key={item.id} className="bg-white dark:bg-slate-900/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800/60 shadow-sm hover:shadow-lg transition-all flex flex-col group">
@@ -611,11 +655,12 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                         <div className="flex items-center gap-2 mb-2">
                                             <span className="text-[10px] font-black uppercase bg-slate-100 dark:bg-slate-800 text-slate-500 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">{item.sedeId}</span>
                                             <span className="text-[10px] font-bold text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-0.5 rounded">{activeTab === 'pocos' ? 'POCO' : activeTab === 'cisternas' ? 'CISTERNA' : 'CAIXA'}</span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${isDesativado ? 'text-slate-500 bg-slate-100 dark:bg-slate-800' : 'text-emerald-700 bg-emerald-50 dark:bg-emerald-900/20'}`}>{isDesativado ? 'DESATIVADO' : 'ATIVO'}</span>
                                         </div>
                                         <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight uppercase">{item.local}</h3>
                                     </div>
                                     {activeTab !== 'pocos' && (
-                                        <div className={`px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-wider ${!isDelayed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100 animate-pulse'}`}>
+                                        <div className={`px-2.5 py-1 rounded-full border text-[9px] font-black uppercase tracking-wider ${isDesativado ? 'bg-slate-100 text-slate-500 border-slate-200' : !isDelayed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100 animate-pulse'}`}>
                                             {computedStatusLimpeza}
                                         </div>
                                     )}
@@ -671,9 +716,9 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
                                 <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-800 space-y-3">
                                     <div className="grid grid-cols-2 gap-2">
-                                        <button onClick={() => handleEdit(item)} disabled={isActionBusy} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
+                                        <button onClick={() => handleEdit(item)} disabled={isActionBusy || isDesativado} className="py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-cyan-500 text-slate-600 dark:text-slate-300 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed">
                                             {isActionBusy ? <Loader2 size={14} className="animate-spin"/> : activeTab === 'pocos' ? <ClipboardList size={14}/> : <RotateCw size={14}/>} 
-                                            {activeTab === 'pocos' ? 'Ficha TECNICA' : 'manutencao'}
+                                            {isDesativado ? 'Desativado' : activeTab === 'pocos' ? 'Ficha TECNICA' : 'manutencao'}
                                         </button>
                                         
                                         {item.fichaOperacional && item.fichaOperacional !== 'LINK' ? (
@@ -684,7 +729,14 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                     </div>
                                     <div className="flex justify-between items-center px-1 pt-1">
                                         <div className="text-[9px] font-bold text-slate-400 flex items-center gap-1 uppercase"><UserIcon size={12}/> {item.responsavel || 'N/A'}</div>
-                                        <button onClick={() => handleHistory(item)} disabled={isActionBusy} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><History size={18}/></button>
+                                        <div className="flex items-center gap-2">
+                                            {isAdmin && (
+                                                <button onClick={() => handleToggleReservatorioStatus(item)} disabled={isActionBusy} className={`px-2 py-1 rounded border text-[9px] font-bold uppercase tracking-wider transition-colors disabled:opacity-50 ${isDesativado ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-600 bg-white border-slate-200'}`}>
+                                                    <Power size={10} className="inline mr-1" />{isDesativado ? 'Ativar' : 'Desativar'}
+                                                </button>
+                                            )}
+                                            <button onClick={() => handleHistory(item)} disabled={isActionBusy} className="p-2 text-slate-400 hover:text-purple-600 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><History size={18}/></button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -906,4 +958,3 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
     </div>
   );
 };
-
