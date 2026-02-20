@@ -153,8 +153,8 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
         );
 
         const certificadosVencidos = latestCertificados.filter(item => {
-          if (item.status === 'VENCIDO') return true;
-          return item.validade ? isBeforeToday(item.validade) : false;
+          const diff = diffDaysFromToday(item.validade);
+          return Number.isFinite(diff) && diff < 0;
         }).length;
 
         const latestFiltros = Array.from(
