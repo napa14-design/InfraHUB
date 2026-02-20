@@ -4,11 +4,13 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logService } from './logService';
 import { authService } from './authService';
 import { logger } from '../utils/logger';
+import { getStorage } from '../utils/storage';
 
 const STORAGE_KEY = 'nexus_modules_v1';
 const MODULE_TABLE_CANDIDATES = ['app_modules', 'modules'];
 
 let resolvedModulesTable: string | null = null;
+const moduleStorage = getStorage();
 
 const parseModules = (raw: string | null): AppModule[] | null => {
   if (!raw) return null;
@@ -22,14 +24,14 @@ const parseModules = (raw: string | null): AppModule[] | null => {
 };
 
 const ensureLocalModules = (): AppModule[] => {
-  const stored = parseModules(localStorage.getItem(STORAGE_KEY));
+  const stored = parseModules(moduleStorage.getItem(STORAGE_KEY));
   if (stored && stored.length > 0) return stored;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MODULES));
+  moduleStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_MODULES));
   return [...INITIAL_MODULES];
 };
 
 const persistLocalModules = (modules: AppModule[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(modules));
+  moduleStorage.setItem(STORAGE_KEY, JSON.stringify(modules));
 };
 
 const mapModuleFromDB = (row: any): AppModule => ({

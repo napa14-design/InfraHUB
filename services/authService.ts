@@ -4,9 +4,11 @@ import { User, UserRole } from '../types';
 import { MOCK_USERS } from '../constants';
 import { logService } from './logService';
 import { logger } from '../utils/logger';
+import { getStorage } from '../utils/storage';
 
 const SESSION_KEY = 'nexus_auth_user';
 const AUTH_TIMEOUT_MS = 5000;
+const authStorage = getStorage();
 
 // Helper for generating IDs safely in all environments
 const generateId = () => {
@@ -134,7 +136,7 @@ export const authService = {
                     regionId: profileData.region_id,
                     sedeIds: profileData.sede_ids || [],
                   };
-                  localStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
+                  authStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
                   
                   // LOG LOGIN ACTION
                   logService.logAction(appUser, 'AUTH', 'LOGIN', 'Sistema', 'Login via Supabase realizado com sucesso.');
@@ -158,7 +160,7 @@ export const authService = {
           }
 
           logger.log("[Auth] Mock user found.");
-          localStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
+          authStorage.setItem(SESSION_KEY, JSON.stringify(mockUser));
           
           // LOG LOGIN ACTION
           logService.logAction(mockUser, 'AUTH', 'LOGIN', 'Sistema', 'Login (Mock Mode) realizado com sucesso.');
@@ -189,11 +191,11 @@ export const authService = {
         logService.logAction(user, 'AUTH', 'LOGIN', 'Sistema', 'Logout realizado.');
     }
     if (isSupabaseConfigured()) await supabase.auth.signOut();
-    localStorage.removeItem(SESSION_KEY);
+    authStorage.removeItem(SESSION_KEY);
   },
 
   getCurrentUser: (): User | null => {
-    const stored = localStorage.getItem(SESSION_KEY);
+    const stored = authStorage.getItem(SESSION_KEY);
     if (stored) {
         try {
             const parsed = JSON.parse(stored);
@@ -203,12 +205,12 @@ export const authService = {
             // Validate against Supabase session if configured (Basic check)
             // Note: Full async session check happens in App.tsx AuthObserver
             if (isSupabaseConfigured()) {
-               // We trust localStorage temporarily for synchronous render, 
+               // We trust cached session data temporarily for synchronous render, 
                // but App.tsx will redirect if session is invalid.
             }
 
             if (parsed.status !== 'ACTIVE') {
-                localStorage.removeItem(SESSION_KEY);
+                authStorage.removeItem(SESSION_KEY);
                 return null;
             }
 
@@ -228,7 +230,7 @@ export const authService = {
     try {
       const { data, error } = await withTimeout(supabase.auth.getUser());
       if (error || !data?.user) {
-        localStorage.removeItem(SESSION_KEY);
+        authStorage.removeItem(SESSION_KEY);
         return null;
       }
 
@@ -246,7 +248,7 @@ export const authService = {
 
       if (profileData.status !== 'ACTIVE') {
         await supabase.auth.signOut();
-        localStorage.removeItem(SESSION_KEY);
+        authStorage.removeItem(SESSION_KEY);
         return null;
       }
 
@@ -262,7 +264,7 @@ export const authService = {
         sedeIds: profileData.sede_ids || [],
       };
 
-      localStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
+      authStorage.setItem(SESSION_KEY, JSON.stringify(appUser));
       return appUser;
     } catch (error: any) {
       if (error?.message === 'timeout') {
@@ -413,9 +415,9 @@ export const authService = {
        const merged = { ...currentUser, ...updates };
        // If I updated my own status to inactive, logout immediately on next refresh/check
        if (merged.status !== 'ACTIVE') {
-           localStorage.removeItem(SESSION_KEY);
+           authStorage.removeItem(SESSION_KEY);
        } else {
-           localStorage.setItem(SESSION_KEY, JSON.stringify(merged));
+           authStorage.setItem(SESSION_KEY, JSON.stringify(merged));
        }
        return merged;
     }
@@ -584,7 +586,7 @@ adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
           currentUser.isFirstLogin = false;
-          localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
+          authStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
           logService.logAction(currentUser, 'AUTH', 'UPDATE', 'Primeiro Acesso', 'Definiu senha e ativou a conta');
       }
 
