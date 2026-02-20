@@ -1,13 +1,14 @@
-
 import React, { useEffect, useState } from 'react';
-import { 
-  PieChart, AlertTriangle, Droplets, Activity,
+import {
+  PieChart, AlertTriangle, Droplets, Loader2,
   ShieldCheck, TrendingUp, AlertCircle, ArrowLeft
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { User, HydroCertificado, HydroFiltro, HydroPoco } from '../../types';
+import { User, HydroCertificado, HydroFiltro, HydroReservatorio } from '../../types';
 import { hydroService } from '../../services/hydroService';
+import { notificationService } from '../../services/notificationService';
 import { EmptyState } from '../Shared/EmptyState';
+import { diffDaysFromToday, formatDateBR } from '../../utils/dateUtils';
 
 const ProgressBar = ({ value, colorClass }: { value: number, colorClass: string }) => (
     <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -40,14 +41,22 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
     const navigate = useNavigate();
     const [certificados, setCertificados] = useState<HydroCertificado[]>([]);
     const [filtros, setFiltros] = useState<HydroFiltro[]>([]);
-    const [pocos, setPocos] = useState<HydroPoco[]>([]);
+    const [reservatorios, setReservatorios] = useState<HydroReservatorio[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        let isActive = true;
+
         const load = async () => {
-            const [c, f, p] = await Promise.all([hydroService.getCertificados(user), hydroService.getFiltros(user), hydroService.getPocos(user)]);
-            
-            // DEDUPLICATION (Same logic as Dashboard) to ensure sync
+            setLoading(true);
+            const [c, f, pocos, cisternas, caixas] = await Promise.all([
+                hydroService.getCertificados(user),
+                hydroService.getFiltros(user),
+                hydroService.getPocos(user),
+                hydroService.getCisternas(user),
+                hydroService.getCaixas(user)
+            ]);
+
             const uniqueCerts = Array.from(c.reduce((map, item) => {
                 const key = `${item.sedeId}-${item.parceiro}`;
                 const existing = map.get(key);
@@ -62,27 +71,98 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                 return map;
             }, new Map<string, HydroFiltro>()).values());
 
-            setCertificados(uniqueCerts); 
-            setFiltros(uniqueFiltros); 
-            setPocos(p); 
+            if (!isActive) return;
+
+            setCertificados(uniqueCerts);
+            setFiltros(uniqueFiltros);
+            setReservatorios([...pocos, ...cisternas, ...caixas]);
             setLoading(false);
         };
-        load();
+
+        void load();
+        const unsubscribeRefresh = notificationService.onRefresh(() => {
+            void load();
+        });
+        const pollingId = window.setInterval(() => {
+            void load();
+        }, 60000);
+
+        return () => {
+            isActive = false;
+            unsubscribeRefresh();
+            window.clearInterval(pollingId);
+        };
     }, [user]);
 
-    const totalAssets = certificados.length + filtros.length + pocos.length;
-    const today = new Date();
-    const criticalItems: Array<any> = [];
+    const totalAssets = certificados.length + filtros.length + reservatorios.length;
 
-    certificados.forEach(c => { const diff = Math.ceil((new Date(c.validade).getTime() - today.getTime()) / 86400000); if (diff <= 30) criticalItems.push({ name: `Certificado ${c.parceiro}`, type: 'Certificado', days: diff }); });
-    filtros.forEach(f => { const diff = Math.ceil((new Date(f.proximaTroca).getTime() - today.getTime()) / 86400000); if (diff <= 15) criticalItems.push({ name: `Filtro ${f.patrimonio}`, type: 'Filtro', days: diff }); });
-    pocos.forEach(p => { const diff = Math.ceil((new Date(p.proximaLimpeza).getTime() - today.getTime()) / 86400000); if (diff <= 30) criticalItems.push({ name: `Limpeza reservatório`, type: 'Limpeza', days: diff }); });
+    const criticalItems: Array<{
+        id: string;
+        kind: 'CERTIFICADO' | 'FILTRO' | 'RESERVATORIO';
+        label: string;
+        sedeId: string;
+        local: string;
+        dueDate: string;
+        days: number;
+        modulePath: string;
+    }> = [];
+
+    certificados.forEach(c => {
+        const diff = diffDaysFromToday(c.validade);
+        if (diff <= 30) {
+            criticalItems.push({
+                id: c.id,
+                kind: 'CERTIFICADO',
+                label: 'Certificado',
+                sedeId: c.sedeId,
+                local: c.parceiro,
+                dueDate: c.validade,
+                days: diff,
+                modulePath: '/module/hydrosys/certificados'
+            });
+        }
+    });
+
+    filtros.forEach(f => {
+        const diff = diffDaysFromToday(f.proximaTroca);
+        if (diff <= 15) {
+            criticalItems.push({
+                id: f.id,
+                kind: 'FILTRO',
+                label: 'Filtro',
+                sedeId: f.sedeId,
+                local: `${f.local} (${f.patrimonio})`,
+                dueDate: f.proximaTroca,
+                days: diff,
+                modulePath: '/module/hydrosys/filtros'
+            });
+        }
+    });
+
+    reservatorios.forEach(r => {
+        const diff = diffDaysFromToday(r.proximaLimpeza);
+        if (diff <= 30) {
+            const tipoLabel = r.tipo === 'POCO' ? 'Po?o' : r.tipo === 'CISTERNA' ? 'Cisterna' : "Caixa d'Agua";
+            criticalItems.push({
+                id: r.id,
+                kind: 'RESERVATORIO',
+                label: tipoLabel,
+                sedeId: r.sedeId,
+                local: r.local,
+                dueDate: r.proximaLimpeza,
+                days: diff,
+                modulePath: '/module/hydrosys/reservatorios'
+            });
+        }
+    });
+
+    criticalItems.sort((a, b) => a.days - b.days);
 
     const expiredCount = criticalItems.filter(i => i.days < 0).length;
     const warningCount = criticalItems.filter(i => i.days >= 0).length;
     const healthScore = Math.round(Math.max(0, 100 - (totalAssets > 0 ? ((expiredCount * 10 + warningCount * 2) / totalAssets) * 20 : 0)));
-    let scoreColor = healthScore < 50 ? "text-red-500" : healthScore < 80 ? "text-amber-500" : "text-emerald-500";
-    let barColor = healthScore < 50 ? "bg-red-500" : healthScore < 80 ? "bg-amber-500" : "bg-emerald-500";
+    const scoreColor = healthScore < 50 ? 'text-red-500' : healthScore < 80 ? 'text-amber-500' : 'text-emerald-500';
+    const barColor = healthScore < 50 ? 'bg-red-500' : healthScore < 80 ? 'bg-amber-500' : 'bg-emerald-500';
 
     return (
         <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
@@ -112,14 +192,19 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                 </header>
 
-                {totalAssets === 0 ? (
-                    <EmptyState icon={PieChart} title="Sem Dados" description="Necessário cadastrar ativos." />
+                {loading ? (
+                    <div className="border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-[#111114]/80 rounded-3xl p-10 flex items-center justify-center gap-3 text-slate-500 dark:text-slate-300">
+                        <Loader2 size={18} className="animate-spin" />
+                        <span className="text-xs font-mono uppercase tracking-widest">Atualizando indicadores...</span>
+                    </div>
+                ) : totalAssets === 0 ? (
+                    <EmptyState icon={PieChart} title="Sem Dados" description="Necess?rio cadastrar ativos." />
                 ) : (
                     <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                            <StatCard title="Índice de Saúde" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
-                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="ação imediata" />
-                            <StatCard title="Alertas Próximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
+                            <StatCard title="?ndice de Sa?de" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
+                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="a??o imediata" />
+                            <StatCard title="Alertas Pr?ximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
                             <StatCard title="Total Monitorado" value={totalAssets} icon={Droplets} type="info" subtitle="Ativos ativos" />
                         </div>
 
@@ -128,14 +213,14 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                                 <h3 className="font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 font-mono uppercase"><TrendingUp size={20} className="text-slate-400" /> Performance</h3>
                                 <div className="flex flex-col items-center justify-center py-6">
                                     <div className={`text-6xl font-black ${scoreColor} mb-2 font-mono`}>{healthScore}</div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pontuação Geral</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pontua??o Geral</p>
                                 </div>
                                 <div className="mt-4"><ProgressBar value={healthScore} colorClass={barColor} /></div>
                             </div>
 
                             <div className="lg:col-span-2 bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
                                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/20 flex justify-between items-center">
-                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono uppercase"><AlertTriangle className="text-amber-500" /> Pendências ({criticalItems.length})</h3>
+                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono uppercase"><AlertTriangle className="text-amber-500" /> Pend?ncias ({criticalItems.length})</h3>
                                 </div>
                                 <div className="flex-1 overflow-y-auto max-h-[400px]">
                                     {criticalItems.length === 0 ? (
@@ -143,14 +228,30 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                                     ) : (
                                         <table className="w-full text-left text-sm">
                                             <thead className="bg-slate-50 dark:bg-slate-950 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
-                                                <tr><th className="px-6 py-4">Item</th><th className="px-6 py-4">Tipo</th><th className="px-6 py-4 text-center">Status</th></tr>
+                                                <tr>
+                                                    <th className="px-4 py-4">Sede</th>
+                                                    <th className="px-4 py-4">Local/Item</th>
+                                                    <th className="px-4 py-4">Tipo</th>
+                                                    <th className="px-4 py-4">Vencimento</th>
+                                                    <th className="px-4 py-4 text-center">Status</th>
+                                                </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                                 {criticalItems.map((item, idx) => (
-                                                    <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                                        <td className="px-6 py-4 font-bold text-slate-900 dark:text-white">{item.name}</td>
-                                                        <td className="px-6 py-4 text-slate-500 text-xs uppercase">{item.type}</td>
-                                                        <td className="px-6 py-4 text-center"><span className={`inline-flex px-2 py-1 rounded text-[10px] font-bold uppercase ${item.days < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{item.days < 0 ? `Vencido (${Math.abs(item.days)}d)` : `Vence em ${item.days}d`}</span></td>
+                                                    <tr
+                                                        key={`${item.kind}-${item.id}-${idx}`}
+                                                        onClick={() => navigate(item.modulePath)}
+                                                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer"
+                                                    >
+                                                        <td className="px-4 py-4 text-xs font-black uppercase tracking-wider text-cyan-700 dark:text-cyan-300">{item.sedeId}</td>
+                                                        <td className="px-4 py-4 font-bold text-slate-900 dark:text-white">{item.local}</td>
+                                                        <td className="px-4 py-4 text-slate-500 text-xs uppercase">{item.label}</td>
+                                                        <td className="px-4 py-4 text-slate-500 text-xs">{formatDateBR(item.dueDate)}</td>
+                                                        <td className="px-4 py-4 text-center">
+                                                            <span className={`inline-flex px-2 py-1 rounded text-[10px] font-bold uppercase ${item.days < 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                                {item.days < 0 ? `Vencido (${Math.abs(item.days)}d)` : `Vence em ${item.days}d`}
+                                                            </span>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
