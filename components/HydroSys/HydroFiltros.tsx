@@ -1,21 +1,38 @@
 
 import React, { useState, useEffect } from 'react';
 import { Filter, AlertTriangle, CheckCircle, Clock, RotateCw, X, Plus, Trash2, Building2, MapPin, History, ArrowLeft, Calendar, User as UserIcon, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { User, HydroFiltro, UserRole, Sede, LogEntry, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
 import { EmptyState } from '../Shared/EmptyState';
 
+type FiltroStatusFilter = 'VENCIDO' | 'PROXIMO' | 'REGULAR';
+
+const parseFiltroStatusFilter = (value: string | null): FiltroStatusFilter | null => {
+  if (!value) return null;
+  const normalized = value.toUpperCase();
+  if (normalized === 'VENCIDO' || normalized === 'PROXIMO' || normalized === 'REGULAR') return normalized;
+  return null;
+};
+
+const getFiltroStatusKey = (days: number): FiltroStatusFilter => {
+  if (days < 0) return 'VENCIDO';
+  if (days < 30) return 'PROXIMO';
+  return 'REGULAR';
+};
+
 export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState<HydroFiltro[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   const [settings, setSettings] = useState<HydroSettings | null>(null);
   
   // Filters
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<FiltroStatusFilter | null>(null);
 
   // Modals
   const [isExchangeModalOpen, setIsExchangeModalOpen] = useState(false);
@@ -49,6 +66,16 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
   const isAdmin = user.role === UserRole.ADMIN;
   const filtroMonths = settings?.validadeFiltroMeses || 6;
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = parseFiltroStatusFilter(params.get('status'));
+    setStatusFilter(statusParam);
+
+    if (isAdmin) {
+      setSelectedSedeFilter(params.get('sede') || '');
+    }
+  }, [location.search, isAdmin]);
   
   const getDaysRemaining = (dateStr: string) => {
     if (!dateStr) return 999;
@@ -120,6 +147,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
 
   const filteredData = data.filter(item => {
       if (isAdmin && selectedSedeFilter && item.sedeId !== selectedSedeFilter) return false;
+      if (statusFilter && getFiltroStatusKey(getDaysRemaining(item.proximaTroca)) !== statusFilter) return false;
       return true;
   });
 
@@ -179,6 +207,33 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                 </div>
             </div>
         </header>
+
+        <div className="flex flex-wrap items-center gap-2">
+            <button
+                onClick={() => setStatusFilter(null)}
+                className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === null ? 'bg-slate-900 text-white border-slate-900 dark:bg-cyan-600 dark:border-cyan-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-cyan-500/40'}`}
+            >
+                Todos
+            </button>
+            <button
+                onClick={() => setStatusFilter('VENCIDO')}
+                className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === 'VENCIDO' ? 'bg-red-500 text-white border-red-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-red-400/60'}`}
+            >
+                Vencidos
+            </button>
+            <button
+                onClick={() => setStatusFilter('PROXIMO')}
+                className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === 'PROXIMO' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-amber-400/60'}`}
+            >
+                Vencendo
+            </button>
+            <button
+                onClick={() => setStatusFilter('REGULAR')}
+                className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${statusFilter === 'REGULAR' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-emerald-400/60'}`}
+            >
+                Regulares
+            </button>
+        </div>
 
         {filteredData.length === 0 ? (
             <EmptyState icon={Filter} title="Nenhum Filtro Encontrado" description={selectedSedeFilter ? "não há filtros cadastrados nesta unidade." : "Nenhum registro disponível."} actionLabel={canManage ? "Cadastrar Agora" : undefined} onAction={canManage ? handleAddNew : undefined} />

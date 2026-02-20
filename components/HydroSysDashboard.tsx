@@ -61,11 +61,14 @@ const KPI_TONES: Record<string, { border: string; icon: string; badge: string; g
   }
 };
 
-const KpiCard = ({ label, value, subtext, icon: Icon, tone = 'neutral', delay = '0ms' }: any) => {
+const KpiCard = ({ label, value, subtext, icon: Icon, tone = 'neutral', delay = '0ms', onClick }: any) => {
   const styles = KPI_TONES[tone] || KPI_TONES.neutral;
+  const isClickable = typeof onClick === 'function';
   return (
-    <div
-      className={`group relative overflow-hidden rounded-2xl bg-white dark:bg-[#111114]/80 border ${styles.border} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5`}
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative w-full overflow-hidden rounded-2xl bg-white dark:bg-[#111114]/80 border ${styles.border} p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 ${isClickable ? 'cursor-pointer hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/50' : 'cursor-default'}`}
       style={{ animationDelay: delay, animation: 'fade-up 0.4s ease-out forwards', opacity: 0 }}
     >
       <div className={`absolute -right-8 -top-8 h-24 w-24 rounded-full ${styles.glow} transition-transform duration-500 group-hover:scale-110`} />
@@ -79,7 +82,7 @@ const KpiCard = ({ label, value, subtext, icon: Icon, tone = 'neutral', delay = 
         <div className="text-2xl font-black text-slate-900 dark:text-white">{value}</div>
         <div className="text-[11px] font-mono uppercase tracking-widest text-slate-500 dark:text-white/40">{label}</div>
       </div>
-    </div>
+    </button>
   );
 };
 
@@ -222,28 +225,32 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       value: kpis.certificadosVencidos,
       icon: Award,
       tone: kpis.certificadosVencidos > 0 ? 'danger' : 'ok',
-      subtext: kpis.certificadosVencidos > 0 ? 'Ação necessária' : 'Em dia'
+      subtext: kpis.certificadosVencidos > 0 ? 'Ação necessária' : 'Em dia',
+      onClick: () => navigate('/module/hydrosys/certificados?status=VENCIDO')
     },
     {
       label: 'Filtros vencidos',
       value: kpis.filtrosVencidos,
       icon: Filter,
       tone: kpis.filtrosVencidos > 0 ? 'warning' : 'ok',
-      subtext: kpis.filtrosVencidos > 0 ? 'Troca urgente' : 'Regular'
+      subtext: kpis.filtrosVencidos > 0 ? 'Troca urgente' : 'Regular',
+      onClick: () => navigate('/module/hydrosys/filtros?status=VENCIDO')
     },
     {
       label: 'Limpezas atrasadas',
       value: kpis.reservatoriosAtrasados,
       icon: AlertTriangle,
       tone: kpis.reservatoriosAtrasados > 0 ? 'danger' : 'ok',
-      subtext: kpis.reservatoriosAtrasados > 0 ? 'Priorizar agenda' : 'Em dia'
+      subtext: kpis.reservatoriosAtrasados > 0 ? 'Priorizar agenda' : 'Em dia',
+      onClick: () => navigate('/module/hydrosys/reservatorios?situacao=ATRASADO')
     },
     {
       label: 'Limpezas próximas (30d)',
       value: kpis.limpezasProximas,
       icon: CalendarClock,
       tone: kpis.limpezasProximas > 0 ? 'warning' : 'neutral',
-      subtext: 'Planejamento'
+      subtext: 'Planejamento',
+      onClick: () => navigate('/module/hydrosys/reservatorios?situacao=PROXIMO_30D')
     },
     {
       label: 'Conformidade Cloro/pH',
@@ -382,6 +389,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                   icon={card.icon}
                   tone={card.tone}
                   subtext={card.subtext}
+                  onClick={card.onClick}
                   delay={`${idx * 60}ms`}
                 />
               ))}

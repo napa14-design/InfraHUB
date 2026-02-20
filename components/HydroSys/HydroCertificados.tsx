@@ -5,7 +5,7 @@ import {
   CheckCircle2, AlertTriangle, Activity, Filter, FlaskConical, 
   Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Eye, ExternalLink, Maximize2
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { User, HydroCertificado, UserRole, Sede, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
 import { notificationService } from '../../services/notificationService';
@@ -41,6 +41,12 @@ const getStatusConfig = (status: string) => {
   }
 };
 
+const parseStatusFilter = (value: string | null): string | null => {
+  if (!value) return null;
+  const normalized = value.toUpperCase();
+  if (normalized === 'VIGENTE' || normalized === 'PROXIMO' || normalized === 'VENCIDO') return normalized;
+  return null;
+};
 const KPICard = ({ title, value, icon, gradient, onClick, isActive }: any) => (
   <div 
     onClick={onClick}
@@ -65,6 +71,7 @@ const KPICard = ({ title, value, icon, gradient, onClick, isActive }: any) => (
 
 export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useToast();
   
   const [data, setData] = useState<HydroCertificado[]>([]);
@@ -139,6 +146,16 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     loadData();
   }, [user]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = parseStatusFilter(params.get('status'));
+    setFilterStatus(statusParam);
+
+    if (isAdmin) {
+      setSelectedSedeFilter(params.get('sede') || '');
+    }
+  }, [location.search, isAdmin]);
 
   // --- DOC PREVIEW LOGIC ---
   const handlePreview = (url: string) => {

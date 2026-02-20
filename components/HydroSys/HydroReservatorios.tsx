@@ -32,6 +32,19 @@ type CreateReservatorioForm = {
     dataLimpeza2: string;
 };
 
+const parseReservatorioSituacao = (value: string | null): 'ATRASADO' | 'PROXIMO_30D' | null => {
+    if (!value) return null;
+    const normalized = value.toUpperCase();
+    if (normalized === 'ATRASADO' || normalized === 'PROXIMO_30D') return normalized;
+    return null;
+};
+
+const parseReservatorioTab = (value: string | null): Tab | null => {
+    if (!value) return null;
+    const normalized = value.toLowerCase();
+    if (normalized === 'pocos' || normalized === 'cisternas' || normalized === 'caixas') return normalized;
+    return null;
+};
 // --- HELPERS ---
 const formatDate = (dateStr: string) => {
     if (!dateStr) return '--/--/--';
@@ -78,6 +91,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   // Filters
   const [filterText, setFilterText] = useState('');
   const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
+  const [situacaoFilter, setSituacaoFilter] = useState<'ATRASADO' | 'PROXIMO_30D' | null>(null);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   
   // Modals
@@ -136,12 +150,23 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const sedeParam = params.get('sede');
+    const tabParam = parseReservatorioTab(params.get('tab'));
+    const situacaoParam = parseReservatorioSituacao(params.get('situacao'));
+
+    setSituacaoFilter(situacaoParam);
+
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+
     if (sedeParam) {
         if (isAdmin) {
             setSelectedSedeFilter(sedeParam);
         } else {
             setFilterText(sedeParam);
         }
+    } else if (isAdmin) {
+      setSelectedSedeFilter('');
     }
   }, [location.search, isAdmin]);
 
@@ -438,14 +463,50 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
     </button>
   );
 
-  const filterList = (list: any[]) => {
+  const getDaysToLimpeza = (dateStr?: string) => {
+      if (!dateStr) return null;
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const target = new Date(year, month - 1, day);
+      target.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const diffMs = target.getTime() - today.getTime();
+      return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  };
+
+  const matchesSituacaoFilter = (item: any) => {
+      if (!situacaoFilter) return true;
+      const days = getDaysToLimpeza(item.proximaLimpeza);
+      if (days === null) return false;
+      if (situacaoFilter === 'ATRASADO') return days < 0;
+      return days >= 0 && days <= 30;
+  };
+
+  const filterList = (list: any[], options?: { ignoreText?: boolean }) => {
       let result = list;
       if (isAdmin && selectedSedeFilter) result = result.filter(i => i.sedeId === selectedSedeFilter);
-      if (filterText) result = result.filter(i => i.local.toLowerCase().includes(filterText.toLowerCase()) || i.sedeId.toLowerCase().includes(filterText.toLowerCase()));
+      if (situacaoFilter) result = result.filter(matchesSituacaoFilter);
+      if (!options?.ignoreText && filterText) {
+          const normalizedText = filterText.toLowerCase();
+          result = result.filter(i => i.local.toLowerCase().includes(normalizedText) || i.sedeId.toLowerCase().includes(normalizedText));
+      }
       return result;
   };
 
   const data = activeTab === 'pocos' ? filterList(pocos) : activeTab === 'cisternas' ? filterList(cisternas) : filterList(caixas);
+
+  useEffect(() => {
+      if (!situacaoFilter) return;
+
+      const tabWithData = (['pocos', 'cisternas', 'caixas'] as Tab[]).find(tab => {
+          const source = tab === 'pocos' ? pocos : tab === 'cisternas' ? cisternas : caixas;
+          return filterList(source, { ignoreText: true }).length > 0;
+      });
+
+      if (tabWithData && tabWithData !== activeTab) {
+          setActiveTab(tabWithData);
+      }
+  }, [situacaoFilter, activeTab, pocos, cisternas, caixas, selectedSedeFilter, filterText, isAdmin]);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-50 dark:bg-[#0A0A0C]">
@@ -501,6 +562,26 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                 <TabButton id="pocos" label="pocos Artesianos" count={filterList(pocos).length} icon={Activity} />
                 <TabButton id="cisternas" label="Cisternas" count={filterList(cisternas).length} icon={Waves} />
                 <TabButton id="caixas" label="Caixas D'agua" count={filterList(caixas).length} icon={Box} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <button
+                    onClick={() => setSituacaoFilter(null)}
+                    className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${situacaoFilter === null ? 'bg-slate-900 text-white border-slate-900 dark:bg-cyan-600 dark:border-cyan-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-cyan-500/40'}`}
+                >
+                    Todas as limpezas
+                </button>
+                <button
+                    onClick={() => setSituacaoFilter('ATRASADO')}
+                    className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${situacaoFilter === 'ATRASADO' ? 'bg-red-500 text-white border-red-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-red-400/60'}`}
+                >
+                    Atrasadas
+                </button>
+                <button
+                    onClick={() => setSituacaoFilter('PROXIMO_30D')}
+                    className={`px-3 py-2 rounded-xl border text-[10px] font-bold uppercase tracking-wider transition-all ${situacaoFilter === 'PROXIMO_30D' ? 'bg-amber-500 text-white border-amber-500' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-300 hover:border-amber-400/60'}`}
+                >
+                    Proximas 30d
+                </button>
             </div>
 
             {/* List */}
