@@ -138,8 +138,8 @@ export const CloroEntryModal: React.FC<Props> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-md p-0 sm:p-4">
-            <div className="bg-white dark:bg-[#111114] w-full max-w-md h-[90vh] sm:h-auto rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center overflow-y-auto overscroll-contain bg-black/70 backdrop-blur-md p-0 sm:p-4">
+            <div className="bg-white dark:bg-[#111114] w-full max-w-md h-[92dvh] sm:h-auto sm:max-h-[92vh] rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden border border-slate-200 dark:border-slate-800 animate-in slide-in-from-bottom-8 sm:zoom-in-95 duration-300">
                 
                 <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-800">
                     <div>
@@ -153,7 +153,7 @@ export const CloroEntryModal: React.FC<Props> = ({
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-8">
                     {/* Readings Section */}
                     <div className="grid grid-cols-2 gap-4">
                         {/* CLORO INPUT */}
@@ -207,7 +207,7 @@ export const CloroEntryModal: React.FC<Props> = ({
 
                     {/* Photo Evidence */}
                     <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Evidência Fotográfica</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Evidência fotográfica</label>
                         <input 
                             type="file" 
                             accept="image/*" 
