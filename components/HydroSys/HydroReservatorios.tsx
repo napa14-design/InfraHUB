@@ -541,6 +541,10 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   useEffect(() => {
       if (!situacaoFilter) return;
 
+      const activeSource = activeTab === 'pocos' ? pocos : activeTab === 'cisternas' ? cisternas : caixas;
+      const activeHasData = filterList(activeSource, { ignoreText: true }).length > 0;
+      if (activeHasData) return;
+
       const tabWithData = (['pocos', 'cisternas', 'caixas'] as Tab[]).find(tab => {
           const source = tab === 'pocos' ? pocos : tab === 'cisternas' ? cisternas : caixas;
           return filterList(source, { ignoreText: true }).length > 0;
