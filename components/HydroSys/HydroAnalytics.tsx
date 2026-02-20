@@ -144,7 +144,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
     reservatorios.forEach(r => {
         const diff = diffDaysFromToday(r.proximaLimpeza);
         if (diff <= 30) {
-            const tipoLabel = r.tipo === 'POCO' ? 'Po?o' : r.tipo === 'CISTERNA' ? 'Cisterna' : "Caixa d'Agua";
+            const tipoLabel = r.tipo === 'POCO' ? 'Poço' : r.tipo === 'CISTERNA' ? 'Cisterna' : "Caixa d'Água";
             criticalItems.push({
                 id: r.id,
                 kind: 'RESERVATORIO',
@@ -200,13 +200,13 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                         <span className="text-xs font-mono uppercase tracking-widest">Atualizando indicadores...</span>
                     </div>
                 ) : totalAssets === 0 ? (
-                    <EmptyState icon={PieChart} title="Sem Dados" description="Necess?rio cadastrar ativos." />
+                    <EmptyState icon={PieChart} title="Sem Dados" description="Necessário cadastrar ativos." />
                 ) : (
                     <>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                            <StatCard title="?ndice de Sa?de" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
-                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="a??o imediata" />
-                            <StatCard title="Alertas Pr?ximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
+                            <StatCard title="Índice de Saúde" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
+                            <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="ação imediata" />
+                            <StatCard title="Alertas Próximos" value={warningCount} icon={AlertTriangle} type={warningCount === 0 ? 'success' : 'warning'} subtitle="Vencem em breve" />
                             <StatCard title="Total Monitorado" value={totalAssets} icon={Droplets} type="info" subtitle="Ativos ativos" />
                         </div>
 
@@ -215,14 +215,14 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                                 <h3 className="font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2 font-mono uppercase"><TrendingUp size={20} className="text-slate-400" /> Performance</h3>
                                 <div className="flex flex-col items-center justify-center py-6">
                                     <div className={`text-6xl font-black ${scoreColor} mb-2 font-mono`}>{healthScore}</div>
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pontua??o Geral</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pontuação Geral</p>
                                 </div>
                                 <div className="mt-4"><ProgressBar value={healthScore} colorClass={barColor} /></div>
                             </div>
 
                             <div className="lg:col-span-2 bg-white/80 dark:bg-[#111114]/80 backdrop-blur-sm rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
                                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-black/20 flex justify-between items-center">
-                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono uppercase"><AlertTriangle className="text-amber-500" /> Pend?ncias ({criticalItems.length})</h3>
+                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white flex items-center gap-2 font-mono uppercase"><AlertTriangle className="text-amber-500" /> Pendências ({criticalItems.length})</h3>
                                 </div>
                                 <div className="flex-1 overflow-y-auto max-h-[400px]">
                                     {criticalItems.length === 0 ? (

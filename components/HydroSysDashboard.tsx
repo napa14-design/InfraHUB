@@ -6,6 +6,7 @@ import { User, UserRole, HydroCertificado } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
+import { notificationService } from '../services/notificationService';
 import { exportToCSV } from '../utils/csvExport';
 import { Breadcrumbs } from './Shared/Breadcrumbs';
 import { DashboardGridSkeleton } from './Shared/Skeleton';
@@ -156,7 +157,18 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           return item.validade ? isBeforeToday(item.validade) : false;
         }).length;
 
-        const filtrosVencidos = filtros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
+        const latestFiltros = Array.from(
+          filtros.reduce((map, item) => {
+            const key = `${item.sedeId}-${item.patrimonio}`;
+            const current = map.get(key);
+            if (!current || dateValue(item.dataTroca) > dateValue(current.dataTroca)) {
+              map.set(key, item);
+            }
+            return map;
+          }, new Map<string, typeof filtros[number]>()).values()
+        );
+
+        const filtrosVencidos = latestFiltros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
 
         const reservatorios = [...pocos, ...cisternas, ...caixas];
         const reservatoriosAtivos = reservatorios.filter(item => item.situacaoLimpeza !== 'DESATIVADO');
@@ -195,11 +207,21 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       }
     };
 
-    loadKpis();
+    void loadKpis();
+
+    const unsubscribeRefresh = notificationService.onRefresh(() => {
+      void loadKpis();
+    });
+
+    const pollingId = window.setInterval(() => {
+      void loadKpis();
+    }, 60000);
 
     return () => {
       isActive = false;
       clearInterval(timer);
+      window.clearInterval(pollingId);
+      unsubscribeRefresh();
     };
   }, [user]);
 
