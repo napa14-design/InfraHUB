@@ -40,6 +40,8 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Selection & History
   const [selectedItem, setSelectedItem] = useState<HydroFiltro | null>(null);
@@ -68,6 +70,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
   const isAdmin = user.role === UserRole.ADMIN;
   const filtroMonths = settings?.validadeFiltroMeses || 6;
+  const isActionBusy = isSavingEdit || isDeleting;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -145,7 +148,18 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
-  const confirmDelete = async () => { if (itemToDelete) { await hydroService.deleteFiltro(itemToDelete.id); await loadData(); setIsDeleteModalOpen(false); setItemToDelete(null); } };
+  const confirmDelete = async () => {
+      if (!itemToDelete || isDeleting) return;
+      setIsDeleting(true);
+      try {
+          await hydroService.deleteFiltro(itemToDelete.id);
+          await loadData();
+          setIsDeleteModalOpen(false);
+          setItemToDelete(null);
+      } finally {
+          setIsDeleting(false);
+      }
+  };
 
   const handleEditClick = (item: HydroFiltro) => {
       setEditFilter({ ...item });
@@ -153,7 +167,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const confirmEdit = async () => {
-      if (!editFilter) return;
+      if (!editFilter || isSavingEdit) return;
 
       if (!editFilter.sedeId || !editFilter.patrimonio || !editFilter.local || !editFilter.dataTroca) {
           alert('Preencha os campos obrigat?rios.');
@@ -163,17 +177,22 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
       const next = new Date(editFilter.dataTroca);
       next.setMonth(next.getMonth() + filtroMonths);
 
-      await hydroService.saveFiltro({
-          ...editFilter,
-          patrimonio: editFilter.patrimonio.toUpperCase(),
-          local: editFilter.local.toUpperCase(),
-          bebedouro: editFilter.bebedouro || 'Bebedouro',
-          proximaTroca: next.toISOString().split('T')[0]
-      });
+      setIsSavingEdit(true);
+      try {
+          await hydroService.saveFiltro({
+              ...editFilter,
+              patrimonio: editFilter.patrimonio.toUpperCase(),
+              local: editFilter.local.toUpperCase(),
+              bebedouro: editFilter.bebedouro || 'Bebedouro',
+              proximaTroca: next.toISOString().split('T')[0]
+          });
 
-      await loadData();
-      setIsEditModalOpen(false);
-      setEditFilter(null);
+          await loadData();
+          setIsEditModalOpen(false);
+          setEditFilter(null);
+      } finally {
+          setIsSavingEdit(false);
+      }
   };
 
   const filteredData = data.filter(item => {
@@ -316,10 +335,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                     </button>
                                     {canManage && (
                                         <div className="flex items-center gap-1">
-                                            <button onClick={() => handleEditClick(item)} className="p-3 text-amber-500 hover:text-amber-600 transition-colors" title="Editar filtro">
+                                            <button onClick={() => handleEditClick(item)} disabled={isActionBusy} className="p-3 text-amber-500 hover:text-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Editar filtro">
                                                 <Edit2 size={18} />
                                             </button>
-                                            <button onClick={() => requestDelete(item)} className="p-3 text-red-400 hover:text-red-600 transition-colors" title="Excluir filtro">
+                                            <button onClick={() => requestDelete(item)} disabled={isActionBusy} className="p-3 text-red-400 hover:text-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Excluir filtro">
                                                 <Trash2 size={18} />
                                             </button>
                                         </div>
@@ -397,7 +416,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
                     <div className="flex justify-between mb-6">
                         <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Editar Filtro</h3>
-                        <button onClick={() => { setIsEditModalOpen(false); setEditFilter(null); }}><X size={20} className="text-slate-500"/></button>
+                        <button onClick={() => { setIsEditModalOpen(false); setEditFilter(null); }} disabled={isSavingEdit}><X size={20} className="text-slate-500"/></button>
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidade</label><select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" value={editFilter.sedeId} onChange={e => setEditFilter({ ...editFilter, sedeId: e.target.value })}><option value="">Selecione...</option>{availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
@@ -416,12 +435,12 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                 <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
                     <div className="flex justify-between items-start mb-4">
                         <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Excluir Filtro</h3>
-                        <button onClick={() => setIsDeleteModalOpen(false)}><X size={20} className="text-slate-500"/></button>
+                        <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}><X size={20} className="text-slate-500"/></button>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">Confirma a exclus?o do filtro <strong>{itemToDelete.patrimonio}</strong> em <strong>{itemToDelete.local}</strong>?</p>
                     <div className="grid grid-cols-2 gap-3">
-                        <button onClick={() => setIsDeleteModalOpen(false)} className="py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">Cancelar</button>
-                        <button onClick={confirmDelete} className="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider">Excluir</button>
+                        <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting} className="py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed">Cancelar</button>
+                        <button onClick={confirmDelete} disabled={isDeleting} className="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">{isDeleting ? <><Loader2 size={14} className="animate-spin" /> Excluindo...</> : 'Excluir'}</button>
                     </div>
                 </div>
             </div>
