@@ -1,16 +1,20 @@
 import React, { useEffect, useState } from 'react';
 
 import {
-
-  PieChart, AlertTriangle, Droplets, Loader2,
-
-  ShieldCheck, TrendingUp, AlertCircle, ArrowLeft
-
+  PieChart,
+  AlertTriangle,
+  Droplets,
+  Loader2,
+  ShieldCheck,
+  TrendingUp,
+  AlertCircle,
+  ArrowLeft,
+  Building2,
 } from 'lucide-react';
 
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
-import { User } from '../../types';
+import { Sede, User, UserRole } from '../../types';
 
 import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
@@ -81,6 +85,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, type = 'neutral' }: any)
 export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
     const navigate = useNavigate();
+    const location = useLocation();
 
     const [snapshot, setSnapshot] = useState<HydroKpiSnapshot>({
         certificadosVencidos: 0,
@@ -96,9 +101,17 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
         criticalItems: [],
     });
     const [sedeNameById, setSedeNameById] = useState<Record<string, string>>({});
+    const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+    const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
     const [loading, setLoading] = useState(true);
 
-
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const sedeParam = params.get('sede') || '';
+        if (sedeParam) {
+            setSelectedSedeFilter(sedeParam);
+        }
+    }, [location.search]);
 
     useEffect(() => {
 
@@ -113,11 +126,21 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
             const lastDay = lastDayOfMonthISO();
 
             await orgService.initialize(user);
-            const sedes = orgService.getSedes();
-            const sedeMap = sedes.reduce<Record<string, string>>((acc, sede) => {
+            const allSedes = orgService.getSedes();
+            const scopedSedes = user.role === UserRole.ADMIN
+                ? allSedes
+                : allSedes.filter((sede) => (user.sedeIds || []).includes(sede.id));
+            const sedeMap = scopedSedes.reduce<Record<string, string>>((acc, sede) => {
                 acc[sede.id] = sede.name;
                 return acc;
             }, {});
+
+            setAvailableSedes(scopedSedes);
+            setSelectedSedeFilter((current) => {
+                if (current && scopedSedes.some((sede) => sede.id === current)) return current;
+                if (scopedSedes.length === 1) return scopedSedes[0].id;
+                return '';
+            });
 
             const [settings, certificados, filtros, cloro, pocos, cisternas, caixas] = await Promise.all([
                 hydroService.getSettings(),
@@ -137,6 +160,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
                 cloro,
                 reservatorios: [...pocos, ...cisternas, ...caixas],
                 settings,
+                sedeId: selectedSedeFilter || undefined,
                 periodStartISO: firstDay,
                 periodEndISO: lastDay,
             });
@@ -174,7 +198,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
         };
 
-    }, [user]);
+    }, [user, selectedSedeFilter]);
 
 
 
@@ -238,6 +262,24 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
                         </div>
 
+                        {availableSedes.length > 1 && (
+                            <div className="w-full md:w-auto">
+                                <div className="relative">
+                                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                    <select
+                                        className="w-full md:w-56 pl-9 pr-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none uppercase"
+                                        value={selectedSedeFilter}
+                                        onChange={(e) => setSelectedSedeFilter(e.target.value)}
+                                    >
+                                        <option value="">Todas as Sedes</option>
+                                        {availableSedes.map((sede) => (
+                                            <option key={sede.id} value={sede.id}>{sede.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
                     </div>
 
                 </header>
@@ -264,7 +306,7 @@ export const HydroSysAnalytics: React.FC<{ user: User }> = ({ user }) => {
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
 
-                            <StatCard title="?ndice de Sa?de" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
+                            <StatCard title="Índice de Saúde" value={`${healthScore}%`} icon={ShieldCheck} type={healthScore >= 80 ? 'success' : healthScore >= 50 ? 'warning' : 'danger'} />
 
                             <StatCard title="Itens Vencidos" value={expiredCount} icon={AlertCircle} type={expiredCount === 0 ? 'success' : 'danger'} subtitle="ação imediata" />
 

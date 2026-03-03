@@ -133,15 +133,15 @@ const buildCriticalItems = (
     if (!Number.isFinite(days) || days > 30) return;
 
     const labelByType: Record<string, string> = {
-      POCO: 'Po?o',
+      POCO: 'Poço',
       CISTERNA: 'Cisterna',
-      CAIXA: "Caixa d'?gua",
+      CAIXA: "Caixa d'água",
     };
 
     criticalItems.push({
       id: item.id,
       kind: 'RESERVATORIO',
-      label: labelByType[item.tipo] || 'Reservat?rio',
+      label: labelByType[item.tipo] || 'Reservatório',
       sedeId: item.sedeId,
       local: item.local,
       dueDate: item.proximaLimpeza,
