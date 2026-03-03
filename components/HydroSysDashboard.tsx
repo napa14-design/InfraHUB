@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, ChevronRight, FileDown, Calendar, Download, X, Waves, Activity, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
-import { User, UserRole, HydroCertificado } from '../types';
+import { User, UserRole, HydroCertificado, Sede } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
@@ -91,7 +91,14 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const navigate = useNavigate();
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const userSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
+  const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
+  const [selectedSedeFilter, setSelectedSedeFilter] = useState<string>('');
+
+  const selectedSede = selectedSedeFilter
+    ? availableSedes.find(s => s.id === selectedSedeFilter) || orgService.getSedeById(selectedSedeFilter)
+    : null;
+  const fallbackUserSede = (user.sedeIds && user.sedeIds.length > 0) ? orgService.getSedeById(user.sedeIds[0]) : null;
+  const visibleSede = selectedSede || fallbackUserSede;
 
   const [isLoading, setIsLoading] = useState(true);
   const [kpis, setKpis] = useState({
@@ -108,6 +115,30 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
   const [reportType, setReportType] = useState<'CLORO' | 'CERTIFICADOS' | 'FILTROS' | 'RESERVATORIOS'>('CLORO');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSedes = async () => {
+      await orgService.initialize(user);
+      if (!isMounted) return;
+
+      const sedes = orgService.getSedes();
+      setAvailableSedes(sedes);
+
+      setSelectedSedeFilter((current) => {
+        if (current && sedes.some(s => s.id === current)) return current;
+        if (sedes.length === 1) return sedes[0].id;
+        return '';
+      });
+    };
+
+    void loadSedes();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   useEffect(() => {
     let isActive = true;
@@ -140,9 +171,28 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           hydroService.getCaixas(user)
         ]);
 
+        const certificadosFiltrados = selectedSedeFilter
+          ? certificados.filter(item => item.sedeId === selectedSedeFilter)
+          : certificados;
+        const filtrosFiltrados = selectedSedeFilter
+          ? filtros.filter(item => item.sedeId === selectedSedeFilter)
+          : filtros;
+        const cloroFiltrado = selectedSedeFilter
+          ? cloro.filter(item => item.sedeId === selectedSedeFilter)
+          : cloro;
+        const pocosFiltrados = selectedSedeFilter
+          ? pocos.filter(item => item.sedeId === selectedSedeFilter)
+          : pocos;
+        const cisternasFiltradas = selectedSedeFilter
+          ? cisternas.filter(item => item.sedeId === selectedSedeFilter)
+          : cisternas;
+        const caixasFiltradas = selectedSedeFilter
+          ? caixas.filter(item => item.sedeId === selectedSedeFilter)
+          : caixas;
+
         const dateValue = (value?: string) => parseISODate(value)?.getTime() ?? 0;
         const latestCertificados = Array.from(
-          certificados.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
+          certificadosFiltrados.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
             const key = `${item.sedeId}-${item.parceiro}`;
             const current = map.get(key);
             if (!current || dateValue(item.validade) > dateValue(current.validade)) {
@@ -158,7 +208,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
         }).length;
 
         const latestFiltros = Array.from(
-          filtros.reduce((map, item) => {
+          filtrosFiltrados.reduce((map, item) => {
             const key = `${item.sedeId}-${item.patrimonio}`;
             const current = map.get(key);
             if (!current || dateValue(item.dataTroca) > dateValue(current.dataTroca)) {
@@ -170,7 +220,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
 
         const filtrosVencidos = latestFiltros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
 
-        const reservatorios = [...pocos, ...cisternas, ...caixas];
+        const reservatorios = [...pocosFiltrados, ...cisternasFiltradas, ...caixasFiltradas];
         const reservatoriosAtivos = reservatorios.filter(item => item.situacaoLimpeza !== 'DESATIVADO');
         const reservatoriosAtrasados = reservatoriosAtivos.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
         const limpezasProximas = reservatoriosAtivos.filter(item => {
@@ -178,7 +228,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           return diff >= 0 && diff <= 30;
         }).length;
 
-        const cloroPeriodo = cloro.filter(item => item.date >= firstDay && item.date <= lastDay);
+        const cloroPeriodo = cloroFiltrado.filter(item => item.date >= firstDay && item.date <= lastDay);
         const cloroValidos = cloroPeriodo.filter(item => Number.isFinite(Number(item.cl)) && Number.isFinite(Number(item.ph)));
         const cloroConforme = cloroValidos.filter(item => {
           const cl = Number(item.cl);
@@ -223,15 +273,23 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       window.clearInterval(pollingId);
       unsubscribeRefresh();
     };
-  }, [user]);
+  }, [user, selectedSedeFilter]);
 
   const allowedSubModules = HYDROSYS_SUBMODULES.filter(mod => {
     return mod.roles.includes(user.role);
   });
 
+  const withSedeFilter = (path: string) => {
+    if (!selectedSedeFilter) return path;
+    const [basePath, queryString] = path.split('?');
+    const params = new URLSearchParams(queryString || '');
+    params.set('sede', selectedSedeFilter);
+    return `${basePath}?${params.toString()}`;
+  };
+
   const handleCardClick = (id: string) => {
       const route = RouteMap[id];
-      if (route) navigate(route);
+      if (route) navigate(withSedeFilter(route));
   };
 
   const complianceTone = kpis.cloroTotal === 0
@@ -249,7 +307,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       icon: Award,
       tone: kpis.certificadosVencidos > 0 ? 'danger' : 'ok',
       subtext: kpis.certificadosVencidos > 0 ? 'Ação necessária' : 'Em dia',
-      onClick: () => navigate('/module/hydrosys/certificados?status=VENCIDO')
+      onClick: () => navigate(withSedeFilter('/module/hydrosys/certificados?status=VENCIDO'))
     },
     {
       label: 'Filtros vencidos',
@@ -257,7 +315,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       icon: Filter,
       tone: kpis.filtrosVencidos > 0 ? 'warning' : 'ok',
       subtext: kpis.filtrosVencidos > 0 ? 'Troca urgente' : 'Regular',
-      onClick: () => navigate('/module/hydrosys/filtros?status=VENCIDO')
+      onClick: () => navigate(withSedeFilter('/module/hydrosys/filtros?status=VENCIDO'))
     },
     {
       label: 'Limpezas atrasadas',
@@ -265,7 +323,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       icon: AlertTriangle,
       tone: kpis.reservatoriosAtrasados > 0 ? 'danger' : 'ok',
       subtext: kpis.reservatoriosAtrasados > 0 ? 'Priorizar agenda' : 'Em dia',
-      onClick: () => navigate('/module/hydrosys/reservatorios?situacao=ATRASADO')
+      onClick: () => navigate(withSedeFilter('/module/hydrosys/reservatorios?situacao=ATRASADO'))
     },
     {
       label: 'Limpezas próximas (30d)',
@@ -273,7 +331,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
       icon: CalendarClock,
       tone: kpis.limpezasProximas > 0 ? 'warning' : 'neutral',
       subtext: 'Planejamento',
-      onClick: () => navigate('/module/hydrosys/reservatorios?situacao=PROXIMO_30D')
+      onClick: () => navigate(withSedeFilter('/module/hydrosys/reservatorios?situacao=PROXIMO_30D'))
     },
     {
       label: 'Conformidade Cloro/pH',
@@ -312,7 +370,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           }
           setIsReportModalOpen(false);
       } catch (e) {
-          alert("Erro ao gerar relatério");
+          alert("Erro ao gerar relatório");
       } finally {
           setIsExporting(false);
       }
@@ -371,7 +429,22 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                         <FileDown size={16} /> Central de relatórios
                     </button>
                 )}
-                {userSede && (
+                {availableSedes.length > 1 && (
+                  <div className="w-full lg:w-auto">
+                    <span className="block text-[10px] font-mono text-slate-400 dark:text-white/30 uppercase tracking-widest mb-1">Filtro KPI</span>
+                    <select
+                      className="w-full min-w-[220px] px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm font-mono text-slate-700 dark:text-slate-200 rounded-xl"
+                      value={selectedSedeFilter}
+                      onChange={(e) => setSelectedSedeFilter(e.target.value)}
+                    >
+                      <option value="">Todas as sedes</option>
+                      {availableSedes.map((sede) => (
+                        <option key={sede.id} value={sede.id}>{sede.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {visibleSede && (
                   <div className="flex flex-col items-start lg:items-end gap-1">
                     <span className="text-[10px] font-mono text-slate-400 dark:text-white/30 uppercase tracking-widest">Unidade</span>
                     <div className="flex items-center gap-3 px-4 py-2 border border-cyan-500/20 bg-cyan-50 dark:bg-cyan-500/5">
@@ -379,7 +452,7 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
                         <span className="animate-ping absolute inline-flex h-full w-full bg-emerald-500 opacity-75"></span>
                         <span className="relative inline-flex h-2 w-2 bg-emerald-500"></span>
                       </span>
-                      <span className="text-slate-800 dark:text-white font-mono font-bold text-lg">{userSede.name}</span>
+                      <span className="text-slate-800 dark:text-white font-mono font-bold text-lg">{visibleSede.name}</span>
                     </div>
                   </div>
                 )}
