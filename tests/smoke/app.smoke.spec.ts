@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test('abre app e renderiza conte?do inicial', async ({ page }) => {
+test('abre app e renderiza conteúdo inicial', async ({ page }) => {
   await page.goto('/');
   await page.waitForTimeout(1200);
 

@@ -281,7 +281,7 @@ export const AdminNotificationConfig: React.FC = () => {
                                       <span>LIMITE CRÍTICO / ATRASO (ERROR)</span>
                                   </div>
                                   <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-950 p-2 border border-slate-200 dark:border-slate-800 w-fit rounded-lg">
-                                      <span className="text-[10px] font-mono text-slate-400 pl-2">AP?"S</span>
+                                      <span className="text-[10px] font-mono text-slate-400 pl-2">APÓS</span>
                                       <input 
                                         type="number"
                                         className="w-12 bg-transparent text-center font-mono font-bold text-slate-900 dark:text-white outline-none"
