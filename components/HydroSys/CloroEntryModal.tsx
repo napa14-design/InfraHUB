@@ -9,6 +9,7 @@ import { compressImage } from '../../utils/imageUtils';
 import { hydroService } from '../../services/hydroService';
 import { formatDate } from '../../utils/formatters';
 import { logger } from '../../utils/logger';
+import { generateId } from '../../utils/id';
 
 interface Props {
     isOpen: boolean;
@@ -119,7 +120,7 @@ export const CloroEntryModal: React.FC<Props> = ({
         setIsSaving(true);
         try {
             await hydroService.saveCloro({
-                id: form.id || `cl-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                id: form.id || generateId('cl'),
                 sedeId: sedeId,
                 date: dateStr,
                 cl: Number(Number(form.cl).toFixed(1)),

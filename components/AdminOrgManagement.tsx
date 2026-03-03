@@ -6,6 +6,7 @@ import { Organization, Region, Sede, Local } from '../types';
 import { orgService } from '../services/orgService';
 import { authService } from '../services/authService';
 import { logger } from '../utils/logger';
+import { generateId } from '../utils/id';
 
 type Tab = 'org' | 'region' | 'sede' | 'local';
 
@@ -132,7 +133,7 @@ export const AdminOrgManagement: React.FC = () => {
                   // Validate Sede
                   if (sedes.some(s => s.id === sedeId)) {
                       // Generate ID manually to avoid DB null error
-                      const newId = `loc-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+                      const newId = generateId('loc');
                       
                       await orgService.saveLocal({
                           id: newId,

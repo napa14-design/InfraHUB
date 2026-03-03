@@ -5,28 +5,12 @@ import { MOCK_USERS } from '../constants';
 import { logService } from './logService';
 import { logger } from '../utils/logger';
 import { getStorage } from '../utils/storage';
+import { generateId, generatePassword } from '../utils/id';
+import { extractSupabaseFunctionError } from '../utils/supabaseError';
 
 const SESSION_KEY = 'nexus_auth_user';
 const AUTH_TIMEOUT_MS = 5000;
 const authStorage = getStorage();
-
-// Helper for generating IDs safely in all environments
-const generateId = () => {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2);
-};
-
-const generateSecureTempPassword = (length = 12) => {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*';
-    const randomBytes = new Uint32Array(length);
-    crypto.getRandomValues(randomBytes);
-    let password = '';
-
-    for (let i = 0; i < randomBytes.length; i++) {
-        password += alphabet[randomBytes[i] % alphabet.length];
-    }
-
-    return password;
-};
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
@@ -45,45 +29,22 @@ const withTimeout = async <T>(promise: Promise<T>, ms = AUTH_TIMEOUT_MS): Promis
     }
 };
 
-const extractEdgeFunctionError = async (error: any): Promise<string> => {
-    const context = (error as any)?.context;
-
-    if (context && typeof context === 'object' && typeof (context as any).clone === 'function') {
-        const response = context as Response;
-        const parsedJson = await response.clone().json().catch(() => null);
-        if (parsedJson && typeof parsedJson === 'object') {
-            if (typeof (parsedJson as any).error === 'string') return (parsedJson as any).error;
-            if (typeof (parsedJson as any).message === 'string') return (parsedJson as any).message;
-        }
-
-        const textBody = await response.clone().text().catch(() => '');
-        if (textBody) return textBody;
-    }
-
-    const msgFromBody =
-        (error as any)?.context?.body?.error ||
-        (error as any)?.context?.body?.message;
-    if (msgFromBody) return msgFromBody;
-
-    return error?.message || "Falha ao executar a Edge Function.";
-};
-
 // --- TRANSLATION HELPER ---
 const translateAuthError = (message: string): string => {
     const m = message.toLowerCase();
     if (m.includes("invalid login credentials")) return "E-mail ou senha incorretos.";
-    if (m.includes("email not confirmed")) return "E-mail pendente de confirmação. Verifique sua caixa de entrada.";
-    if (m.includes("user not found")) return "usuário não encontrado.";
-    if (m.includes("already registered")) return "Este e-mail já está cadastrado no sistema.";
-    if (m.includes("password should be at least")) return "A senha deve ter no mínimo 6 caracteres.";
-    if (m.includes("weak password")) return "Senha muito fraca. Tente uma combinação mais complexa.";
+    if (m.includes("email not confirmed")) return "E-mail pendente de confirmaÃ§Ã£o. Verifique sua caixa de entrada.";
+    if (m.includes("user not found")) return "usuÃ¡rio nÃ£o encontrado.";
+    if (m.includes("already registered")) return "Este e-mail jÃ¡ estÃ¡ cadastrado no sistema.";
+    if (m.includes("password should be at least")) return "A senha deve ter no mÃ­nimo 6 caracteres.";
+    if (m.includes("weak password")) return "Senha muito fraca. Tente uma combinaÃ§Ã£o mais complexa.";
     if (m.includes("too many requests") || m.includes("rate limit")) return "Muitas tentativas consecutivas. Aguarde alguns instantes.";
-    if (m.includes("session expired")) return "Sessão expirada. Faça login novamente.";
-    if (m.includes("anonymous")) return "Acesso anônimo não permitido.";
-    if (m.includes("network")) return "Erro de conexão. Verifique sua internet.";
+    if (m.includes("session expired")) return "SessÃ£o expirada. FaÃ§a login novamente.";
+    if (m.includes("anonymous")) return "Acesso anÃ´nimo nÃ£o permitido.";
+    if (m.includes("network")) return "Erro de conexÃ£o. Verifique sua internet.";
     
-    // Fallback amigável mantendo o erro original para debug se necessário
-    return `não foi possível completar a ação. (${message})`;
+    // Fallback amigÃ¡vel mantendo o erro original para debug se necessÃ¡rio
+    return `nÃ£o foi possÃ­vel completar a aÃ§Ã£o. (${message})`;
 };
 
 export const authService = {
@@ -124,7 +85,7 @@ export const authService = {
                   logger.error("[Auth] Profile Fetch Error:", profileError);
                   return { 
                       user: null, 
-                      error: "Login realizado, mas o perfil de USUÁRIO não foi encontrado." 
+                      error: "Login realizado, mas o perfil de USUÃRIO nÃ£o foi encontrado." 
                   };
               }
 
@@ -141,7 +102,7 @@ export const authService = {
                   const appUser: User = {
                     id: authData.user.id,
                     email: authData.user.email || '',
-                    name: profileData.name || 'Usuário',
+                    name: profileData.name || 'UsuÃ¡rio',
                     role: profileData.role as UserRole,
                     status: profileData.status,
                     isFirstLogin: profileData.is_first_login ?? false, // Map from DB
@@ -191,7 +152,7 @@ export const authService = {
     } catch (err: any) {
       if (err?.message === 'timeout') {
         logger.warn("[Auth] Login timeout");
-        return { user: null, error: "Tempo de conexão esgotado. Verifique sua internet." };
+        return { user: null, error: "Tempo de conexÃ£o esgotado. Verifique sua internet." };
       }
       logger.error("[Auth] Unexpected Exception:", err);
       return { user: null, error: `Erro inesperado: ${err.message || err}` };
@@ -213,7 +174,7 @@ export const authService = {
         try {
             const parsed = JSON.parse(stored);
             // Defensive check for name
-            if (!parsed.name) parsed.name = 'Usuário';
+            if (!parsed.name) parsed.name = 'UsuÃ¡rio';
             
             // Validate against Supabase session if configured (Basic check)
             // Note: Full async session check happens in App.tsx AuthObserver
@@ -268,7 +229,7 @@ export const authService = {
       const appUser: User = {
         id: data.user.id,
         email: data.user.email || '',
-        name: profileData.name || 'Usuário',
+        name: profileData.name || 'UsuÃ¡rio',
         role: profileData.role as UserRole,
         status: profileData.status,
         isFirstLogin: profileData.is_first_login ?? false,
@@ -313,10 +274,10 @@ export const authService = {
   createUser: async (userData: Partial<User>, customPassword?: string): Promise<any> => {
      let tempId: string = generateId(); 
      
-     const tempPassword = customPassword || generateSecureTempPassword(10);
+     const tempPassword = customPassword || generatePassword(10);
 
      if (tempPassword.length < 6) {
-         return { error: "A senha deve ter no mínimo 6 caracteres." };
+         return { error: "A senha deve ter no mÃ­nimo 6 caracteres." };
      }
 
      const currentUser = authService.getCurrentUser();
@@ -326,12 +287,12 @@ export const authService = {
      if (isSupabaseConfigured()) {
          try {
              if (!safeEmail) {
-                 return { error: "Informe um e-mail válido." };
+                 return { error: "Informe um e-mail vÃ¡lido." };
              }
 
              const { data: { session } } = await supabase.auth.getSession();
              if (!session) {
-                 return { error: "Sessão expirada. Faça login novamente." };
+                 return { error: "SessÃ£o expirada. FaÃ§a login novamente." };
              }
 
              const { data, error } = await supabase.functions.invoke('admin-create-user', {
@@ -352,7 +313,7 @@ export const authService = {
              });
 
              if (error) {
-                 const msg = await extractEdgeFunctionError(error);
+                 const msg = await extractSupabaseFunctionError(error);
                  return { error: msg };
              }
 
@@ -360,7 +321,7 @@ export const authService = {
              if (response?.id) tempId = response.id;
 
              if (currentUser) {
-                 logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuário ${safeEmail}`, `Criou conta para ${safeName || 'Usuário'} (${userData.role})`);
+                 logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuÃ¡rio ${safeEmail}`, `Criou conta para ${safeName || 'UsuÃ¡rio'} (${userData.role})`);
              }
 
              return { 
@@ -378,7 +339,7 @@ export const authService = {
      // Always update Mock/Local state so UI feels responsive
      MOCK_USERS.push({
          id: tempId,
-         name: safeName || 'Novo usuário',
+         name: safeName || 'Novo usuÃ¡rio',
          email: safeEmail || 'novo@email.com',
          role: userData.role || UserRole.OPERATIONAL,
          organizationId: userData.organizationId,
@@ -389,7 +350,7 @@ export const authService = {
      });
 
      if (currentUser) {
-         logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuário ${safeEmail || 'novo@email.com'}`, `Criou conta (Mock) para ${safeName || 'Usuário'}`);
+         logService.logAction(currentUser, 'ADMIN', 'CREATE', `usuÃ¡rio ${safeEmail || 'novo@email.com'}`, `Criou conta (Mock) para ${safeName || 'UsuÃ¡rio'}`);
      }
 
      return { 
@@ -415,7 +376,7 @@ export const authService = {
         await supabase.from('profiles').update(dbUpdates).eq('id', id);
         
         if (currentUser) {
-            logService.logAction(currentUser, 'ADMIN', 'UPDATE', `usuário ID ${id}`, `Atualizou dados: ${Object.keys(updates).join(', ')}`);
+            logService.logAction(currentUser, 'ADMIN', 'UPDATE', `usuÃ¡rio ID ${id}`, `Atualizou dados: ${Object.keys(updates).join(', ')}`);
         }
     }
     
@@ -440,7 +401,7 @@ export const authService = {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
-                return { success: false, error: "Sessão expirada. Faça login novamente." };
+                return { success: false, error: "SessÃ£o expirada. FaÃ§a login novamente." };
             }
 
             const { error } = await supabase.functions.invoke('admin-delete-user', {
@@ -451,12 +412,12 @@ export const authService = {
             });
 
             if (error) {
-                const msg = await extractEdgeFunctionError(error);
+                const msg = await extractSupabaseFunctionError(error);
                 return { success: false, error: msg };
             }
         } catch (e: any) {
             logger.error("Unexpected error in deleteUser:", e);
-            return { success: false, error: e?.message || "Erro inesperado ao excluir usuário." };
+            return { success: false, error: e?.message || "Erro inesperado ao excluir usuÃ¡rio." };
         }
     } else {
         const idx = MOCK_USERS.findIndex(u => u.id === id);
@@ -464,7 +425,7 @@ export const authService = {
     }
 
     if (currentUser) {
-        logService.logAction(currentUser, 'ADMIN', 'DELETE', `usuário ID ${id}`, 'Removeu conta do sistema');
+        logService.logAction(currentUser, 'ADMIN', 'DELETE', `usuÃ¡rio ID ${id}`, 'Removeu conta do sistema');
     }
     return { success: true };
   },
@@ -484,7 +445,7 @@ export const authService = {
           if (!error) {
               const currentUser = authService.getCurrentUser();
               if (currentUser) {
-                  logService.logAction(currentUser, 'AUTH', 'UPDATE', 'Senha', 'Alterou a própria senha');
+                  logService.logAction(currentUser, 'AUTH', 'UPDATE', 'Senha', 'Alterou a prÃ³pria senha');
               }
               return true;
           }
@@ -508,7 +469,7 @@ export const authService = {
       if (safeEmail.endsWith('.local') || safeEmail.includes('interno')) {
           return { 
               success: false, 
-              message: "Contas operacionais internas não recebem e-mail. Solicite o reset de senha diretamente ao seu Gestor." 
+              message: "Contas operacionais internas nÃ£o recebem e-mail. Solicite o reset de senha diretamente ao seu Gestor." 
           };
       }
 
@@ -536,17 +497,17 @@ adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{
     } else {
         // Supabase Mode: Try Edge Function first
         try {
-            // 🔑 OBTER O TOKEN DE SESSÃO DO USUÁRIO LOGADO
+            // ðŸ”‘ OBTER O TOKEN DE SESSÃƒO DO USUÃRIO LOGADO
             const { data: { session } } = await supabase.auth.getSession();
             
             if (!session) {
                 return { 
                     success: false, 
-                    error: "Sessão expirada. Faça login novamente." 
+                    error: "SessÃ£o expirada. FaÃ§a login novamente." 
                 };
             }
 
-            // ✅ ENVIAR O TOKEN NO HEADER AUTHORIZATION
+            // âœ… ENVIAR O TOKEN NO HEADER AUTHORIZATION
             const { data, error } = await supabase.functions.invoke('admin-reset-password', {
                 body: { userId: targetUserId, newPassword: newPassword },
                 headers: {
@@ -556,7 +517,7 @@ adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{
 
             if (error) {
                 logger.error("Edge Function Failed:", error);
-                const msg = await extractEdgeFunctionError(error);
+                const msg = await extractSupabaseFunctionError(error);
                 return { success: false, error: msg };
             }
 
@@ -567,11 +528,10 @@ adminResetPassword: async (targetUserId: string, newPassword: string): Promise<{
 
         } catch (e) {
             logger.error("Invoke Error:", e);
-            return { success: false, error: "Erro de conexão com o servidor de funções." };
+            return { success: false, error: "Erro de conexÃ£o com o servidor de funÃ§Ãµes." };
         }
     }
 },
-
 
   completeFirstLogin: async (userId: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
       if (isSupabaseConfigured()) {

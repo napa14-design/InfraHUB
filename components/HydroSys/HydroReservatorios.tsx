@@ -18,6 +18,7 @@ import { useConfirmation } from '../Shared/ConfirmationContext';
 import { useDocumentPreview } from '../Shared/DocumentPreviewContext';
 import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
 import { logger } from '../../utils/logger';
+import { generateId } from '../../utils/id';
 
 type Tab = 'pocos' | 'cisternas' | 'caixas';
 type CreateReservatorioForm = {
@@ -288,7 +289,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
 
       setIsCreating(true);
       try {
-          const id = 'res-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+          const id = generateId('res');
           const tipo = getTabTipo(activeTab);
           const responsavel = createForm.responsavel.trim() || user.name || 'N/A';
           const dataReferencia = activeTab === 'pocos'

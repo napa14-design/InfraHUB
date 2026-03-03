@@ -2,6 +2,7 @@
 import { LogEntry, LogActionType, User } from '../types';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { logger } from '../utils/logger';
+import { generateId } from '../utils/id';
 
 // Mock Data Storage
 const MOCK_LOGS: LogEntry[] = [
@@ -58,7 +59,7 @@ export const logService = {
         details?: string
     ) => {
         const entry: LogEntry = {
-            id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            id: generateId('log'),
             userId: user.id,
             userName: user.name,
             userRole: user.role,

@@ -6,6 +6,7 @@ import { logService } from './logService';
 import { authService } from './authService';
 import { notificationService } from './notificationService';
 import { logger } from '../utils/logger';
+import { generateId } from '../utils/id';
 
 // Cache em memória para Cloro quando offline/mock
 let MOCK_CLORO_CACHE: HydroCloroEntry[] = [];
@@ -197,7 +198,7 @@ export const hydroService = {
       }
       
       const fileExt = file instanceof File ? file.name.split('.').pop() : 'jpg';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+      const fileName = `${generateId('hydro-photo')}.${fileExt}`;
       
       const { data, error } = await supabase.storage
           .from('hydro-cloro-images')

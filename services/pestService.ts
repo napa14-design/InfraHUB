@@ -6,6 +6,7 @@ import { authService } from './authService';
 import { notificationService } from './notificationService';
 import { logger } from '../utils/logger';
 import { isBeforeToday } from '../utils/dateUtils';
+import { generateId } from '../utils/id';
 
 const excelToISO = (serial: number) => {
     const date = new Date((serial - 25569) * 86400 * 1000);
@@ -242,7 +243,7 @@ export const pestService = {
         nextDate.setDate(nextDate.getDate() + daysToAdd);
 
         const nextItem: PestControlEntry = {
-            id: `pc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+            id: generateId('pc'),
             sedeId: completedItem.sedeId,
             item: completedItem.item,
             target: completedItem.target,

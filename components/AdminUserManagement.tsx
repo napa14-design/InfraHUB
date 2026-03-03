@@ -6,6 +6,7 @@ import { authService } from '../services/authService';
 import { orgService } from '../services/orgService';
 import { notificationService } from '../services/notificationService';
 import { useToast } from './Shared/ToastContext';
+import { generateId, generatePassword } from '../utils/id';
 
 export const AdminUserManagement: React.FC = () => {
   const navigate = useNavigate();
@@ -134,7 +135,7 @@ export const AdminUserManagement: React.FC = () => {
           return;
         }
         await notificationService.add({
-          id: `del-user-${Date.now()}`,
+          id: generateId('del-user'),
           title: 'Usuário Removido',
           message: `${userToDelete.name} foi removido do sistema por ${currentUser?.name}.`,
           type: 'WARNING',
@@ -166,7 +167,7 @@ export const AdminUserManagement: React.FC = () => {
   const confirmResetPassword = async () => {
       if (userToReset) {
           setIsResetting(true);
-          const randomPass = Math.random().toString(36).slice(-8).toUpperCase();
+          const randomPass = generatePassword(8);
           const result = await authService.adminResetPassword(userToReset.id, randomPass);
           setIsResetting(false);
           
@@ -226,7 +227,7 @@ export const AdminUserManagement: React.FC = () => {
     if (isEditing && editingId) {
         await authService.updateUser(editingId, formData);
         await notificationService.add({
-            id: `upd-user-${Date.now()}`,
+            id: generateId('upd-user'),
             title: 'Usuário Atualizado',
             message: `Dados de ${formData.name} atualizados por ${currentUser?.name}.`,
             type: 'INFO',
@@ -244,7 +245,7 @@ export const AdminUserManagement: React.FC = () => {
             return;
         }
         await notificationService.add({
-            id: `new-user-${Date.now()}`,
+            id: generateId('new-user'),
             title: 'Novo usuário',
             message: `${formData.name} foi adicionado ao sistema por ${currentUser?.name}.`,
             type: 'SUCCESS',
@@ -289,7 +290,7 @@ export const AdminUserManagement: React.FC = () => {
     
     if (newStatus === 'INACTIVE') {
          await notificationService.add({
-            id: `status-user-${Date.now()}`,
+            id: generateId('status-user'),
             title: 'Acesso Revogado',
             message: `O acesso de ${user.name} foi inativado.`,
             type: 'WARNING',

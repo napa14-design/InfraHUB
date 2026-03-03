@@ -14,6 +14,8 @@ import { EmptyState } from '../Shared/EmptyState';
 import { useToast } from '../Shared/ToastContext';
 import { CardSkeleton } from '../Shared/Skeleton';
 import { useDocumentPreview } from '../Shared/DocumentPreviewContext';
+import { useConfirmation } from '../Shared/ConfirmationContext';
+import { generateId } from '../../utils/id';
 
 const getDaysRemaining = (validade: string) => {
   if (!validade) return 0;
@@ -75,6 +77,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const location = useLocation();
   const { addToast } = useToast();
   const { openDocument } = useDocumentPreview();
+  const { confirm } = useConfirmation();
   
   const [data, setData] = useState<HydroCertificado[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +187,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
     const nextSemestre = getNextSemestre(item.semestre || '');
     setFormData({
       ...item,
-      id: `cert-${Date.now()}`,
+      id: generateId('cert'),
       semestre: nextSemestre,
       dataAnalise: todayStr,
       validade: nextValidade,
@@ -221,11 +224,17 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const handleDelete = async (id: string) => {
-    if(confirm("Deseja remover este certificado permanentemente?")) {
+    confirm({
+      title: 'Excluir certificado',
+      message: 'Deseja remover este certificado permanentemente?',
+      type: 'danger',
+      confirmLabel: 'Excluir',
+      onConfirm: async () => {
         await hydroService.deleteCertificado(id);
         await loadData();
-        addToast("Certificado removido.", "info");
-    }
+        addToast('Certificado removido.', 'info');
+      },
+    });
   };
 
   const activeItems: HydroCertificado[] = Array.from(data.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
