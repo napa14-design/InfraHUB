@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Filter, AlertTriangle, CheckCircle, Clock, RotateCw, X, Plus, Trash2, Building2, MapPin, History, ArrowLeft, Calendar, User as UserIcon, Loader2 } from 'lucide-react';
+import { Filter, AlertTriangle, CheckCircle, Clock, RotateCw, X, Plus, Trash2, Building2, MapPin, History, ArrowLeft, Calendar, User as UserIcon, Loader2, Edit2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, HydroFiltro, UserRole, Sede, LogEntry, HydroSettings } from '../../types';
 import { hydroService } from '../../services/hydroService';
@@ -39,10 +39,12 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // Selection & History
   const [selectedItem, setSelectedItem] = useState<HydroFiltro | null>(null);
   const [itemToDelete, setItemToDelete] = useState<HydroFiltro | null>(null);
+  const [editFilter, setEditFilter] = useState<HydroFiltro | null>(null);
   const [historyLogs, setHistoryLogs] = useState<LogEntry[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   
@@ -143,7 +145,36 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
-  const confirmDelete = async () => { if (itemToDelete) { await hydroService.deleteFiltro(itemToDelete.id); await loadData(); setIsDeleteModalOpen(false); } };
+  const confirmDelete = async () => { if (itemToDelete) { await hydroService.deleteFiltro(itemToDelete.id); await loadData(); setIsDeleteModalOpen(false); setItemToDelete(null); } };
+
+  const handleEditClick = (item: HydroFiltro) => {
+      setEditFilter({ ...item });
+      setIsEditModalOpen(true);
+  };
+
+  const confirmEdit = async () => {
+      if (!editFilter) return;
+
+      if (!editFilter.sedeId || !editFilter.patrimonio || !editFilter.local || !editFilter.dataTroca) {
+          alert('Preencha os campos obrigat?rios.');
+          return;
+      }
+
+      const next = new Date(editFilter.dataTroca);
+      next.setMonth(next.getMonth() + filtroMonths);
+
+      await hydroService.saveFiltro({
+          ...editFilter,
+          patrimonio: editFilter.patrimonio.toUpperCase(),
+          local: editFilter.local.toUpperCase(),
+          bebedouro: editFilter.bebedouro || 'Bebedouro',
+          proximaTroca: next.toISOString().split('T')[0]
+      });
+
+      await loadData();
+      setIsEditModalOpen(false);
+      setEditFilter(null);
+  };
 
   const filteredData = data.filter(item => {
       if (isAdmin && selectedSedeFilter && item.sedeId !== selectedSedeFilter) return false;
@@ -281,12 +312,17 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                 
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
                                     <button onClick={() => handleHistoryClick(item)} className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                                        <History size={16} /> histórico
+                                        <History size={16} /> hist??rico
                                     </button>
                                     {canManage && (
-                                        <button onClick={() => requestDelete(item)} className="p-3 text-red-400 hover:text-red-600 transition-colors">
-                                            <Trash2 size={18} />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => handleEditClick(item)} className="p-3 text-amber-500 hover:text-amber-600 transition-colors" title="Editar filtro">
+                                                <Edit2 size={18} />
+                                            </button>
+                                            <button onClick={() => requestDelete(item)} className="p-3 text-red-400 hover:text-red-600 transition-colors" title="Excluir filtro">
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -349,6 +385,43 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                 ))}
                             </div>
                         )}
+                    </div>
+                </div>
+            </div>
+        )}
+
+
+        {/* EDIT MODAL */}
+        {isEditModalOpen && editFilter && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
+                    <div className="flex justify-between mb-6">
+                        <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Editar Filtro</h3>
+                        <button onClick={() => { setIsEditModalOpen(false); setEditFilter(null); }}><X size={20} className="text-slate-500"/></button>
+                    </div>
+                    <div className="space-y-4">
+                        <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidade</label><select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" value={editFilter.sedeId} onChange={e => setEditFilter({ ...editFilter, sedeId: e.target.value })}><option value="">Selecione...</option>{availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Patrim?nio" value={editFilter.patrimonio} onChange={e => setEditFilter({ ...editFilter, patrimonio: e.target.value })} />
+                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Local Instala??o" value={editFilter.local} onChange={e => setEditFilter({ ...editFilter, local: e.target.value })} />
+                        <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">?ltima Troca</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={editFilter.dataTroca} onChange={e => setEditFilter({ ...editFilter, dataTroca: e.target.value })} /></div>
+                        <button onClick={confirmEdit} className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Salvar Altera??es</button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* DELETE MODAL */}
+        {isDeleteModalOpen && itemToDelete && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl animate-in zoom-in-95">
+                    <div className="flex justify-between items-start mb-4">
+                        <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Excluir Filtro</h3>
+                        <button onClick={() => setIsDeleteModalOpen(false)}><X size={20} className="text-slate-500"/></button>
+                    </div>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">Confirma a exclus?o do filtro <strong>{itemToDelete.patrimonio}</strong> em <strong>{itemToDelete.local}</strong>?</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <button onClick={() => setIsDeleteModalOpen(false)} className="py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider">Cancelar</button>
+                        <button onClick={confirmDelete} className="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider">Excluir</button>
                     </div>
                 </div>
             </div>
