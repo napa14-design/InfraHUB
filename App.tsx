@@ -8,6 +8,7 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { ThemeProvider } from './components/ThemeContext';
 import { ToastProvider } from './components/Shared/ToastContext';
 import { ConfirmationProvider } from './components/Shared/ConfirmationContext';
+import { DocumentPreviewProvider } from './components/Shared/DocumentPreviewContext';
 import { TetrisLoader } from './components/Shared/TetrisLoader';
 import { logger } from './utils/logger';
 
@@ -252,7 +253,8 @@ const App: React.FC = () => {
     <ThemeProvider>
       <ToastProvider>
         <ConfirmationProvider>
-          <Router>
+          <DocumentPreviewProvider>
+            <Router>
             <AuthObserver />
             <PWANavigator user={user} />
             <ErrorBoundary>
@@ -321,7 +323,8 @@ const App: React.FC = () => {
                 </Routes>
               </Suspense>
             </ErrorBoundary>
-          </Router>
+            </Router>
+          </DocumentPreviewProvider>
         </ConfirmationProvider>
       </ToastProvider>
     </ThemeProvider>

@@ -15,6 +15,7 @@ import { EmptyState } from '../Shared/EmptyState';
 import { ReservoirFichaModal } from './ReservoirFichaModal';
 import { useToast } from '../Shared/ToastContext';
 import { useConfirmation } from '../Shared/ConfirmationContext';
+import { useDocumentPreview } from '../Shared/DocumentPreviewContext';
 import { useHydroData } from '../../hooks/useHydroData'; // Using new Hook
 import { logger } from '../../utils/logger';
 
@@ -82,6 +83,7 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
   const location = useLocation();
   const { addToast } = useToast();
   const { confirm } = useConfirmation(); // Using global confirmation
+  const { openDocument } = useDocumentPreview();
   
   // Custom Hook for Data
   const { pocos, cisternas, caixas, settings, loading, refresh } = useHydroData(user);
@@ -726,7 +728,13 @@ export const HydroReservatorios: React.FC<{ user: User }> = ({ user }) => {
                                         </button>
                                         
                                         {item.fichaOperacional && item.fichaOperacional !== 'LINK' ? (
-                                            <a href={item.fichaOperacional} target="_blank" rel="noreferrer" className="py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-blue-100"><FileJson size={14} /> Ficha Antiga</a>
+                                            <button
+                                                type="button"
+                                                onClick={() => openDocument(item.fichaOperacional, 'Ficha Operacional Antiga')}
+                                                className="py-3 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 transition-all hover:bg-blue-100"
+                                            >
+                                                <FileJson size={14} /> Ficha Antiga
+                                            </button>
                                         ) : (
                                             <button disabled className="py-3 bg-slate-100 dark:bg-slate-800 text-slate-400 rounded-xl font-bold text-[10px] uppercase tracking-wider flex items-center justify-center gap-2 cursor-not-allowed opacity-60"><FileJson size={14} /> Sem Anexo</button>
                                         )}
