@@ -1,6 +1,6 @@
 
 import React, { Component, useState, useEffect, Suspense, lazy, ReactNode } from 'react';
-import { HashRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { User, UserRole } from './types';
 import { authService } from './services/authService';
 import { orgService } from './services/orgService'; 
@@ -44,7 +44,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 text-center">
           <div className="max-w-md p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-mono uppercase">Erro de Carregamento</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha crítica na aplicação.</p>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha crÃ­tica na aplicaÃ§Ã£o.</p>
             <div className="text-xs text-red-500 mb-4 font-mono bg-red-50 dark:bg-red-900/10 p-2 rounded break-all text-left overflow-auto max-h-32">
                 {this.state.error?.message || 'Erro desconhecido'}
                 <br/>
@@ -54,7 +54,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               onClick={() => { this.setState({ hasError: false }); window.location.reload(); }} 
               className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-colors"
             >
-              Recarregar Página
+              Recarregar PÃ¡gina
             </button>
           </div>
         </div>
@@ -127,7 +127,7 @@ const AuthObserver = () => {
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
 
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event, _session) => {
       if (event === 'PASSWORD_RECOVERY') {
         logger.log("Password Recovery Event Detected - Redirecting...");
         navigate('/update-password');
@@ -145,18 +145,17 @@ const AuthObserver = () => {
 // Componente para lidar com redirecionamento PWA (Modo Cloro)
 const PWANavigator = ({ user }: { user: User | null }) => {
   const navigate = useNavigate();
-  const location = useLocation();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    // Só executa se tiver USUÁRIO e ainda não tiver verificado nesta sessão do componente
+    // SÃ³ executa se tiver USUÃRIO e ainda nÃ£o tiver verificado nesta sessÃ£o do componente
     if (user && !checked) {
        const params = new URLSearchParams(window.location.search);
        const mode = params.get('mode');
        
        if (mode === 'cloro') {
            logger.log("[PWA] Redirecting to Cloro Module");
-           // Navega para o Módulo e remove o query param da história para não ficar preso
+           // Navega para o MÃ³dulo e remove o query param da histÃ³ria para nÃ£o ficar preso
            navigate('/module/hydrosys/cloro', { replace: true });
        }
        setChecked(true);
@@ -187,7 +186,7 @@ const App: React.FC = () => {
         setRedirectPath('/module/hydrosys/cloro');
     }
 
-    // Render rápido com cache (evita espera longa em refresh)
+    // Render rÃ¡pido com cache (evita espera longa em refresh)
     setLoading(false);
 
     const refresh = async () => {
@@ -265,7 +264,7 @@ const App: React.FC = () => {
                   <Route 
                     path="/login" 
                     element={
-                      // Se o USUÁRIO logar, usa o redirectPath definido no useEffect inicial
+                      // Se o USUÃRIO logar, usa o redirectPath definido no useEffect inicial
                       user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
                     } 
                   />
