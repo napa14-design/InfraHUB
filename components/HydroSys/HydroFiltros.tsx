@@ -312,7 +312,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                                 
                                 <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
                                     <button onClick={() => handleHistoryClick(item)} className="p-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-500 rounded-xl transition-colors flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider">
-                                        <History size={16} /> hist??rico
+                                        <History size={16} /> histórico
                                     </button>
                                     {canManage && (
                                         <div className="flex items-center gap-1">
@@ -401,10 +401,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidade</label><select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" value={editFilter.sedeId} onChange={e => setEditFilter({ ...editFilter, sedeId: e.target.value })}><option value="">Selecione...</option>{availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
-                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Patrim?nio" value={editFilter.patrimonio} onChange={e => setEditFilter({ ...editFilter, patrimonio: e.target.value })} />
-                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Local Instala??o" value={editFilter.local} onChange={e => setEditFilter({ ...editFilter, local: e.target.value })} />
-                        <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">?ltima Troca</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={editFilter.dataTroca} onChange={e => setEditFilter({ ...editFilter, dataTroca: e.target.value })} /></div>
-                        <button onClick={confirmEdit} className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Salvar Altera??es</button>
+                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Patrimônio" value={editFilter.patrimonio} onChange={e => setEditFilter({ ...editFilter, patrimonio: e.target.value })} />
+                        <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Local Instalação" value={editFilter.local} onChange={e => setEditFilter({ ...editFilter, local: e.target.value })} />
+                        <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Última Troca</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={editFilter.dataTroca} onChange={e => setEditFilter({ ...editFilter, dataTroca: e.target.value })} /></div>
+                        <button onClick={confirmEdit} className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Salvar Alterações</button>
                     </div>
                 </div>
             </div>
