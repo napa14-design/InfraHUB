@@ -7,11 +7,18 @@ import { orgService } from '../services/orgService';
 import { authService } from '../services/authService';
 import { logger } from '../utils/logger';
 import { generateId } from '../utils/id';
+import { useToast } from './Shared/ToastContext';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 type Tab = 'org' | 'region' | 'sede' | 'local';
 
 export const AdminOrgManagement: React.FC = () => {
   const navigate = useNavigate();
+  const { addToast } = useToast();
+  const saveAction = useAsyncAction();
+  const deleteAction = useAsyncAction();
+  const refreshAction = useAsyncAction();
+  const importAction = useAsyncAction();
   const [activeTab, setActiveTab] = useState<Tab>('org');
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +36,7 @@ export const AdminOrgManagement: React.FC = () => {
   // Delete Modal
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: string, name: string } | null>(null);
+  const isActionBusy = saveAction.isLoading || deleteAction.isLoading || refreshAction.isLoading || importAction.isLoading;
 
   useEffect(() => {
     refreshData();
@@ -42,19 +50,29 @@ export const AdminOrgManagement: React.FC = () => {
   };
 
   const handleForceRefresh = async () => {
-    setIsLoading(true);
-    await orgService.initialize(authService.getCurrentUser() || undefined);
-    refreshData();
-    setIsLoading(false);
+    if (refreshAction.isLoading) return;
+
+    await refreshAction.run(async () => {
+      setIsLoading(true);
+      await orgService.initialize(authService.getCurrentUser() || undefined);
+      refreshData();
+      addToast('Dados sincronizados com sucesso.', 'success');
+    }).catch(() => {
+      addToast('Não foi possível sincronizar os dados.', 'error');
+    }).finally(() => {
+      setIsLoading(false);
+    });
   };
 
   const handleStartEdit = (item: any) => {
+    if (isActionBusy) return;
     setEditingId(item.id);
     setEditForm({ ...item });
     setIsNew(false);
   };
 
   const handleStartNew = () => {
+    if (isActionBusy) return;
     setIsNew(true);
     const newId = Date.now().toString();
     setEditingId(newId);
@@ -66,32 +84,49 @@ export const AdminOrgManagement: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (activeTab === 'org') await orgService.saveOrg(editForm as Organization);
-    if (activeTab === 'region') await orgService.saveRegion(editForm as Region);
-    if (activeTab === 'sede') await orgService.saveSede(editForm as Sede);
-    if (activeTab === 'local') await orgService.saveLocal(editForm as Local);
-    
-    setEditingId(null);
-    setIsNew(false);
-    refreshData();
+    if (saveAction.isLoading) return;
+    if (!editForm?.name || String(editForm.name).trim().length < 2) {
+      addToast('Informe um nome válido para continuar.', 'warning');
+      return;
+    }
+
+    await saveAction.run(async () => {
+      if (activeTab === 'org') await orgService.saveOrg(editForm as Organization);
+      if (activeTab === 'region') await orgService.saveRegion(editForm as Region);
+      if (activeTab === 'sede') await orgService.saveSede(editForm as Sede);
+      if (activeTab === 'local') await orgService.saveLocal(editForm as Local);
+
+      setEditingId(null);
+      setIsNew(false);
+      refreshData();
+      addToast('Registro salvo com sucesso.', 'success');
+    }).catch((error: any) => {
+      addToast(error?.message || 'Não foi possível salvar o registro.', 'error');
+    });
   };
 
   const requestDelete = (id: string, name: string) => {
+    if (isActionBusy) return;
     setItemToDelete({ id, name });
     setDeleteModalOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (itemToDelete) {
+    if (!itemToDelete || deleteAction.isLoading) return;
+
+    await deleteAction.run(async () => {
       if (activeTab === 'org') await orgService.deleteOrg(itemToDelete.id);
       if (activeTab === 'region') await orgService.deleteRegion(itemToDelete.id);
       if (activeTab === 'sede') await orgService.deleteSede(itemToDelete.id);
       if (activeTab === 'local') await orgService.deleteLocal(itemToDelete.id);
-      
+
       refreshData();
       setDeleteModalOpen(false);
       setItemToDelete(null);
-    }
+      addToast('Registro excluído com sucesso.', 'success');
+    }).catch((error: any) => {
+      addToast(error?.message || 'Não foi possível excluir o registro.', 'error');
+    });
   };
 
   // --- CSV IMPORT LOGIC ---
@@ -104,60 +139,66 @@ export const AdminOrgManagement: React.FC = () => {
       if (!file) return;
 
       if (activeTab !== 'local') {
-          alert("Importação em massa disponível apenas para LOCAIS no momento.");
+          addToast('Importação em massa disponível apenas para locais.', 'warning');
+          if (fileInputRef.current) fileInputRef.current.value = '';
           return;
       }
 
-      setIsLoading(true);
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-          const text = event.target?.result as string;
+      if (importAction.isLoading) return;
+
+      await importAction.run(async () => {
+          setIsLoading(true);
+          const text = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (event) => resolve((event.target?.result as string) || '');
+              reader.onerror = () => reject(new Error('Falha ao ler arquivo CSV'));
+              // FIX: Force ISO-8859-1 for Excel/Brazil compatibility
+              reader.readAsText(file, 'ISO-8859-1');
+          });
+
           const lines = text.split('\n');
           let successCount = 0;
           let errorCount = 0;
 
-          // Expect CSV Format: SEDE_ID, NOME, TIPO
-          // Skip Header if present (simple check: if first line has 'SEDE' or 'TIPO')
+          // Expect CSV format: SEDE_ID, NOME, TIPO
           const startIndex = lines[0].toUpperCase().includes('SEDE') ? 1 : 0;
 
           for (let i = startIndex; i < lines.length; i++) {
               const line = lines[i].trim();
               if (!line) continue;
 
-              const parts = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
-              
-              if (parts.length >= 3) {
-                  const [sedeId, name, tipoRaw] = parts;
-                  const tipo = tipoRaw.toUpperCase(); // Normalize type
-
-                  // Validate Sede
-                  if (sedes.some(s => s.id === sedeId)) {
-                      // Generate ID manually to avoid DB null error
-                      const newId = generateId('loc');
-                      
-                      await orgService.saveLocal({
-                          id: newId,
-                          sedeId,
-                          name,
-                          tipo
-                      });
-                      successCount++;
-                  } else {
-                      logger.warn(`Sede ID invalido na linha ${i + 1}: ${sedeId}`);
-                      errorCount++;
-                  }
-              } else {
+              const parts = line.split(',').map((value) => value.trim().replace(/^"|"$/g, ''));
+              if (parts.length < 3) {
                   errorCount++;
+                  continue;
               }
+
+              const [sedeId, name, tipoRaw] = parts;
+              const tipo = tipoRaw.toUpperCase();
+
+              if (!sedes.some((sede) => sede.id === sedeId)) {
+                  logger.warn(`Sede ID inválido na linha ${i + 1}: ${sedeId}`);
+                  errorCount++;
+                  continue;
+              }
+
+              await orgService.saveLocal({
+                  id: generateId('loc'),
+                  sedeId,
+                  name,
+                  tipo,
+              });
+              successCount++;
           }
 
-          setIsLoading(false);
-          alert(`Processamento Finalizado!\n\nNº Importados: ${successCount}\nNº Falhas/Ignorados: ${errorCount}\n\nNota: Certifique-se que o SEDE_ID existe.`);
           refreshData();
+          addToast(`Importação concluída: ${successCount} importados, ${errorCount} falhas.`, errorCount > 0 ? 'warning' : 'success');
+      }).catch((error: any) => {
+          addToast(error?.message || 'Não foi possível processar o arquivo CSV.', 'error');
+      }).finally(() => {
+          setIsLoading(false);
           if (fileInputRef.current) fileInputRef.current.value = '';
-      };
-      // FIX: Force ISO-8859-1 for Excel/Brazil compatibility
-      reader.readAsText(file, 'ISO-8859-1');
+      });
   };
 
   const renderTabButton = (tab: Tab, label: string, icon: React.ReactNode) => (
@@ -280,19 +321,21 @@ export const AdminOrgManagement: React.FC = () => {
         <div className="flex gap-2">
             <button 
               onClick={handleForceRefresh}
-              className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              disabled={isActionBusy}
+              className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <RefreshCw size={16} className={`mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw size={16} className={`mr-2 ${(isLoading || refreshAction.isLoading) ? 'animate-spin' : ''}`} />
               SINCRONIZAR
             </button>
             
             {activeTab === 'local' && (
                 <button 
                     onClick={handleImportClick}
-                    className="flex items-center justify-center px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-emerald-500/20"
+                    disabled={isActionBusy}
+                    className="flex items-center justify-center px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-mono text-xs font-bold uppercase tracking-widest transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
                     title="CSV Format: SEDE_ID, NOME, TIPO"
                 >
-                    <FileUp size={16} className="mr-2" />
+                    {(importAction.isLoading || isLoading) ? <RefreshCw size={16} className="mr-2 animate-spin" /> : <FileUp size={16} className="mr-2" />}
                     IMPORTAR CSV
                 </button>
             )}
@@ -300,7 +343,8 @@ export const AdminOrgManagement: React.FC = () => {
             {!editingId && (
               <button 
                 onClick={handleStartNew}
-                className="flex items-center justify-center px-6 py-3 bg-brand-600 text-white font-mono text-xs font-bold uppercase tracking-widest hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20"
+                disabled={isActionBusy}
+                className="flex items-center justify-center px-6 py-3 bg-brand-600 text-white font-mono text-xs font-bold uppercase tracking-widest hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Plus size={16} className="mr-2" />
                 ADD {activeTab === 'org' ? 'INSTITUIÇÃO' : activeTab === 'region' ? 'REGIÃO' : activeTab === 'sede' ? 'SEDE' : 'LOCAL'}
@@ -344,8 +388,8 @@ export const AdminOrgManagement: React.FC = () => {
                </div>
                {renderEditContent()}
                <div className="col-span-2 flex justify-end gap-2 pr-4">
-                 <button onClick={handleSave} className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-500"><Check size={14}/></button>
-                 <button onClick={() => { setEditingId(null); setIsNew(false); }} className="p-1.5 bg-slate-600 text-white hover:bg-slate-500"><X size={14}/></button>
+                 <button onClick={handleSave} disabled={saveAction.isLoading} className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed">{saveAction.isLoading ? <RefreshCw size={14} className="animate-spin"/> : <Check size={14}/>}</button>
+                 <button onClick={() => { if (saveAction.isLoading) return; setEditingId(null); setIsNew(false); }} disabled={saveAction.isLoading} className="p-1.5 bg-slate-600 text-white hover:bg-slate-500 disabled:opacity-60 disabled:cursor-not-allowed"><X size={14}/></button>
                </div>
             </div>
           )}
@@ -370,8 +414,8 @@ export const AdminOrgManagement: React.FC = () => {
                  </div>
                  {renderEditContent()}
                  <div className="col-span-2 flex justify-end gap-2 pr-4">
-                   <button onClick={handleSave} className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-500"><Check size={14}/></button>
-                   <button onClick={() => setEditingId(null)} className="p-1.5 bg-slate-600 text-white hover:bg-slate-500"><X size={14}/></button>
+                   <button onClick={handleSave} disabled={saveAction.isLoading} className="p-1.5 bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-60 disabled:cursor-not-allowed">{saveAction.isLoading ? <RefreshCw size={14} className="animate-spin"/> : <Check size={14}/>}</button>
+                   <button onClick={() => { if (saveAction.isLoading) return; setEditingId(null); }} disabled={saveAction.isLoading} className="p-1.5 bg-slate-600 text-white hover:bg-slate-500 disabled:opacity-60 disabled:cursor-not-allowed"><X size={14}/></button>
                  </div>
                </div>
              ) : (
@@ -394,8 +438,8 @@ export const AdminOrgManagement: React.FC = () => {
                     )}
                  </div>
                  <div className="col-span-2 flex justify-end gap-2 pr-4 opacity-50 group-hover:opacity-100">
-                   <button onClick={() => handleStartEdit(item)} className="text-slate-400 hover:text-brand-500"><Edit2 size={16}/></button>
-                   <button onClick={() => requestDelete(item.id, item.name)} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>
+                   <button onClick={() => handleStartEdit(item)} disabled={isActionBusy} className="text-slate-400 hover:text-brand-500 disabled:opacity-50 disabled:cursor-not-allowed"><Edit2 size={16}/></button>
+                   <button onClick={() => requestDelete(item.id, item.name)} disabled={isActionBusy} className="text-slate-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"><Trash2 size={16}/></button>
                  </div>
                </div>
              )
@@ -422,13 +466,15 @@ export const AdminOrgManagement: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                     <button 
                       onClick={() => setDeleteModalOpen(false)}
-                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase"
+                      disabled={deleteAction.isLoading}
+                      className="py-3 bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 font-mono text-xs hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors uppercase disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         CANCELAR
                     </button>
                     <button 
                       onClick={confirmDelete}
-                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase"
+                      disabled={deleteAction.isLoading}
+                      className="py-3 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors uppercase disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         CONFIRMAR EXCLUSÃO
                     </button>

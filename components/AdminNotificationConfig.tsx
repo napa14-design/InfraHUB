@@ -5,18 +5,24 @@ import { useNavigate } from 'react-router-dom';
 import { NotificationRule } from '../types';
 import { configService } from '../services/configService';
 import { useToast } from './Shared/ToastContext';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { useConfirmation } from './Shared/ConfirmationContext';
 
 type ModuleTab = 'hydrosys' | 'pestcontrol' | 'system';
 
 export const AdminNotificationConfig: React.FC = () => {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { confirm } = useConfirmation();
+  const saveAction = useAsyncAction();
+  const resetAction = useAsyncAction();
   const [activeTab, setActiveTab] = useState<ModuleTab>('hydrosys');
   const [rules, setRules] = useState<NotificationRule[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'IDLE' | 'SUCCESS' | 'ERROR'>('IDLE');
   const [errorMessage, setErrorMessage] = useState('');
+  const isActionBusy = saveAction.isLoading || resetAction.isLoading;
 
   useEffect(() => {
     const load = async () => {
@@ -33,14 +39,15 @@ export const AdminNotificationConfig: React.FC = () => {
   };
 
   const handleSave = async () => {
-    // Validation Logic
+    if (saveAction.isLoading) return;
+
     for (const r of rules) {
         if (r.enabled && r.warningDays <= r.criticalDays) {
-            addToast(`Regra "${r.name}": Dias de Aviso deve ser MAIOR que Dias Críticos.`, "warning");
+            addToast(`Regra "${r.name}": Dias de aviso deve ser MAIOR que dias críticos.`, "warning");
             return;
         }
         if (r.warningDays < 0 || r.criticalDays < 0) {
-            addToast(`Regra "${r.name}": Os dias não podem ser negativos.`, "warning");
+            addToast(`Regra "${r.name}": os dias não podem ser negativos.`, "warning");
             return;
         }
     }
@@ -48,36 +55,53 @@ export const AdminNotificationConfig: React.FC = () => {
     setIsSaving(true);
     setSaveStatus('IDLE');
     setErrorMessage('');
-    let errorFound = null;
 
-    for (const r of rules) {
-        const { error } = await configService.saveRule(r);
-        if (error) {
-            errorFound = error;
-            break; // Stop on first error
+    await saveAction.run(async () => {
+        let errorFound: any = null;
+
+        for (const r of rules) {
+            const { error } = await configService.saveRule(r);
+            if (error) {
+                errorFound = error;
+                break;
+            }
         }
-    }
 
-    setIsSaving(false);
-    if (errorFound) {
-        setSaveStatus('ERROR');
-        const msg = typeof errorFound === 'string' ? errorFound : JSON.stringify(errorFound);
-        setErrorMessage(msg);
-        addToast("Erro ao salvar regras.", "error");
-    } else {
+        if (errorFound) throw errorFound;
+
         setSaveStatus('SUCCESS');
         setHasChanges(false);
         addToast("Regras atualizadas com sucesso!", "success");
         setTimeout(() => setSaveStatus('IDLE'), 3000);
-    }
+    }).catch((errorFound: any) => {
+        setSaveStatus('ERROR');
+        const msg = typeof errorFound === 'string' ? errorFound : JSON.stringify(errorFound);
+        setErrorMessage(msg);
+        addToast("Erro ao salvar regras.", "error");
+    }).finally(() => {
+        setIsSaving(false);
+    });
   };
 
-  const handleReset = async () => {
-      if(confirm('Isso irá redefinir todas as regras para o Padrão do sistema. Continuar?')) {
-          setRules(await configService.resetDefaults());
-          setHasChanges(false);
-          addToast("Regras redefinidas para o Padrão.", "info");
-      }
+  const handleReset = () => {
+      if (resetAction.isLoading) return;
+
+      confirm({
+          title: 'Restaurar padrões',
+          message: 'Isso redefinirá todas as regras para o padrão do sistema. Deseja continuar?',
+          type: 'warning',
+          confirmLabel: 'Restaurar',
+          onConfirm: async () => {
+              await resetAction.run(async () => {
+                  setRules(await configService.resetDefaults());
+                  setHasChanges(false);
+                  setSaveStatus('IDLE');
+                  addToast('Regras redefinidas para o padrão.', 'info');
+              }).catch(() => {
+                  addToast('Não foi possível restaurar os padrões.', 'error');
+              });
+          },
+      });
   }
 
   // Filter Rules based on Active Tab
@@ -131,14 +155,15 @@ export const AdminNotificationConfig: React.FC = () => {
         <div className="flex gap-2">
             <button 
                 onClick={handleReset}
-                className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+                disabled={isActionBusy}
+                className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-                <RefreshCw size={16} className="mr-2" />
+                <RefreshCw size={16} className={`mr-2 ${resetAction.isLoading ? 'animate-spin' : ''}`} />
                 PADRÕES
             </button>
             <button 
                 onClick={handleSave}
-                disabled={!hasChanges || isSaving}
+                disabled={!hasChanges || isActionBusy}
                 className={`flex items-center justify-center px-6 py-3 text-white font-mono text-xs font-bold uppercase tracking-widest transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed
                     ${saveStatus === 'SUCCESS' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20' : 
                       saveStatus === 'ERROR' ? 'bg-red-600 hover:bg-red-500 shadow-red-500/20' :
@@ -221,6 +246,7 @@ export const AdminNotificationConfig: React.FC = () => {
                                         className="sr-only peer"
                                         checked={rule.enabled}
                                         onChange={e => handleUpdate(rule.id, 'enabled', e.target.checked)}
+                                        disabled={isActionBusy}
                                     />
                                     <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
                                   </label>
@@ -241,6 +267,7 @@ export const AdminNotificationConfig: React.FC = () => {
                                         className="w-12 bg-transparent text-center font-mono font-bold text-slate-900 dark:text-white outline-none"
                                         value={rule.warningDays}
                                         onChange={e => handleUpdate(rule.id, 'warningDays', Number(e.target.value))}
+                                        disabled={isActionBusy}
                                       />
                                       <span className="text-[10px] font-mono text-slate-500 uppercase border-l border-slate-300 dark:border-slate-700 pl-3 pr-2">DIAS</span>
                                   </div>
@@ -260,6 +287,7 @@ export const AdminNotificationConfig: React.FC = () => {
                                         className="w-12 bg-transparent text-center font-mono font-bold text-slate-900 dark:text-white outline-none"
                                         value={rule.criticalDays}
                                         onChange={e => handleUpdate(rule.id, 'criticalDays', Number(e.target.value))}
+                                        disabled={isActionBusy}
                                       />
                                       <span className="text-[10px] font-mono text-slate-500 uppercase border-l border-slate-300 dark:border-slate-700 pl-3 pr-2">DIAS</span>
                                   </div>
