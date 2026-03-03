@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Award, FileText, Calendar, Plus, Edit, X, History, Clock, 
   CheckCircle2, AlertTriangle, Activity, Filter, FlaskConical, 
-  Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw
+  Microscope, Trash2, ArrowLeft, Building2, Save, RotateCw, Loader2
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { User, HydroCertificado, UserRole, Sede, HydroSettings } from '../../types';
@@ -16,6 +16,7 @@ import { CardSkeleton } from '../Shared/Skeleton';
 import { useDocumentPreview } from '../Shared/DocumentPreviewContext';
 import { useConfirmation } from '../Shared/ConfirmationContext';
 import { generateId } from '../../utils/id';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 const getDaysRemaining = (validade: string) => {
   if (!validade) return 0;
@@ -92,7 +93,8 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [historyItems, setHistoryItems] = useState<HydroCertificado[]>([]);
   const [historyTitle, setHistoryTitle] = useState('');
-
+  const saveAction = useAsyncAction();
+  const deleteAction = useAsyncAction();
 
   const canCreate = user.role !== UserRole.OPERATIONAL;
   const isAdmin = user.role === UserRole.ADMIN;
@@ -212,15 +214,19 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
         addToast("Preencha todos os campos obrigatórios.", "warning");
         return;
     }
-    const payload = {
-      ...formData,
-      validadeSemestre: formData.validadeSemestre || formData.validade
-    };
-    await hydroService.saveCertificado(payload);
-    await notificationService.markByLink('/module/hydrosys/certificados');
-    await loadData();
-    setIsSheetOpen(false);
-    addToast(sheetMode === 'RENEW' ? "Certificado renovado com sucesso!" : "Registro salvo com sucesso!", "success");
+    await saveAction.run(async () => {
+      const payload = {
+        ...formData,
+        validadeSemestre: formData.validadeSemestre || formData.validade
+      };
+      await hydroService.saveCertificado(payload);
+      await notificationService.markByLink('/module/hydrosys/certificados');
+      await loadData();
+      setIsSheetOpen(false);
+      addToast(sheetMode === 'RENEW' ? "Certificado renovado com sucesso!" : "Registro salvo com sucesso!", "success");
+    }).catch(() => {
+      addToast("Não foi possível salvar o certificado.", "error");
+    });
   };
 
   const handleDelete = async (id: string) => {
@@ -230,9 +236,13 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
       type: 'danger',
       confirmLabel: 'Excluir',
       onConfirm: async () => {
-        await hydroService.deleteCertificado(id);
-        await loadData();
-        addToast('Certificado removido.', 'info');
+        await deleteAction.run(async () => {
+          await hydroService.deleteCertificado(id);
+          await loadData();
+          addToast('Certificado removido.', 'info');
+        }).catch(() => {
+          addToast('Não foi possível excluir o certificado.', 'error');
+        });
       },
     });
   };
@@ -308,7 +318,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                 )}
 
                 {canCreate && (
-                    <button onClick={handleNew} className="w-full sm:w-auto px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all">
+                    <button onClick={handleNew} disabled={saveAction.isLoading || deleteAction.isLoading} className="w-full sm:w-auto px-6 py-3 bg-cyan-600 hover:bg-cyan-700 text-white rounded-xl font-bold font-mono text-sm shadow-lg flex items-center justify-center gap-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
                         <Plus size={18} /> <span className="hidden sm:inline">NOVO LAUDO</span><span className="sm:hidden">NOVO</span>
                     </button>
                 )}
@@ -393,7 +403,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                         <div className="flex gap-1 opacity-80 hover:opacity-100 transition-opacity">
                                             <button onClick={() => handleOpenHistory(item.parceiro, item.sedeId)} className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg" title="Ver histórico"><History size={16}/></button>
                                             <button onClick={() => handleEdit(item)} className="p-2 text-slate-400 hover:text-brand-500" title="Editar"><Edit size={16} /></button>
-                                            {canCreate && <button onClick={() => handleDelete(item.id)} className="p-2 text-slate-400 hover:text-red-500" title="Excluir"><Trash2 size={16} /></button>}
+                                            {canCreate && <button onClick={() => handleDelete(item.id)} disabled={deleteAction.isLoading} className="p-2 text-slate-400 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Excluir"><Trash2 size={16} /></button>}
                                         </div>
                                     </div>
                                 </div>
@@ -405,7 +415,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
         )}
       </div>
 
-      {/* MODAL HIST?"RICO */}
+      {/* MODAL HIST?RICO */}
       {isHistoryOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
               <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
@@ -482,7 +492,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                     <h2 className="text-xl font-black font-mono uppercase text-slate-900 dark:text-white">
                         {sheetMode === 'RENEW' ? 'RENOVAR LAUDO' : sheetMode === 'EDIT' ? 'EDITAR REGISTRO' : 'REGISTRO DE LAUDO'}
                     </h2>
-                    <button onClick={() => setIsSheetOpen(false)} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full"><X size={20}/></button>
+                    <button onClick={() => setIsSheetOpen(false)} disabled={saveAction.isLoading} className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full disabled:opacity-50 disabled:cursor-not-allowed"><X size={20}/></button>
                 </div>
                 <div className="flex-1 space-y-6 overflow-y-auto">
                     <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase">Unidade</label><select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={formData.sedeId} onChange={e => setFormData({...formData, sedeId: e.target.value})} disabled={sheetMode === 'RENEW' || sheetMode === 'EDIT'}>{orgService.getSedes().map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
@@ -501,7 +511,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                         <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-xs" value={formData.linkFisico} onChange={e => setFormData({...formData, linkFisico: e.target.value})} placeholder="URL Laudo Físico" />
                     </div>
                 </div>
-                <button onClick={handleSave} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-xl shadow-cyan-500/20 uppercase tracking-widest mt-8 flex items-center justify-center gap-2"><Save size={18}/> {sheetMode === 'RENEW' ? 'CONFIRMAR RENOVAÇÃO' : 'SALVAR REGISTRO'}</button>
+                <button onClick={handleSave} disabled={saveAction.isLoading} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white font-black rounded-2xl shadow-xl shadow-cyan-500/20 uppercase tracking-widest mt-8 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">{saveAction.isLoading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18}/>} {saveAction.isLoading ? 'SALVANDO...' : sheetMode === 'RENEW' ? 'CONFIRMAR RENOVAÇÃO' : 'SALVAR REGISTRO'}</button>
             </div>
         </div>
       )}

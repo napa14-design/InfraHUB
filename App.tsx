@@ -44,7 +44,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4 text-center">
           <div className="max-w-md p-6 bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 font-mono uppercase">Erro de Carregamento</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha crÃ­tica na aplicaÃ§Ã£o.</p>
+            <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Houve uma falha crítica na aplicação.</p>
             <div className="text-xs text-red-500 mb-4 font-mono bg-red-50 dark:bg-red-900/10 p-2 rounded break-all text-left overflow-auto max-h-32">
                 {this.state.error?.message || 'Erro desconhecido'}
                 <br/>
@@ -54,7 +54,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
               onClick={() => { this.setState({ hasError: false }); window.location.reload(); }} 
               className="px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold uppercase tracking-widest text-xs transition-colors"
             >
-              Recarregar PÃ¡gina
+              Recarregar Página
             </button>
           </div>
         </div>
@@ -148,14 +148,14 @@ const PWANavigator = ({ user }: { user: User | null }) => {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    // SÃ³ executa se tiver USUÃRIO e ainda nÃ£o tiver verificado nesta sessÃ£o do componente
+    // Só executa se tiver USUÁRIO e ainda não tiver verificado nesta sessão do componente
     if (user && !checked) {
        const params = new URLSearchParams(window.location.search);
        const mode = params.get('mode');
        
        if (mode === 'cloro') {
            logger.log("[PWA] Redirecting to Cloro Module");
-           // Navega para o MÃ³dulo e remove o query param da histÃ³ria para nÃ£o ficar preso
+           // Navega para o Módulo e remove o query param da história para não ficar preso
            navigate('/module/hydrosys/cloro', { replace: true });
        }
        setChecked(true);
@@ -186,7 +186,7 @@ const App: React.FC = () => {
         setRedirectPath('/module/hydrosys/cloro');
     }
 
-    // Render rÃ¡pido com cache (evita espera longa em refresh)
+    // Render rápido com cache (evita espera longa em refresh)
     setLoading(false);
 
     const refresh = async () => {
@@ -264,7 +264,7 @@ const App: React.FC = () => {
                   <Route 
                     path="/login" 
                     element={
-                      // Se o USUÃRIO logar, usa o redirectPath definido no useEffect inicial
+                      // Se o USUÁRIO logar, usa o redirectPath definido no useEffect inicial
                       user ? <Navigate to={redirectPath} replace /> : <Login onLogin={handleLogin} />
                     } 
                   />

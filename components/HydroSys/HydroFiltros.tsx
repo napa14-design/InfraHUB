@@ -7,6 +7,8 @@ import { hydroService } from '../../services/hydroService';
 import { orgService } from '../../services/orgService';
 import { logService } from '../../services/logService';
 import { EmptyState } from '../Shared/EmptyState';
+import { useToast } from '../Shared/ToastContext';
+import { useAsyncAction } from '../../hooks/useAsyncAction';
 
 type FiltroStatusFilter = 'VENCIDO' | 'PROXIMO' | 'REGULAR';
 
@@ -26,6 +28,9 @@ const getFiltroStatusKey = (days: number): FiltroStatusFilter => {
 export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { addToast } = useToast();
+  const exchangeAction = useAsyncAction();
+  const addAction = useAsyncAction();
   const [data, setData] = useState<HydroFiltro[]>([]);
   const [availableSedes, setAvailableSedes] = useState<Sede[]>([]);
   const [settings, setSettings] = useState<HydroSettings | null>(null);
@@ -70,7 +75,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   const canManage = user.role === UserRole.ADMIN || user.role === UserRole.GESTOR;
   const isAdmin = user.role === UserRole.ADMIN;
   const filtroMonths = settings?.validadeFiltroMeses || 6;
-  const isActionBusy = isSavingEdit || isDeleting;
+  const isActionBusy = isSavingEdit || isDeleting || exchangeAction.isLoading || addAction.isLoading;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -116,11 +121,16 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const confirmExchange = async () => {
-    if (selectedItem && todayDate) {
+    if (!selectedItem || !todayDate || exchangeAction.isLoading) return;
+
+    await exchangeAction.run(async () => {
         await hydroService.saveFiltro({ ...selectedItem, dataTroca: todayDate, proximaTroca: nextDate });
         await loadData();
         setIsExchangeModalOpen(false);
-    }
+        addToast('Troca de filtro registrada com sucesso.', 'success');
+    }).catch(() => {
+        addToast('Não foi possível registrar a troca.', 'error');
+    });
   };
 
   const handleAddNew = () => {
@@ -130,8 +140,14 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
   };
 
   const confirmAdd = async () => {
-      if (newFilter.sedeId && newFilter.patrimonio && newFilter.local && newFilter.dataTroca) {
-          const next = new Date(newFilter.dataTroca); next.setMonth(next.getMonth() + filtroMonths);
+      if (!newFilter.sedeId || !newFilter.patrimonio || !newFilter.local || !newFilter.dataTroca || addAction.isLoading) {
+          addToast('Preencha os campos obrigatórios.', 'warning');
+          return;
+      }
+
+      await addAction.run(async () => {
+          const next = new Date(newFilter.dataTroca);
+          next.setMonth(next.getMonth() + filtroMonths);
           await hydroService.saveFiltro({
               id: Date.now().toString(),
               sedeId: newFilter.sedeId,
@@ -144,7 +160,10 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
           await loadData();
           setIsAddModalOpen(false);
           setNewFilter(initialNewFilter);
-      } else { alert('Preencha os campos obrigatórios.'); }
+          addToast('Filtro cadastrado com sucesso.', 'success');
+      }).catch(() => {
+          addToast('Não foi possível cadastrar o filtro.', 'error');
+      });
   };
 
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
@@ -156,6 +175,9 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
           await loadData();
           setIsDeleteModalOpen(false);
           setItemToDelete(null);
+          addToast('Filtro excluído com sucesso.', 'success');
+      } catch {
+          addToast('Não foi possível excluir o filtro.', 'error');
       } finally {
           setIsDeleting(false);
       }
@@ -190,6 +212,9 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
           await loadData();
           setIsEditModalOpen(false);
           setEditFilter(null);
+          addToast('Filtro atualizado com sucesso.', 'success');
+      } catch {
+          addToast('Não foi possível atualizar o filtro.', 'error');
       } finally {
           setIsSavingEdit(false);
       }
@@ -368,7 +393,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                             <p className="text-[10px] font-bold text-emerald-600 uppercase mb-1 tracking-widest">Nova Validade (+{filtroMonths} meses)</p>
                             <p className="text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">{new Date(nextDate).toLocaleDateString()}</p>
                         </div>
-                        <button onClick={confirmExchange} className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20">CONFIRMAR TROCA</button>
+                        <button onClick={confirmExchange} disabled={exchangeAction.isLoading} className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-emerald-500/20 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">{exchangeAction.isLoading ? <><Loader2 size={14} className="animate-spin" /> Processando...</> : 'CONFIRMAR TROCA'}</button>
                     </div>
                 </div>
             </div>
@@ -450,13 +475,13 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
         {isAddModalOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
                 <div className="bg-white dark:bg-[#111114] rounded-3xl w-full max-w-sm p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
-                    <div className="flex justify-between mb-6"><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Novo Ativo</h3><button onClick={() => setIsAddModalOpen(false)}><X size={20} className="text-slate-500"/></button></div>
+                    <div className="flex justify-between mb-6"><h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Novo Ativo</h3><button onClick={() => setIsAddModalOpen(false)} disabled={addAction.isLoading}><X size={20} className="text-slate-500"/></button></div>
                     <div className="space-y-4">
                         <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Unidade</label><select className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm uppercase" value={newFilter.sedeId} onChange={e => setNewFilter({...newFilter, sedeId: e.target.value})}><option value="">Selecione...</option>{availableSedes.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
                         <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Patrimônio" value={newFilter.patrimonio} onChange={e => setNewFilter({...newFilter, patrimonio: e.target.value.toUpperCase()})} />
                         <input className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" placeholder="Local Instalação" value={newFilter.local} onChange={e => setNewFilter({...newFilter, local: e.target.value.toUpperCase()})} />
                         <div className="space-y-1"><label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Última Troca</label><input type="date" className="w-full p-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-sm" value={newFilter.dataTroca} onChange={e => setNewFilter({...newFilter, dataTroca: e.target.value})} /></div>
-                        <button onClick={confirmAdd} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl">Cadastrar Novo</button>
+                        <button onClick={confirmAdd} disabled={addAction.isLoading} className="w-full py-4 bg-cyan-600 hover:bg-cyan-700 text-white rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">{addAction.isLoading ? <><Loader2 size={14} className="animate-spin" /> Cadastrando...</> : 'Cadastrar Novo'}</button>
                     </div>
                 </div>
             </div>
