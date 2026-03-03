@@ -48,7 +48,7 @@ export const PestControlHelp: React.FC<{ user: User }> = () => {
                        <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
                            <li className="flex gap-3">
                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0"></span>
-                               <span><strong>Ventilação:</strong> Manter ambientes ventilados por no mínimo 2 horas aPós aplicação de fumaça.</span>
+                               <span><strong>Ventilação:</strong> Manter ambientes ventilados por no mínimo 2 horas após aplicação de fumaça.</span>
                            </li>
                            <li className="flex gap-3">
                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mt-2 flex-shrink-0"></span>

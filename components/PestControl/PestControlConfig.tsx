@@ -323,7 +323,7 @@ export const PestControlConfig: React.FC<{ user: User }> = () => {
            <div className="p-6 bg-slate-900 dark:bg-slate-800 rounded-3xl border border-slate-800 flex items-start gap-4">
                 <Info size={24} className="text-amber-500 flex-shrink-0" />
                 <p className="text-xs text-slate-300 leading-relaxed font-mono">
-                    <strong>NOTA DE SEGURAN??A:</strong> Alterar as frequências por sede afetará apenas os **novos** agendamentos gerados automaticamente aPós a conclusão da tarefa atual. Registros já agendados permanecem com suas datas originais.
+                    <strong>NOTA DE SEGURANÇA:</strong> Alterar as frequências por sede afetará apenas os **novos** agendamentos gerados automaticamente após a conclusão da tarefa atual. Registros já agendados permanecem com suas datas originais.
                 </p>
            </div>
        </div>

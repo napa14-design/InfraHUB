@@ -15,6 +15,19 @@ const generateId = () => {
     return Date.now().toString(36) + Math.random().toString(36).substr(2);
 };
 
+const generateSecureTempPassword = (length = 12) => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*';
+    const randomBytes = new Uint32Array(length);
+    crypto.getRandomValues(randomBytes);
+    let password = '';
+
+    for (let i = 0; i < randomBytes.length; i++) {
+        password += alphabet[randomBytes[i] % alphabet.length];
+    }
+
+    return password;
+};
+
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 const normalizeName = (name?: string) =>
@@ -178,7 +191,7 @@ export const authService = {
     } catch (err: any) {
       if (err?.message === 'timeout') {
         logger.warn("[Auth] Login timeout");
-        return { user: null, error: "Tempo de conexÃ£o esgotado. Verifique sua internet." };
+        return { user: null, error: "Tempo de conexão esgotado. Verifique sua internet." };
       }
       logger.error("[Auth] Unexpected Exception:", err);
       return { user: null, error: `Erro inesperado: ${err.message || err}` };
@@ -300,11 +313,7 @@ export const authService = {
   createUser: async (userData: Partial<User>, customPassword?: string): Promise<any> => {
      let tempId: string = generateId(); 
      
-     // Generate robust password
-     const generatedPassword = Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
-     const finalGeneratedPassword = generatedPassword.slice(0, 10).toUpperCase(); 
-     
-     const tempPassword = customPassword || finalGeneratedPassword;
+     const tempPassword = customPassword || generateSecureTempPassword(10);
 
      if (tempPassword.length < 6) {
          return { error: "A senha deve ter no mínimo 6 caracteres." };

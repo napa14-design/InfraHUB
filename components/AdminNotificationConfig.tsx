@@ -134,7 +134,7 @@ export const AdminNotificationConfig: React.FC = () => {
                 className="flex items-center justify-center px-4 py-3 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-mono text-xs font-bold uppercase hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
                 <RefreshCw size={16} className="mr-2" />
-                PADR?.ES
+                PADRÕES
             </button>
             <button 
                 onClick={handleSave}

@@ -20,12 +20,12 @@ const DocumentPreviewContext = createContext<DocumentPreviewContextValue | undef
 export const DocumentPreviewProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<PreviewState>({
     isOpen: false,
-    title: 'Visualiza??o de documento',
+    title: 'Visualização de documento',
     originalUrl: '',
     embedUrl: ''
   });
 
-  const openDocument = useCallback((url: string, title = 'Visualiza??o de documento') => {
+  const openDocument = useCallback((url: string, title = 'Visualização de documento') => {
     const originalUrl = (url || '').trim();
     if (!originalUrl) return;
 
@@ -73,7 +73,7 @@ export const DocumentPreviewProvider: React.FC<{ children: React.ReactNode }> = 
                   type="button"
                   onClick={closeDocument}
                   className="p-1.5 bg-white/10 hover:bg-red-500/80 rounded-lg transition-colors text-white"
-                  aria-label="Fechar visualiza??o"
+                  aria-label="Fechar visualização"
                 >
                   <X size={18} />
                 </button>

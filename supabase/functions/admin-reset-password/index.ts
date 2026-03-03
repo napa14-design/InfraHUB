@@ -13,8 +13,8 @@ const allowedOrigins = (Deno.env.get("CORS_ORIGINS") || "")
 
 const resolveCorsOrigin = (req: Request) => {
   const origin = req.headers.get("Origin") || "";
-  if (!allowedOrigins.length) return "*";
-  if (!origin) return allowedOrigins[0];
+  if (!origin) return "";
+  if (!allowedOrigins.length) return origin;
   return allowedOrigins.includes(origin) ? origin : "";
 };
 
@@ -28,10 +28,10 @@ const buildCorsHeaders = (origin: string) => ({
 
 serve(async (req) => {
   const corsOrigin = resolveCorsOrigin(req);
-  if (allowedOrigins.length && req.headers.get("Origin") && !corsOrigin) {
+  if (req.headers.get("Origin") && !corsOrigin) {
     return new Response("Origin not allowed", { status: 403 });
   }
-  const corsHeaders = buildCorsHeaders(corsOrigin || "*");
+  const corsHeaders = buildCorsHeaders(corsOrigin || "null");
 
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
