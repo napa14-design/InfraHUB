@@ -2,15 +2,16 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Droplets, Award, TestTube, Filter, Droplet, Settings, PieChart, ChevronRight, FileDown, Calendar, Download, X, Waves, Activity, AlertTriangle, CheckCircle2, CalendarClock } from 'lucide-react';
-import { User, UserRole, HydroCertificado, Sede } from '../types';
+import { User, UserRole, Sede } from '../types';
 import { HYDROSYS_SUBMODULES } from '../constants';
 import { orgService } from '../services/orgService';
 import { hydroService } from '../services/hydroService';
+import { hydroKpiService } from '../services/hydroKpiService';
 import { notificationService } from '../services/notificationService';
 import { exportToCSV } from '../utils/csvExport';
 import { Breadcrumbs } from './Shared/Breadcrumbs';
 import { DashboardGridSkeleton } from './Shared/Skeleton';
-import { diffDaysFromToday, firstDayOfMonthISO, isBeforeToday, lastDayOfMonthISO, parseISODate } from '../utils/dateUtils';
+import { firstDayOfMonthISO, lastDayOfMonthISO } from '../utils/dateUtils';
 
 interface Props {
   user: User;
@@ -169,83 +170,25 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
           hydroService.getPocos(user),
           hydroService.getCisternas(user),
           hydroService.getCaixas(user)
-        ]);
-
-        const certificadosFiltrados = selectedSedeFilter
-          ? certificados.filter(item => item.sedeId === selectedSedeFilter)
-          : certificados;
-        const filtrosFiltrados = selectedSedeFilter
-          ? filtros.filter(item => item.sedeId === selectedSedeFilter)
-          : filtros;
-        const cloroFiltrado = selectedSedeFilter
-          ? cloro.filter(item => item.sedeId === selectedSedeFilter)
-          : cloro;
-        const pocosFiltrados = selectedSedeFilter
-          ? pocos.filter(item => item.sedeId === selectedSedeFilter)
-          : pocos;
-        const cisternasFiltradas = selectedSedeFilter
-          ? cisternas.filter(item => item.sedeId === selectedSedeFilter)
-          : cisternas;
-        const caixasFiltradas = selectedSedeFilter
-          ? caixas.filter(item => item.sedeId === selectedSedeFilter)
-          : caixas;
-
-        const dateValue = (value?: string) => parseISODate(value)?.getTime() ?? 0;
-        const latestCertificados = Array.from(
-          certificadosFiltrados.reduce((map: Map<string, HydroCertificado>, item: HydroCertificado) => {
-            const key = `${item.sedeId}-${item.parceiro}`;
-            const current = map.get(key);
-            if (!current || dateValue(item.validade) > dateValue(current.validade)) {
-              map.set(key, item);
-            }
-            return map;
-          }, new Map<string, HydroCertificado>()).values()
-        );
-
-        const certificadosVencidos = latestCertificados.filter(item => {
-          const diff = diffDaysFromToday(item.validade);
-          return Number.isFinite(diff) && diff < 0;
-        }).length;
-
-        const latestFiltros = Array.from(
-          filtrosFiltrados.reduce((map, item) => {
-            const key = `${item.sedeId}-${item.patrimonio}`;
-            const current = map.get(key);
-            if (!current || dateValue(item.dataTroca) > dateValue(current.dataTroca)) {
-              map.set(key, item);
-            }
-            return map;
-          }, new Map<string, typeof filtros[number]>()).values()
-        );
-
-        const filtrosVencidos = latestFiltros.filter(item => item.proximaTroca && isBeforeToday(item.proximaTroca)).length;
-
-        const reservatorios = [...pocosFiltrados, ...cisternasFiltradas, ...caixasFiltradas];
-        const reservatoriosAtivos = reservatorios.filter(item => item.situacaoLimpeza !== 'DESATIVADO');
-        const reservatoriosAtrasados = reservatoriosAtivos.filter(item => item.proximaLimpeza && isBeforeToday(item.proximaLimpeza)).length;
-        const limpezasProximas = reservatoriosAtivos.filter(item => {
-          const diff = diffDaysFromToday(item.proximaLimpeza);
-          return diff >= 0 && diff <= 30;
-        }).length;
-
-        const cloroPeriodo = cloroFiltrado.filter(item => item.date >= firstDay && item.date <= lastDay);
-        const cloroValidos = cloroPeriodo.filter(item => Number.isFinite(Number(item.cl)) && Number.isFinite(Number(item.ph)));
-        const cloroConforme = cloroValidos.filter(item => {
-          const cl = Number(item.cl);
-          const ph = Number(item.ph);
-          return cl >= settings.cloroMin && cl <= settings.cloroMax && ph >= settings.phMin && ph <= settings.phMax;
-        }).length;
-
-        const conformidade = cloroValidos.length > 0 ? Math.round((cloroConforme / cloroValidos.length) * 100) : 0;
+        ]);        const snapshot = hydroKpiService.buildSnapshot({
+          certificados,
+          filtros,
+          cloro,
+          reservatorios: [...pocos, ...cisternas, ...caixas],
+          settings,
+          sedeId: selectedSedeFilter || undefined,
+          periodStartISO: firstDay,
+          periodEndISO: lastDay,
+        });
 
         if (isActive) {
           setKpis({
-            certificadosVencidos,
-            filtrosVencidos,
-            reservatoriosAtrasados,
-            conformidade,
-            cloroTotal: cloroValidos.length,
-            limpezasProximas
+            certificadosVencidos: snapshot.certificadosVencidos,
+            filtrosVencidos: snapshot.filtrosVencidos,
+            reservatoriosAtrasados: snapshot.reservatoriosAtrasados,
+            conformidade: snapshot.conformidade,
+            cloroTotal: snapshot.cloroTotal,
+            limpezasProximas: snapshot.limpezasProximas,
           });
         }
       } finally {
@@ -605,3 +548,4 @@ export const HydroSysDashboard: React.FC<Props> = ({ user }) => {
     </div>
   );
 };
+
