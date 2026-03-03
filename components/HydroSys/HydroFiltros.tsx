@@ -144,7 +144,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
           await loadData();
           setIsAddModalOpen(false);
           setNewFilter(initialNewFilter);
-      } else { alert('Preencha os campos obrigatérios.'); }
+      } else { alert('Preencha os campos obrigatórios.'); }
   };
 
   const requestDelete = (item: HydroFiltro) => { setItemToDelete(item); setIsDeleteModalOpen(true); };
@@ -170,7 +170,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
       if (!editFilter || isSavingEdit) return;
 
       if (!editFilter.sedeId || !editFilter.patrimonio || !editFilter.local || !editFilter.dataTroca) {
-          alert('Preencha os campos obrigat?rios.');
+          alert('Preencha os campos obrigatórios.');
           return;
       }
 
@@ -437,7 +437,7 @@ export const HydroFiltros: React.FC<{ user: User }> = ({ user }) => {
                         <h3 className="font-bold text-slate-900 dark:text-white font-mono uppercase tracking-widest">Excluir Filtro</h3>
                         <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting}><X size={20} className="text-slate-500"/></button>
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">Confirma a exclus?o do filtro <strong>{itemToDelete.patrimonio}</strong> em <strong>{itemToDelete.local}</strong>?</p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">Confirma a exclusão do filtro <strong>{itemToDelete.patrimonio}</strong> em <strong>{itemToDelete.local}</strong>?</p>
                     <div className="grid grid-cols-2 gap-3">
                         <button onClick={() => setIsDeleteModalOpen(false)} disabled={isDeleting} className="py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed">Cancelar</button>
                         <button onClick={confirmDelete} disabled={isDeleting} className="py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2">{isDeleting ? <><Loader2 size={14} className="animate-spin" /> Excluindo...</> : 'Excluir'}</button>

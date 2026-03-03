@@ -206,7 +206,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
 
   const handleSave = async () => {
     if (!formData.parceiro || !formData.dataAnalise || !formData.validade) {
-        addToast("Preencha todos os campos obrigatérios.", "warning");
+        addToast("Preencha todos os campos obrigatórios.", "warning");
         return;
     }
     const payload = {
@@ -371,12 +371,12 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                     <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800/50">
                                         <div className="flex gap-2">
                                             {item.linkMicro && (
-                                                <button onClick={() => openDocument(item.linkMicro, 'Laudo Microbiol?gico')} className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro">
+                                                <button onClick={() => openDocument(item.linkMicro, 'Laudo Microbiológico')} className="p-2 text-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100" title="Ver Micro">
                                                     <Microscope size={16}/>
                                                 </button>
                                             )}
                                             {item.linkFisico && (
-                                                <button onClick={() => openDocument(item.linkFisico, 'Laudo F?sico')} className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico">
+                                                <button onClick={() => openDocument(item.linkFisico, 'Laudo Físico')} className="p-2 text-cyan-600 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg hover:bg-cyan-100" title="Ver Físico">
                                                     <FlaskConical size={16}/>
                                                 </button>
                                             )}
@@ -435,7 +435,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                             {/* VISIBLE LINKS AS PREVIEW BUTTONS */}
                                             <div className="flex gap-2 mt-2">
                                                 {h.linkMicro ? (
-                                                    <button onClick={() => openDocument(h.linkMicro, 'Laudo Microbiol?gico (Hist?rico)')} className="flex-1 py-1.5 px-3 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
+                                                    <button onClick={() => openDocument(h.linkMicro, 'Laudo Microbiológico (Histórico)')} className="flex-1 py-1.5 px-3 rounded bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-purple-100 transition-colors">
                                                         <Microscope size={12}/> Ver Micro
                                                     </button>
                                                 ) : (
@@ -445,7 +445,7 @@ export const HydroCertificados: React.FC<{ user: User }> = ({ user }) => {
                                                 )}
                                                 
                                                 {h.linkFisico ? (
-                                                    <button onClick={() => openDocument(h.linkFisico, 'Laudo F?sico (Hist?rico)')} className="flex-1 py-1.5 px-3 rounded bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-cyan-100 transition-colors">
+                                                    <button onClick={() => openDocument(h.linkFisico, 'Laudo Físico (Histórico)')} className="flex-1 py-1.5 px-3 rounded bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-800 text-cyan-600 dark:text-cyan-400 text-[10px] font-bold uppercase flex items-center justify-center gap-2 hover:bg-cyan-100 transition-colors">
                                                         <FlaskConical size={12}/> Ver Físico
                                                     </button>
                                                 ) : (
